@@ -1,17 +1,24 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../../Services/auth.service';
+import { DemoService } from '../../Services/demo.service';
+import { NotificationService } from '../../Services/notification.service';
+import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/interfaces';
+import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
+
+type ProfileTab = 'stats' | 'demos' | 'settings';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, DemoUploadModalComponent],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
   profileForm: FormGroup;
   userName = '';
   email = '';
@@ -19,10 +26,22 @@ export class ProfileComponent implements OnInit {
   role = '';
   successMsg = '';
   errorMsg = '';
+  activeTab: ProfileTab = 'stats';
+  statsOverview: PersonalStatsOverview | null = null;
+  statsLoading = true;
+  personalDemos: Demo[] = [];
+  demosLoading = true;
+  showUploadModal = false;
+  reprocessingId: string | null = null;
+  deletingId: string | null = null;
+  private listPollSub?: Subscription;
 
   constructor(
     private fb: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private demoService: DemoService,
+    private notify: NotificationService,
+    private router: Router
   ) {
     this.profileForm = this.fb.group({
       displayName: ['', Validators.required],
@@ -46,6 +65,127 @@ export class ProfileComponent implements OnInit {
         this.errorMsg = 'Erro ao carregar perfil.';
       }
     });
+
+    this.loadStatsOverview();
+    this.loadPersonalDemos();
+  }
+
+  ngOnDestroy(): void {
+    this.listPollSub?.unsubscribe();
+  }
+
+  loadStatsOverview(): void {
+    this.statsLoading = true;
+    this.demoService.getPersonalStatsOverview().subscribe({
+      next: (overview) => {
+        this.statsOverview = overview;
+        this.statsLoading = false;
+      },
+      error: () => {
+        this.statsLoading = false;
+      }
+    });
+  }
+
+  loadPersonalDemos(): void {
+    this.demosLoading = true;
+    this.demoService.listPersonalDemos().subscribe({
+      next: (demos) => {
+        this.personalDemos = demos;
+        this.demosLoading = false;
+        this.setupListPolling();
+      },
+      error: () => {
+        this.demosLoading = false;
+      }
+    });
+  }
+
+  get summary() {
+    return this.statsOverview?.summary;
+  }
+
+  get demoStats(): PersonalDemoStat[] {
+    return this.statsOverview?.demos || [];
+  }
+
+  get recentDemos(): PersonalDemoStat[] {
+    return this.demoStats.slice(0, 20);
+  }
+
+  get hasStats(): boolean {
+    return (this.summary?.demosCompleted || 0) > 0;
+  }
+
+  get hasPendingDemos(): boolean {
+    return this.personalDemos.some((d) => d.status === 'pending' || d.status === 'processing');
+  }
+
+  setupListPolling(): void {
+    this.listPollSub?.unsubscribe();
+    if (!this.hasPendingDemos) return;
+
+    const previouslyPending = this.personalDemos.filter(
+      (d) => d.status === 'pending' || d.status === 'processing'
+    );
+
+    this.listPollSub = this.demoService.pollPendingPersonalDemos().subscribe({
+      next: (demos) => {
+        for (const prev of previouslyPending) {
+          const now = demos.find((d) => d.id === prev.id);
+          if (now?.status === 'completed' && prev.status !== 'completed') {
+            this.notify.success(`Demo pessoal processada: ${now.fileName}`);
+            this.loadStatsOverview();
+          }
+        }
+        this.personalDemos = demos;
+      }
+    });
+  }
+
+  setTab(tab: ProfileTab): void {
+    this.activeTab = tab;
+  }
+
+  gaugePercent(value: number, max: number): number {
+    return Math.min(Math.max((value / max) * 100, 0), 100);
+  }
+
+  kdGaugePercent(): number {
+    return this.gaugePercent(this.summary?.kd || 0, 2);
+  }
+
+  ratingGaugePercent(): number {
+    return this.gaugePercent(this.summary?.rating || 0, 2);
+  }
+
+  kastGaugePercent(): number {
+    return this.gaugePercent(this.summary?.kast || 0, 100);
+  }
+
+  hsGaugePercent(): number {
+    return this.gaugePercent(this.summary?.hsPercent || 0, 100);
+  }
+
+  adrGaugePercent(): number {
+    return this.gaugePercent(this.summary?.adr || 0, 120);
+  }
+
+  demoGridClass(status: string): string {
+    if (status === 'completed') return 'dot-completed';
+    if (status === 'failed') return 'dot-failed';
+    if (status === 'processing') return 'dot-processing';
+    return 'dot-pending';
+  }
+
+  shortFileName(name: string): string {
+    if (name.length <= 28) return name;
+    return name.slice(0, 12) + '…' + name.slice(-12);
+  }
+
+  formatDate(date?: string): string {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   }
 
   onUpdateProfile(): void {
@@ -65,6 +205,83 @@ export class ProfileComponent implements OnInit {
   }
 
   connectSteam(): void {
-    alert('Login via Steam será implementado em fase futura. Edite o Steam ID manualmente abaixo.');
+    this.notify.info(
+      'Edite o Steam ID manualmente no formulário abaixo.',
+      'Steam em breve',
+      { hint: 'A conexão automática com Steam será implementada em uma fase futura.' }
+    );
+  }
+
+  openUploadModal(): void {
+    if (!this.steamId?.trim()) {
+      this.notify.warning('Configure seu Steam ID antes de enviar uma demo pessoal.');
+      this.setTab('settings');
+      return;
+    }
+    this.showUploadModal = true;
+  }
+
+  closeUploadModal(): void {
+    this.showUploadModal = false;
+  }
+
+  onDemoUploaded(_demo: Demo): void {
+    this.showUploadModal = false;
+    this.loadPersonalDemos();
+    this.loadStatsOverview();
+    this.setTab('stats');
+  }
+
+  viewDemo(demoId: string): void {
+    this.router.navigate(['/demo', demoId]);
+  }
+
+  reprocessDemo(demo: Demo): void {
+    this.reprocessingId = demo.id;
+    this.demoService.reprocessDemo(demo.id).subscribe({
+      next: () => {
+        this.reprocessingId = null;
+        this.notify.info('Demo reenfileirada para processamento.');
+        this.loadPersonalDemos();
+      },
+      error: (err) => {
+        this.reprocessingId = null;
+        this.notify.error(err.error?.error || 'Erro ao reprocessar demo');
+      }
+    });
+  }
+
+  deleteDemo(demo: Demo): void {
+    this.deletingId = demo.id;
+    this.demoService.deleteDemo(demo.id).subscribe({
+      next: () => {
+        this.deletingId = null;
+        this.notify.success('Demo excluída.');
+        this.loadPersonalDemos();
+        this.loadStatsOverview();
+      },
+      error: (err) => {
+        this.deletingId = null;
+        this.notify.error(err.error?.error || 'Erro ao excluir demo');
+      }
+    });
+  }
+
+  canReprocess(demo: Demo): boolean {
+    return demo.status === 'pending' || demo.status === 'failed';
+  }
+
+  canDelete(demo: Demo): boolean {
+    return demo.status !== 'processing';
+  }
+
+  getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      pending: 'Aguardando',
+      processing: 'Processando',
+      completed: 'Concluído',
+      failed: 'Falhou',
+    };
+    return labels[status] || status;
   }
 }

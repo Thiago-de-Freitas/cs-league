@@ -81,6 +81,37 @@ export interface Demo {
   stats?: MatchPlayerStat[];
   createdAt?: string;
   updatedAt?: string;
+  playerCount?: number;
+}
+
+export interface PersonalStatsSummary {
+  demosTotal: number;
+  demosCompleted: number;
+  kills: number;
+  deaths: number;
+  kd: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+  rating: number;
+}
+
+export interface PersonalDemoStat {
+  demoId: string;
+  fileName: string;
+  status: string;
+  createdAt: string;
+  kills: number;
+  deaths: number;
+  kd: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+}
+
+export interface PersonalStatsOverview {
+  summary: PersonalStatsSummary;
+  demos: PersonalDemoStat[];
 }
 
 export interface PersonalDemoValidation {
@@ -104,4 +135,30 @@ export interface MatchPlayerStat {
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+export interface PlayerRankingEntry {
+  rank: number;
+  playerName: string;
+  displayName?: string | null;
+  steamId?: string | null;
+  demos: number;
+  kills: number;
+  deaths: number;
+  kd: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+  rating: number;
+}
+
+export interface TeamRankingEntry {
+  rank: number;
+  teamId: string;
+  name: string;
+  tag: string;
+  logoUrl?: string | null;
+  wins: number;
+  losses: number;
+  leagues: number;
 }

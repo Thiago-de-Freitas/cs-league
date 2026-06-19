@@ -2,6 +2,8 @@
   <div class="bracket-toolbar">
     <span class="teams-count">{{ teams.length }} / {{ bracketSize }} times</span>
     <span class="bracket-format">Eliminatória simples</span>
+    <span *ngIf="canEditSeeds" class="bracket-hint">Selecione os times na 1ª rodada</span>
+    <span *ngIf="bracketLocked" class="bracket-hint bracket-hint-locked">Chaveamento gerado</span>
   </div>
 
   <div class="bracket-scroll">
@@ -25,7 +27,17 @@
               [class.winner]="match.teamA.isWinner"
               [class.loser]="match.status === 'completed' && !match.teamA.isWinner && !match.teamA.isBye">
               <span class="team-seed" *ngIf="match.teamA.seed">{{ match.teamA.seed }}</span>
-              <span class="team-name">{{ match.teamA.tag ? match.teamA.name + ' [' + match.teamA.tag + ']' : match.teamA.name }}</span>
+              <select
+                *ngIf="canEditSeeds && col.round === 1 && match.teamA.seed"
+                class="bracket-team-select input-field"
+                [ngModel]="teamIdForSeed(match.teamA.seed)"
+                (ngModelChange)="onSeedChange(match.teamA.seed!, $event)">
+                <option value="">BYE / vazio</option>
+                <option *ngFor="let t of teams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
+              </select>
+              <span *ngIf="!canEditSeeds || col.round !== 1 || !match.teamA.seed" class="team-name">
+                {{ match.teamA.tag ? match.teamA.name + ' [' + match.teamA.tag + ']' : match.teamA.name }}
+              </span>
               <span class="team-badge" *ngIf="match.teamA.isWinner">W</span>
             </div>
             <div
@@ -34,7 +46,17 @@
               [class.winner]="match.teamB.isWinner"
               [class.loser]="match.status === 'completed' && !match.teamB.isWinner && !match.teamB.isBye">
               <span class="team-seed" *ngIf="match.teamB.seed">{{ match.teamB.seed }}</span>
-              <span class="team-name">{{ match.teamB.tag ? match.teamB.name + ' [' + match.teamB.tag + ']' : match.teamB.name }}</span>
+              <select
+                *ngIf="canEditSeeds && col.round === 1 && match.teamB.seed"
+                class="bracket-team-select input-field"
+                [ngModel]="teamIdForSeed(match.teamB.seed)"
+                (ngModelChange)="onSeedChange(match.teamB.seed!, $event)">
+                <option value="">BYE / vazio</option>
+                <option *ngFor="let t of teams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
+              </select>
+              <span *ngIf="!canEditSeeds || col.round !== 1 || !match.teamB.seed" class="team-name">
+                {{ match.teamB.tag ? match.teamB.name + ' [' + match.teamB.tag + ']' : match.teamB.name }}
+              </span>
               <span class="team-badge" *ngIf="match.teamB.isWinner">W</span>
             </div>
           </div>

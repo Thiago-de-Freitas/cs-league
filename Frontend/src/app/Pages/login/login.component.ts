@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
+import { NotificationService } from '../../Services/notification.service';
 
 @Component({
   selector: 'app-login',
@@ -20,7 +21,8 @@ export class LoginComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private notify: NotificationService
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
@@ -57,6 +59,10 @@ export class LoginComponent implements OnInit {
   }
 
   loginWithSteam(): void {
-    alert('Login via Steam será implementado em uma fase futura. Por enquanto, edite o Steam ID no perfil.');
+    this.notify.info(
+      'Por enquanto, edite o Steam ID no seu perfil após o login.',
+      'Steam em breve',
+      { hint: 'O login via Steam será implementado em uma fase futura.' }
+    );
   }
 }

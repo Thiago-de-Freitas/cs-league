@@ -67,6 +67,83 @@
       <p class="meta mb-4">Envie arquivos .dem e obtenha estatísticas detalhadas: K/D, ADR, HS% e KAST.</p>
       <button type="button" class="btn btn-success w-full" (click)="openUploadModal()">Enviar Demo</button>
     </section>
+
+    <div class="dashboard-rankings">
+      <section class="dashboard-card gc-card ranking-card">
+        <div class="ranking-card-header">
+          <h2 class="gc-card-title">Top Jogadores</h2>
+          <p class="meta ranking-subtitle">Melhores estatísticas nas demos analisadas</p>
+        </div>
+
+        <div *ngIf="rankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+
+        <div *ngIf="!rankingsLoading && playerRankings.length > 0" class="table-container">
+          <table class="stats-table ranking-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Jogador</th>
+                <th>Rating</th>
+                <th>K/D</th>
+                <th>ADR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let player of playerRankings">
+                <td class="rank-cell" [class.rank-top]="player.rank <= 3">{{ player.rank }}</td>
+                <td>
+                  <strong>{{ getPlayerLabel(player) }}</strong>
+                  <span class="meta ranking-demos">{{ player.demos }} demo(s)</span>
+                </td>
+                <td class="stat-highlight">{{ player.rating }}</td>
+                <td>{{ getKd(player) }}</td>
+                <td>{{ player.adr }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p *ngIf="!rankingsLoading && playerRankings.length === 0" class="meta">Nenhuma estatística disponível ainda.</p>
+      </section>
+
+      <section class="dashboard-card gc-card ranking-card ranking-card-wide">
+        <div class="ranking-card-header">
+          <h2 class="gc-card-title">Top Times</h2>
+          <p class="meta ranking-subtitle">Times com mais vitórias nas ligas</p>
+        </div>
+
+        <div *ngIf="rankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+
+        <div *ngIf="!rankingsLoading && teamRankings.length > 0" class="table-container">
+          <table class="stats-table ranking-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Time</th>
+                <th>Vitórias</th>
+                <th>Derrotas</th>
+                <th>Ligas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let team of teamRankings">
+                <td class="rank-cell" [class.rank-top]="team.rank <= 3">{{ team.rank }}</td>
+                <td>
+                  <a [routerLink]="['/team-details', team.teamId]" class="ranking-team-link">
+                    <img *ngIf="team.logoUrl" [src]="team.logoUrl" [alt]="team.name" class="ranking-team-logo">
+                    <span *ngIf="!team.logoUrl" class="ranking-team-badge">{{ team.tag }}</span>
+                    <strong>{{ team.name }}</strong>
+                  </a>
+                </td>
+                <td><span class="stat-badge stat-badge-wins">{{ team.wins }}</span></td>
+                <td><span class="stat-badge stat-badge-losses">{{ team.losses }}</span></td>
+                <td>{{ team.leagues }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p *ngIf="!rankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
+      </section>
+    </div>
   </div>
 </div>
 
@@ -84,6 +161,7 @@
 
 <app-demo-upload-modal
   *ngIf="showUploadModal"
+  [allowedModes]="['general']"
   (closed)="closeUploadModal()"
   (uploaded)="onDemoUploaded($event)">
 </app-demo-upload-modal>

@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
+import { RankingsService } from '../../Services/rankings.service';
 import { AuthService } from '../../Services/auth.service';
-import { League, Team, TeamInvite } from '../../Models/interfaces';
+import { League, Team, TeamInvite, PlayerRankingEntry, TeamRankingEntry } from '../../Models/interfaces';
 import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
 import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/create-team-modal/create-team-modal.component';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
@@ -27,10 +28,14 @@ export class DashboardComponent implements OnInit {
   showUploadModal = false;
   showArchivedLeagues = false;
   pendingInvites: TeamInvite[] = [];
+  playerRankings: PlayerRankingEntry[] = [];
+  teamRankings: TeamRankingEntry[] = [];
+  rankingsLoading = true;
 
   constructor(
     private leagueService: LeagueService,
     private teamService: TeamService,
+    private rankingsService: RankingsService,
     private authService: AuthService,
     private router: Router
   ) {}
@@ -57,6 +62,33 @@ export class DashboardComponent implements OnInit {
     this.teamService.getPendingInvites().subscribe({
       next: (invites) => (this.pendingInvites = invites)
     });
+    this.loadRankings();
+  }
+
+  loadRankings(): void {
+    this.rankingsLoading = true;
+    this.rankingsService.getPlayerRankings().subscribe({
+      next: (players) => (this.playerRankings = players),
+      error: () => (this.playerRankings = [])
+    });
+    this.rankingsService.getTeamRankings().subscribe({
+      next: (teams) => {
+        this.teamRankings = teams;
+        this.rankingsLoading = false;
+      },
+      error: () => {
+        this.teamRankings = [];
+        this.rankingsLoading = false;
+      }
+    });
+  }
+
+  getPlayerLabel(player: PlayerRankingEntry): string {
+    return player.displayName || player.playerName;
+  }
+
+  getKd(player: PlayerRankingEntry): string {
+    return player.deaths > 0 ? player.kd.toFixed(2) : player.kills.toString();
   }
 
   acceptInvite(invite: TeamInvite): void {

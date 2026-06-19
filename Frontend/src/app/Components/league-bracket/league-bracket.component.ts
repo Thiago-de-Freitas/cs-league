@@ -1,12 +1,18 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, Output, EventEmitter, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Team, Match } from '../../Models/interfaces';
 import { BracketColumnView, buildBracketView } from '../../Utils/bracket.util';
+
+export interface BracketSeedAssignEvent {
+  seed: number;
+  teamId: string | null;
+}
 
 @Component({
   selector: 'app-league-bracket',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './league-bracket.component.html',
   styleUrls: ['./league-bracket.component.css']
 })
@@ -14,6 +20,9 @@ export class LeagueBracketComponent implements OnChanges {
   @Input() teams: Team[] = [];
   @Input() maxTeams = 8;
   @Input() matches: Match[] = [];
+  @Input() canManage = false;
+  @Input() bracketLocked = false;
+  @Output() seedAssign = new EventEmitter<BracketSeedAssignEvent>();
 
   bracketSize = 8;
   columns: BracketColumnView[] = [];
@@ -26,6 +35,10 @@ export class LeagueBracketComponent implements OnChanges {
     }
   }
 
+  get canEditSeeds(): boolean {
+    return this.canManage && !this.bracketLocked;
+  }
+
   statusLabel(status?: string): string {
     switch (status) {
       case 'completed': return 'Finalizada';
@@ -34,6 +47,16 @@ export class LeagueBracketComponent implements OnChanges {
       case 'cancelled': return 'Cancelada';
       default: return '';
     }
+  }
+
+  teamIdForSeed(seed?: number): string {
+    if (!seed) return '';
+    const team = this.teams.find((t) => t.seed === seed);
+    return team?.id ?? '';
+  }
+
+  onSeedChange(seed: number, teamId: string): void {
+    this.seedAssign.emit({ seed, teamId: teamId || null });
   }
 
   private rebuild(): void {

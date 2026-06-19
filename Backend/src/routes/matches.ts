@@ -35,6 +35,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         winner: { select: { id: true, name: true, tag: true } },
         league: { select: { id: true, name: true, ownerId: true, maxTeams: true } },
         demos: {
+          where: { isPersonal: false },
           include: { stats: true },
           orderBy: { createdAt: 'desc' },
         },

@@ -19,6 +19,7 @@ type UploadMode = 'general' | 'personal';
 export class DemoUploadModalComponent implements OnInit {
   @Input() prefillLeagueId = '';
   @Input() prefillMatchId = '';
+  @Input() allowedModes: UploadMode[] = ['general', 'personal'];
   @Output() closed = new EventEmitter<void>();
   @Output() uploaded = new EventEmitter<Demo>();
 
@@ -26,14 +27,13 @@ export class DemoUploadModalComponent implements OnInit {
   selectedFile: File | null = null;
   uploading = false;
   errorMsg = '';
-  matchValidationMsg = '';
-  matchValidationOk = false;
-  validatingMatch = false;
   leagues: League[] = [];
   selectedLeagueId = '';
   selectedMatchId = '';
   matches: Match[] = [];
   hasSteamId = false;
+  personalValidationOk = false;
+  validatingPersonal = false;
   existingDemoNames = new Set<string>();
 
   constructor(
@@ -43,11 +43,20 @@ export class DemoUploadModalComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.uploadMode = this.allowedModes[0] || 'general';
+
     this.authService.currentUser$.subscribe((user) => {
       this.hasSteamId = !!user?.steamId?.trim();
+      if (this.isPersonalMode && this.hasSteamId) {
+        this.validatePersonalProfile();
+      }
     });
 
-    this.demoService.listDemos().subscribe({
+    const listDemos$ = this.isPersonalOnly
+      ? this.demoService.listPersonalDemos()
+      : this.demoService.listDemos();
+
+    listDemos$.subscribe({
       next: (demos) => {
         this.existingDemoNames = new Set(
           demos
@@ -57,28 +66,67 @@ export class DemoUploadModalComponent implements OnInit {
       }
     });
 
-    this.leagueService.getLeagues().subscribe({
-      next: (leagues) => {
-        this.leagues = leagues;
-        if (this.prefillLeagueId) {
-          this.selectedLeagueId = this.prefillLeagueId;
-          this.onLeagueChange(this.prefillMatchId);
+    if (!this.isPersonalMode) {
+      this.leagueService.getLeagues().subscribe({
+        next: (leagues) => {
+          this.leagues = leagues;
+          if (this.prefillLeagueId) {
+            this.selectedLeagueId = this.prefillLeagueId;
+            this.onLeagueChange(this.prefillMatchId);
+          }
         }
-      }
-    });
+      });
+    }
+  }
+
+  get isPersonalOnly(): boolean {
+    return this.allowedModes.length === 1 && this.allowedModes[0] === 'personal';
+  }
+
+  get isGeneralOnly(): boolean {
+    return this.allowedModes.length === 1 && this.allowedModes[0] === 'general';
+  }
+
+  get showModeSelector(): boolean {
+    return this.allowedModes.length > 1;
   }
 
   get isPersonalMode(): boolean {
     return this.uploadMode === 'personal';
   }
 
+  get showMatchAssociation(): boolean {
+    return !this.isPersonalMode;
+  }
+
   onModeChange(): void {
     this.errorMsg = '';
-    this.matchValidationMsg = '';
-    this.matchValidationOk = false;
-    if (this.isPersonalMode && this.selectedMatchId) {
-      this.validateSelectedMatch();
+    if (this.isPersonalMode) {
+      this.selectedLeagueId = '';
+      this.selectedMatchId = '';
+      this.matches = [];
+      this.validatePersonalProfile();
+    } else {
+      this.personalValidationOk = false;
     }
+  }
+
+  validatePersonalProfile(): void {
+    if (!this.hasSteamId) {
+      this.personalValidationOk = false;
+      return;
+    }
+    this.validatingPersonal = true;
+    this.demoService.validatePersonalDemo().subscribe({
+      next: (result) => {
+        this.validatingPersonal = false;
+        this.personalValidationOk = result.valid;
+      },
+      error: () => {
+        this.validatingPersonal = false;
+        this.personalValidationOk = false;
+      }
+    });
   }
 
   onBackdropClick(event: MouseEvent): void {
@@ -108,8 +156,6 @@ export class DemoUploadModalComponent implements OnInit {
   }
 
   onLeagueChange(preselectMatchId?: string): void {
-    this.matchValidationMsg = '';
-    this.matchValidationOk = false;
     if (!this.selectedLeagueId) {
       this.matches = [];
       this.selectedMatchId = '';
@@ -119,39 +165,6 @@ export class DemoUploadModalComponent implements OnInit {
       next: (league) => {
         this.matches = league.matches || [];
         this.selectedMatchId = preselectMatchId || '';
-        if (this.isPersonalMode && this.selectedMatchId) {
-          this.validateSelectedMatch();
-        }
-      }
-    });
-  }
-
-  onMatchChange(): void {
-    this.matchValidationMsg = '';
-    this.matchValidationOk = false;
-    if (this.isPersonalMode && this.selectedMatchId) {
-      this.validateSelectedMatch();
-    }
-  }
-
-  validateSelectedMatch(): void {
-    if (!this.selectedMatchId) return;
-    this.validatingMatch = true;
-    this.demoService.validatePersonalDemo(this.selectedMatchId).subscribe({
-      next: (result) => {
-        this.validatingMatch = false;
-        if (result.valid) {
-          this.matchValidationOk = true;
-          this.matchValidationMsg = '';
-        } else {
-          this.matchValidationOk = false;
-          this.matchValidationMsg = result.error || 'Não é possível enviar demo para esta partida.';
-        }
-      },
-      error: () => {
-        this.validatingMatch = false;
-        this.matchValidationOk = false;
-        this.matchValidationMsg = 'Erro ao validar a partida.';
       }
     });
   }
@@ -167,19 +180,15 @@ export class DemoUploadModalComponent implements OnInit {
         this.errorMsg = 'Configure seu Steam ID no perfil antes de enviar uma demo pessoal.';
         return;
       }
-      if (!this.selectedMatchId) {
-        this.errorMsg = 'Selecione a partida para enviar a demo pessoal.';
-        return;
-      }
-      if (!this.matchValidationOk) {
-        this.errorMsg = this.matchValidationMsg || 'A partida selecionada não é válida para demo pessoal.';
+      if (!this.personalValidationOk) {
+        this.errorMsg = 'Valide seu perfil antes de enviar a demo pessoal.';
         return;
       }
     }
 
     this.uploading = true;
     this.errorMsg = '';
-    const matchId = this.selectedMatchId || undefined;
+    const matchId = this.isPersonalMode ? undefined : (this.selectedMatchId || undefined);
 
     this.demoService.uploadDemo(this.selectedFile, {
       matchId,

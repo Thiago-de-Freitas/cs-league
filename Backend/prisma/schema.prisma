@@ -65,6 +65,7 @@ model Team {
   id        String   @id @default(cuid())
   name      String
   tag       String
+  logoUrl   String?
   ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

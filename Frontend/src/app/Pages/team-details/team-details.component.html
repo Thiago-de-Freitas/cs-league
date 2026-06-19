@@ -5,15 +5,45 @@
 
     <div class="details-card gc-card" *ngIf="team && !loading">
       <div class="team-header">
-        <span class="team-tag-badge">{{ team.tag }}</span>
-        <h1 class="page-title">{{ team.name }}</h1>
+        <div class="team-logo-wrap">
+          <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do {{ team.name }}" class="team-logo-img">
+          <span *ngIf="!team.logoUrl" class="team-tag-badge team-logo-fallback">{{ team.tag }}</span>
+        </div>
+        <div class="team-header-info">
+          <h1 class="page-title">{{ team.name }}</h1>
+          <div class="team-stats-row">
+            <span class="stat-badge stat-badge-wins">V {{ team.wins }}</span>
+            <span class="stat-badge stat-badge-losses">D {{ team.losses }}</span>
+            <span class="badge badge-gray">PTS {{ team.points }}</span>
+          </div>
+        </div>
       </div>
-      <div class="team-stats-row mb-4">
-        <span class="stat-badge stat-badge-wins">V {{ team.wins }}</span>
-        <span class="stat-badge stat-badge-losses">D {{ team.losses }}</span>
-        <span class="badge badge-gray">PTS {{ team.points }}</span>
+
+      <div *ngIf="isOwner" class="team-logo-section mt-4">
+        <h2 class="section-title">Logo do Time</h2>
+        <p class="meta mb-4">PNG, JPG, WEBP ou GIF — máximo 2 MB.</p>
+        <div class="team-logo-actions">
+          <label class="btn btn-secondary btn-small logo-upload-btn" [class.is-disabled]="uploadingLogo">
+            {{ uploadingLogo ? 'Enviando...' : (team.logoUrl ? 'Alterar logo' : 'Enviar logo') }}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              (change)="onLogoSelected($event)"
+              [disabled]="uploadingLogo">
+          </label>
+          <button
+            *ngIf="team.logoUrl"
+            type="button"
+            class="btn btn-ghost btn-small"
+            (click)="removeLogo()"
+            [disabled]="uploadingLogo">
+            Remover logo
+          </button>
+        </div>
       </div>
-      <h2 class="section-title">Roster</h2>
+
+      <h2 class="section-title mt-4">Roster</h2>
       <ul class="gc-list">
         <li *ngFor="let member of team.players" class="gc-list-item">
           <span class="member-name">{{ member.name }}</span>

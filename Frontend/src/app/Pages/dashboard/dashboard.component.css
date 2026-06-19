@@ -1,1 +1,95 @@
-/* Dashboard usa estilos globais */
+.dashboard-rankings {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1.25rem;
+}
+
+.ranking-card-header {
+  margin-bottom: 1.25rem;
+}
+
+.ranking-card-header .gc-card-title {
+  margin: 0 0 0.4rem;
+  line-height: 1.2;
+}
+
+.ranking-subtitle {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.ranking-card .table-container {
+  margin-top: 0;
+}
+
+.ranking-loading {
+  padding: 1.5rem 0;
+}
+
+.ranking-table {
+  font-size: 0.9rem;
+}
+
+.ranking-table td,
+.ranking-table th {
+  vertical-align: middle;
+}
+
+.rank-cell {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--gc-text-muted);
+  width: 2.5rem;
+}
+
+.rank-top {
+  color: var(--gc-orange);
+}
+
+.ranking-demos {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.ranking-team-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ranking-team-link:hover {
+  color: var(--gc-orange);
+}
+
+.ranking-team-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--gc-border);
+}
+
+.ranking-team-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 0.35rem;
+  background: var(--gc-orange-dim);
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 900px) {
+  .dashboard-rankings {
+    grid-template-columns: 1fr;
+  }
+}

@@ -16,7 +16,7 @@
       <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
         [teams]="league.teams || []"
-        [canManageLeague]="isAdmin"
+        [canManageLeague]="isAdmin && !hasBracketGenerated"
         (teamsReordered)="onTeamsReordered($event)"
         (editTeam)="onEditTeam($event)"
         (removeTeam)="onRemoveTeam($event)">
@@ -38,11 +38,13 @@
       </div>
       <div class="admin-actions">
         <button class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity">Adicionar Time</button>
-        <button class="btn btn-secondary" (click)="showCreateMatch = true">Criar Partida</button>
         <button class="btn btn-success" (click)="generateBracket()" [disabled]="generatingBracket || league.teams.length < 2">
-          {{ generatingBracket ? 'Gerando...' : 'Gerar Chaveamento' }}
+          {{ generatingBracket ? 'Gerando...' : (hasBracketGenerated ? 'Regenerar Chaveamento' : 'Gerar Chaveamento') }}
         </button>
       </div>
+      <p *ngIf="!hasBracketGenerated" class="admin-hint">
+        Defina os times na chave abaixo e clique em <strong>Gerar Chaveamento</strong> para criar as partidas.
+      </p>
 
       <div *ngIf="showAddTeam" class="admin-form">
         <label class="form-label" for="team-multi-select">Times disponíveis</label>
@@ -62,27 +64,16 @@
           Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
           {{ selectedTeamIds.length }} selecionado(s) · {{ remainingSlots }} vaga(s) restante(s)
         </p>
+        <p *ngIf="selectionOverLimit" class="error-message">
+          Você selecionou mais times do que as vagas disponíveis. Desmarque {{ selectedTeamIds.length - remainingSlots }} time(s).
+        </p>
         <button
           class="btn btn-primary"
           (click)="addTeamsToLeague()"
-          [disabled]="addingTeams || selectedTeamIds.length === 0">
+          [disabled]="addingTeams || !canSubmitTeamSelection">
           {{ addingTeams ? 'Adicionando...' : (selectedTeamIds.length ? 'Adicionar ' + selectedTeamIds.length + ' time(s)' : 'Adicionar times') }}
         </button>
         <button class="btn btn-secondary" (click)="cancelAddTeams()" [disabled]="addingTeams">Cancelar</button>
-      </div>
-
-      <div *ngIf="showCreateMatch" class="admin-form">
-        <select [(ngModel)]="matchTeam1Id" class="input-field">
-          <option value="">Time 1</option>
-          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
-        </select>
-        <select [(ngModel)]="matchTeam2Id" class="input-field">
-          <option value="">Time 2</option>
-          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
-        </select>
-        <input [(ngModel)]="matchMap" class="input-field" placeholder="Mapa (opcional)">
-        <button class="btn btn-primary" (click)="createMatch()">Criar</button>
-        <button class="btn btn-secondary" (click)="showCreateMatch = false">Cancelar</button>
       </div>
     </div>
 
@@ -146,7 +137,10 @@
       <app-league-bracket
         [teams]="league.teams"
         [maxTeams]="league.maxTeams || 8"
-        [matches]="league.matches || []">
+        [matches]="league.matches || []"
+        [canManage]="isAdmin && !isArchived"
+        [bracketLocked]="hasBracketGenerated"
+        (seedAssign)="onBracketSeedAssign($event)">
       </app-league-bracket>
     </div>
   </section>

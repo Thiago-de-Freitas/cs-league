@@ -58,10 +58,43 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         this.demo = demo;
         this.stats = demo.stats || [];
         this.loading = false;
+        if (demo.status === 'pending' || demo.status === 'processing') {
+          this.startDemoViewPolling(id);
+        }
       },
       error: () => {
         this.errorMsg = 'Demo não encontrada.';
         this.loading = false;
+      }
+    });
+  }
+
+  startDemoViewPolling(id: string): void {
+    this.pollSub?.unsubscribe();
+    this.pollingDemo = true;
+    this.pollSub = this.demoService.pollDemoStatus(id).subscribe({
+      next: (demo) => {
+        this.demo = demo;
+        if (demo.status === 'completed') {
+          this.stats = demo.stats || [];
+          this.pollingDemo = false;
+        } else if (demo.status === 'failed') {
+          this.pollingDemo = false;
+        }
+      }
+    });
+  }
+
+  reprocessDemo(): void {
+    if (!this.demo) return;
+    this.demoService.reprocessDemo(this.demo.id).subscribe({
+      next: (updated) => {
+        this.demo = updated;
+        this.pollingDemo = true;
+        this.startDemoViewPolling(updated.id);
+      },
+      error: (err) => {
+        this.errorMsg = err.error?.error || 'Erro ao reprocessar demo';
       }
     });
   }

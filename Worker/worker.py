@@ -101,13 +101,16 @@ def parse_demo(file_path: str) -> list[dict]:
 
     parser = DemoParser(file_path)
 
-    deaths = parser.parse_event("player_death", player=["X", "Y"], other=["attacker_steamid", "user_steamid"])
+    deaths = parser.parse_event("player_death", player=["X", "Y"], other=["attacker_steamid", "user_steamid", "assister_steamid", "headshot"])
     damages = parser.parse_event("player_hurt", player=["X", "Y"], other=["attacker_steamid", "user_steamid", "dmg_health", "hitgroup"])
     rounds = parser.parse_event("round_end", player=["X", "Y"])
 
-    total_rounds = max(len(rounds) if rounds is not None and len(rounds) > 0 else 1, 1)
+    total_rounds = 1
+    if rounds is not None and len(rounds) > 0:
+        total_rounds = max(int(rounds["total_rounds_played"].max()), 1)
 
     player_data: dict[str, dict] = {}
+    deaths_by_round: dict[int, set[str]] = {}
 
     def ensure_player(steam_id: str, name: str = "Unknown"):
         if steam_id not in player_data:
@@ -125,18 +128,28 @@ def parse_demo(file_path: str) -> list[dict]:
         for _, row in deaths.iterrows():
             attacker = str(row.get("attacker_steamid", ""))
             victim = str(row.get("user_steamid", ""))
+            assister = str(row.get("assister_steamid", ""))
             attacker_name = str(row.get("attacker_name", attacker))
             victim_name = str(row.get("user_name", victim))
+            round_num = int(row.get("total_rounds_played", 0) or 0)
 
             if attacker and attacker != "0":
                 ensure_player(attacker, attacker_name)
                 player_data[attacker]["kills"] += 1
                 if row.get("headshot") in (True, 1):
                     player_data[attacker]["headshot_kills"] += 1
+                if round_num > 0:
+                    player_data[attacker]["kast_rounds"].add(round_num)
+
+            if assister and assister != "0" and round_num > 0:
+                ensure_player(assister)
+                player_data[assister]["kast_rounds"].add(round_num)
 
             if victim and victim != "0":
                 ensure_player(victim, victim_name)
                 player_data[victim]["deaths"] += 1
+                if round_num > 0:
+                    deaths_by_round.setdefault(round_num, set()).add(victim)
 
     if damages is not None and len(damages) > 0:
         for _, row in damages.iterrows():
@@ -146,13 +159,10 @@ def parse_demo(file_path: str) -> list[dict]:
                 dmg = row.get("dmg_health", 0) or 0
                 player_data[attacker]["total_damage"] += int(dmg)
 
-    if deaths is not None and len(deaths) > 0:
-        for tick, row in deaths.iterrows():
-            round_num = row.get("total_rounds_played", tick)
-            attacker = str(row.get("attacker_steamid", ""))
-            if attacker and attacker != "0":
-                ensure_player(attacker)
-                player_data[attacker]["kast_rounds"].add(round_num)
+    all_players = set(player_data.keys())
+    for round_num, victims in deaths_by_round.items():
+        for steam_id in all_players - victims:
+            player_data[steam_id]["kast_rounds"].add(round_num)
 
     results = []
     for steam_id, data in player_data.items():

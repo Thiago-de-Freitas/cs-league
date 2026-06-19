@@ -57,6 +57,7 @@ function formatLeague(league: NonNullable<Awaited<ReturnType<typeof getLeagueWit
       id: lt.team.id,
       name: lt.team.name,
       tag: lt.team.tag,
+      logoUrl: lt.team.logoUrl,
       ownerId: lt.team.ownerId,
       wins: lt.wins,
       losses: lt.losses,
@@ -607,6 +608,26 @@ router.post('/:id/matches', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
+    const bracketMatchCount = await prisma.match.count({
+      where: { leagueId: req.params.id, round: { gt: 0 } },
+    });
+    if (bracketMatchCount === 0) {
+      res.status(400).json({
+        error: 'Gere o chaveamento antes de criar partidas. Apenas times da liga podem ser usados.',
+      });
+      return;
+    }
+
+    const leagueTeams = await prisma.leagueTeam.findMany({
+      where: { leagueId: req.params.id },
+      select: { teamId: true },
+    });
+    const bracketTeamIds = new Set(leagueTeams.map((lt) => lt.teamId));
+    if (!bracketTeamIds.has(team1Id) || !bracketTeamIds.has(team2Id)) {
+      res.status(400).json({ error: 'Ambos os times devem estar chaveados na liga.' });
+      return;
+    }
+
     const match = await prisma.match.create({
       data: {
         leagueId: req.params.id,
@@ -651,6 +672,26 @@ router.put('/:id/teams/order', authMiddleware, async (req: AuthRequest, res: Res
     if (!teams?.length) {
       res.status(400).json({ error: 'Lista de times é obrigatória' });
       return;
+    }
+
+    const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
+    if (existingMatches > 0) {
+      res.status(400).json({
+        error: 'Não é possível alterar os seeds após o chaveamento ser gerado.',
+      });
+      return;
+    }
+
+    const leagueTeams = await prisma.leagueTeam.findMany({
+      where: { leagueId: req.params.id },
+      select: { teamId: true },
+    });
+    const leagueTeamIds = new Set(leagueTeams.map((lt) => lt.teamId));
+    for (const t of teams) {
+      if (!leagueTeamIds.has(t.teamId)) {
+        res.status(400).json({ error: 'Time não pertence a esta liga.' });
+        return;
+      }
     }
 
     await prisma.$transaction(

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NavbarComponent } from './Components/navbar/navbar.component';
+import { NotificationHostComponent } from './Components/notification-host/notification-host.component';
 import { AuthService } from './Services/auth.service';
 
 @Component({
@@ -10,9 +11,10 @@ import { AuthService } from './Services/auth.service';
     <main class="main-content">
       <router-outlet></router-outlet>
     </main>
+    <app-notification-host></app-notification-host>
   `,
   styles: '',
-  imports: [RouterModule, NavbarComponent]
+  imports: [RouterModule, NavbarComponent, NotificationHostComponent]
 })
 export class AppComponent implements OnInit {
   title = 'cs2-platform-frontend';

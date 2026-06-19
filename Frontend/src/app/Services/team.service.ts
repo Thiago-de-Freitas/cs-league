@@ -29,6 +29,16 @@ export class TeamService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
+  uploadLogo(teamId: string, file: File): Observable<Team> {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return this.http.post<Team>(`${this.apiUrl}/${teamId}/logo`, formData);
+  }
+
+  removeLogo(teamId: string): Observable<Team> {
+    return this.http.delete<Team>(`${this.apiUrl}/${teamId}/logo`);
+  }
+
   inviteUser(teamId: string, userId: string): Observable<unknown> {
     return this.http.post(`${this.apiUrl}/${teamId}/invite`, { userId });
   }

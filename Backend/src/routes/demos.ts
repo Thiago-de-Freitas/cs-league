@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
 import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload, canUserManageMatchDemo } from '../lib/demoValidation';
+import { buildPersonalStatsOverview } from '../lib/personalStats';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -42,8 +43,7 @@ function parseIsPersonal(value: unknown): boolean {
 
 router.get('/validate-personal', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const matchId = String(req.query.matchId || '');
-    const result = await validatePersonalDemoUpload(req.user!.userId, matchId);
+    const result = await validatePersonalDemoUpload(req.user!.userId);
     if (!result.valid) {
       res.json({ valid: false, error: result.error, code: result.code });
       return;
@@ -55,6 +55,62 @@ router.get('/validate-personal', authMiddleware, async (req: AuthRequest, res: R
   }
 });
 
+router.get('/personal/overview', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demos = await prisma.demo.findMany({
+      where: { uploadedById: req.user!.userId, isPersonal: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        fileName: true,
+        status: true,
+        createdAt: true,
+        stats: true,
+      },
+    });
+
+    res.json(buildPersonalStatsOverview(demos));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao carregar estatísticas do perfil' });
+  }
+});
+
+router.get('/personal', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demos = await prisma.demo.findMany({
+      where: { uploadedById: req.user!.userId, isPersonal: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        fileName: true,
+        status: true,
+        errorMessage: true,
+        isPersonal: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { stats: true } },
+      },
+    });
+
+    res.json(
+      demos.map((d) => ({
+        id: d.id,
+        fileName: d.fileName,
+        status: d.status.toLowerCase(),
+        errorMessage: d.errorMessage,
+        isPersonal: d.isPersonal,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        playerCount: d._count.stats,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar demos pessoais' });
+  }
+});
+
 router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
@@ -63,7 +119,7 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
     }
 
     const isPersonal = parseIsPersonal(req.body.isPersonal);
-    const matchId = req.body.matchId ? String(req.body.matchId) : undefined;
+    const matchId = isPersonal ? undefined : (req.body.matchId ? String(req.body.matchId) : undefined);
     const fileName = req.file.originalname;
 
     const duplicateCheck = await validateDuplicateDemoUpload(req.user!.userId, fileName);
@@ -74,7 +130,7 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
     }
 
     if (isPersonal) {
-      const validation = await validatePersonalDemoUpload(req.user!.userId, matchId || '');
+      const validation = await validatePersonalDemoUpload(req.user!.userId);
       if (!validation.valid) {
         fs.unlink(req.file.path, () => {});
         res.status(400).json({ error: validation.error, code: validation.code });
@@ -102,7 +158,7 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
         fileName: req.file.originalname,
         status: 'PENDING',
         isPersonal,
-        ...(matchId && { matchId }),
+        ...(matchId && !isPersonal && { matchId }),
       },
     });
 
@@ -173,6 +229,87 @@ router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response)
   }
 });
 
+router.post('/:id/reprocess', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({ where: { id: req.params.id } });
+
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+
+    if (demo.uploadedById !== req.user!.userId && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Sem permissão para reprocessar esta demo' });
+      return;
+    }
+
+    if (demo.status === 'PROCESSING') {
+      res.status(400).json({ error: 'Demo já está sendo processada' });
+      return;
+    }
+
+    if (!fs.existsSync(demo.filePath)) {
+      res.status(400).json({ error: 'Arquivo da demo não encontrado no servidor' });
+      return;
+    }
+
+    await prisma.demo.update({
+      where: { id: demo.id },
+      data: { status: 'PENDING', errorMessage: null },
+    });
+
+    await enqueueDemoJob(demo.id, demo.filePath);
+
+    res.json({
+      id: demo.id,
+      fileName: demo.fileName,
+      status: 'pending',
+      matchId: demo.matchId,
+      isPersonal: demo.isPersonal,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao reprocessar demo' });
+  }
+});
+
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({ where: { id: req.params.id } });
+
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+
+    if (demo.uploadedById !== req.user!.userId && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Sem permissão para excluir esta demo' });
+      return;
+    }
+
+    if (demo.status === 'PROCESSING') {
+      res.status(400).json({ error: 'Não é possível excluir uma demo em processamento' });
+      return;
+    }
+
+    if (demo.status === 'COMPLETED' && demo.matchId && !demo.isPersonal) {
+      res.status(400).json({ error: 'Desassocie a demo da partida antes de excluir' });
+      return;
+    }
+
+    if (fs.existsSync(demo.filePath)) {
+      fs.unlink(demo.filePath, () => {});
+    }
+
+    await prisma.demo.delete({ where: { id: demo.id } });
+
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir demo' });
+  }
+});
+
 router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const demo = await prisma.demo.findUnique({
@@ -187,6 +324,11 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
 
     if (demo.uploadedById !== req.user!.userId && req.user!.role !== 'ADMIN') {
       res.status(403).json({ error: 'Sem permissão para alterar esta demo' });
+      return;
+    }
+
+    if (demo.isPersonal) {
+      res.status(400).json({ error: 'Demos pessoais ficam no perfil e não podem ser associadas a partidas.' });
       return;
     }
 
@@ -215,11 +357,8 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
         return;
       }
     } else {
-      const validation = await validatePersonalDemoUpload(req.user!.userId, matchId);
-      if (!validation.valid) {
-        res.status(400).json({ error: validation.error, code: validation.code });
-        return;
-      }
+      res.status(400).json({ error: 'Demos pessoais não podem ser associadas a partidas.' });
+      return;
     }
 
     const updated = await prisma.demo.update({
@@ -245,22 +384,40 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const demos = await prisma.demo.findMany({
-      where: { uploadedById: req.user!.userId },
+      where: { uploadedById: req.user!.userId, isPersonal: false },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         fileName: true,
         status: true,
+        errorMessage: true,
         matchId: true,
         isPersonal: true,
         createdAt: true,
+        updatedAt: true,
+        _count: { select: { stats: true } },
+        match: {
+          select: {
+            id: true,
+            team1: { select: { id: true, name: true, tag: true } },
+            team2: { select: { id: true, name: true, tag: true } },
+          },
+        },
       },
     });
 
     res.json(
       demos.map((d) => ({
-        ...d,
+        id: d.id,
+        fileName: d.fileName,
         status: d.status.toLowerCase(),
+        errorMessage: d.errorMessage,
+        matchId: d.matchId,
+        isPersonal: d.isPersonal,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        playerCount: d._count.stats,
+        match: d.match,
       }))
     );
   } catch (err) {

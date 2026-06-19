@@ -3,15 +3,20 @@
     <div class="gc-card-header list-page-header">
       <div>
         <h1 class="page-title">Demos</h1>
-        <p class="page-subtitle list-page-subtitle">Envie e acompanhe arquivos .dem com estatísticas automáticas</p>
+        <p class="page-subtitle list-page-subtitle">Demos gerais para ligas e partidas — demos pessoais ficam no seu perfil</p>
       </div>
       <button class="btn btn-primary" (click)="openUploadModal()">+ Enviar Demo</button>
     </div>
 
     <div *ngIf="processingDemo" class="processing-status mb-4">
-      <p class="meta mb-2">Processando: <strong>{{ processingDemo.fileName }}</strong></p>
+      <p class="meta mb-2">Último envio: <strong>{{ processingDemo.fileName }}</strong></p>
       <div class="processing-bar">
-        <div class="processing-bar-fill" [class.done]="pollStatus === 'completed'" [class.failed]="pollStatus === 'failed'"></div>
+        <div
+          class="processing-bar-fill"
+          [class.done]="pollStatus === 'completed'"
+          [class.failed]="pollStatus === 'failed'"
+          [class.processing]="pollStatus === 'processing'">
+        </div>
       </div>
       <p>Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
       <p *ngIf="processingDemo.errorMessage" class="error-message">{{ processingDemo.errorMessage }}</p>
@@ -22,23 +27,45 @@
     <div *ngIf="loading" class="loading">Carregando...</div>
 
     <div class="gc-card" *ngIf="!loading">
-      <h2 class="section-title">Suas Demos</h2>
+      <h2 class="section-title">Demos Gerais</h2>
       <ul class="gc-list" *ngIf="demos.length > 0; else noDemos">
         <li *ngFor="let demo of demos" class="gc-list-item demo-list-item">
           <div class="demo-row">
-            <span>{{ demo.fileName }}</span>
-            <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
-            <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
-            <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
-              Ver Stats
-            </button>
-            <button
-              *ngIf="!demo.matchId"
-              class="btn btn-ghost btn-small"
-              (click)="openAssociate(demo)">
-              Associar
-            </button>
+            <div class="demo-info">
+              <span class="demo-name">{{ demo.fileName }}</span>
+              <span class="meta" *ngIf="demo.match">{{ getMatchLabel(demo) }}</span>
+              <span class="meta" *ngIf="demo.status === 'completed' && demo.playerCount">
+                {{ demo.playerCount }} jogador(es)
+              </span>
+            </div>
+            <div class="demo-actions">
+              <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+              <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
+                Ver Stats
+              </button>
+              <button
+                *ngIf="canReprocess(demo)"
+                class="btn btn-ghost btn-small"
+                (click)="reprocessDemo(demo, $event)"
+                [disabled]="reprocessingId === demo.id">
+                {{ reprocessingId === demo.id ? 'Enviando...' : 'Reprocessar' }}
+              </button>
+              <button
+                *ngIf="!demo.matchId"
+                class="btn btn-ghost btn-small"
+                (click)="openAssociate(demo)">
+                Associar
+              </button>
+              <button
+                *ngIf="canDelete(demo)"
+                class="btn btn-ghost btn-small btn-danger-text"
+                (click)="deleteDemo(demo, $event)"
+                [disabled]="deletingId === demo.id">
+                {{ deletingId === demo.id ? 'Excluindo...' : 'Excluir' }}
+              </button>
+            </div>
           </div>
+          <p *ngIf="demo.errorMessage" class="error-message demo-error">{{ demo.errorMessage }}</p>
           <div *ngIf="associatingDemoId === demo.id" class="associate-panel mt-2">
             <select [(ngModel)]="associateLeagueId" (ngModelChange)="onAssociateLeagueChange()" class="input-field">
               <option value="">Selecione uma liga</option>
@@ -70,6 +97,7 @@
   *ngIf="showUploadModal"
   [prefillLeagueId]="uploadPrefillLeagueId"
   [prefillMatchId]="uploadPrefillMatchId"
+  [allowedModes]="['general']"
   (closed)="closeUploadModal()"
   (uploaded)="onDemoUploaded($event)">
 </app-demo-upload-modal>

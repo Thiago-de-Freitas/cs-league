@@ -2,32 +2,45 @@
   <div class="gc-modal">
     <div class="gc-modal-header">
       <div>
-        <h2 id="upload-demo-title" class="gc-modal-title">Enviar Demo</h2>
-        <p class="gc-modal-subtitle">Envie arquivos .dem para análise automática de performance</p>
+        <h2 id="upload-demo-title" class="gc-modal-title">
+          {{ isPersonalOnly ? 'Enviar Demo Pessoal' : 'Enviar Demo' }}
+        </h2>
+        <p class="gc-modal-subtitle">
+          <ng-container *ngIf="isPersonalOnly">
+            Análise exclusiva do seu desempenho no perfil
+          </ng-container>
+          <ng-container *ngIf="!isPersonalOnly">
+            Envie arquivos .dem para análise automática de performance
+          </ng-container>
+        </p>
       </div>
       <button type="button" class="gc-modal-close" (click)="close()" [disabled]="uploading" aria-label="Fechar">&times;</button>
     </div>
 
     <div class="gc-modal-body">
-      <div class="form-group">
+      <div class="form-group" *ngIf="showModeSelector">
         <label class="form-label">Tipo de envio</label>
         <div class="upload-mode-options">
-          <label class="upload-mode-option">
+          <label class="upload-mode-option" *ngIf="allowedModes.includes('general')">
             <input type="radio" name="uploadMode" value="general" [(ngModel)]="uploadMode" (ngModelChange)="onModeChange()">
             <span>Demo geral</span>
           </label>
-          <label class="upload-mode-option">
+          <label class="upload-mode-option" *ngIf="allowedModes.includes('personal')">
             <input type="radio" name="uploadMode" value="personal" [(ngModel)]="uploadMode" (ngModelChange)="onModeChange()">
             <span>Demo pessoal</span>
           </label>
         </div>
         <p class="form-hint" *ngIf="!isPersonalMode">
-          Envio livre para análise. A associação com partida é opcional.
+          Envio para ligas e partidas. A associação com partida é opcional.
         </p>
         <p class="form-hint" *ngIf="isPersonalMode">
-          Atualiza <strong>suas</strong> estatísticas na partida selecionada. É necessário estar no time e ter Steam ID no perfil.
+          Fica apenas no seu <a routerLink="/profile" class="text-link" (click)="close()">perfil</a>. Extrai somente suas estatísticas.
         </p>
       </div>
+
+      <p class="form-hint" *ngIf="isPersonalOnly">
+        Esta demo será vinculada ao seu perfil e não aparecerá em partidas de ligas.
+      </p>
 
       <div *ngIf="isPersonalMode && !hasSteamId" class="warning-message">
         Configure seu <a routerLink="/profile" class="text-link" (click)="close()">Steam ID no perfil</a> para usar demo pessoal.
@@ -44,10 +57,8 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">
-          {{ isPersonalMode ? 'Partida' : 'Associar a partida (opcional)' }}
-        </label>
+      <div class="form-group" *ngIf="showMatchAssociation">
+        <label class="form-label">Associar a partida (opcional)</label>
         <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="input-field">
           <option value="">Selecione uma liga</option>
           <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
@@ -55,20 +66,18 @@
         <select
           *ngIf="matches.length > 0"
           [(ngModel)]="selectedMatchId"
-          (ngModelChange)="onMatchChange()"
           class="input-field mt-2">
           <option value="">Selecione uma partida</option>
           <option *ngFor="let m of matches" [value]="m.id">
             {{ m.team1.name }} vs {{ m.team2.name }}
           </option>
         </select>
-
-        <p *ngIf="isPersonalMode && validatingMatch" class="form-hint mt-2">Validando partida...</p>
-        <p *ngIf="isPersonalMode && matchValidationOk" class="success-message mt-2">
-          Partida válida para demo pessoal.
-        </p>
-        <p *ngIf="isPersonalMode && matchValidationMsg" class="error-message mt-2">{{ matchValidationMsg }}</p>
       </div>
+
+      <p *ngIf="isPersonalMode && validatingPersonal" class="form-hint mt-2">Validando perfil...</p>
+      <p *ngIf="isPersonalMode && personalValidationOk" class="success-message mt-2">
+        Perfil válido para demo pessoal.
+      </p>
 
       <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
 
@@ -78,7 +87,7 @@
           type="button"
           class="btn btn-primary"
           (click)="upload()"
-          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !matchValidationOk))">
+          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !personalValidationOk))">
           {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
         </button>
       </div>

@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { DemoService } from '../../Services/demo.service';
 import { LeagueService } from '../../Services/league.service';
+import { NotificationService } from '../../Services/notification.service';
 import { Demo, League, Match } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 
@@ -14,7 +16,7 @@ import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/dem
   templateUrl: './demo-upload.component.html',
   styleUrls: ['./demo-upload.component.css']
 })
-export class DemoUploadComponent implements OnInit {
+export class DemoUploadComponent implements OnInit, OnDestroy {
   demos: Demo[] = [];
   leagues: League[] = [];
   loading = true;
@@ -28,11 +30,15 @@ export class DemoUploadComponent implements OnInit {
   associateMatchId = '';
   associateMatches: Match[] = [];
   associating = false;
+  reprocessingId: string | null = null;
+  deletingId: string | null = null;
   errorMsg = '';
+  private listPollSub?: Subscription;
 
   constructor(
     private demoService: DemoService,
     private leagueService: LeagueService,
+    private notificationService: NotificationService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
@@ -51,15 +57,53 @@ export class DemoUploadComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.listPollSub?.unsubscribe();
+  }
+
   loadDemos(): void {
     this.loading = true;
     this.demoService.listDemos().subscribe({
       next: (demos) => {
         this.demos = demos;
         this.loading = false;
+        this.setupListPolling();
       },
       error: () => {
         this.loading = false;
+      }
+    });
+  }
+
+  get hasPendingDemos(): boolean {
+    return this.demos.some((d) => d.status === 'pending' || d.status === 'processing');
+  }
+
+  setupListPolling(): void {
+    this.listPollSub?.unsubscribe();
+    if (!this.hasPendingDemos) return;
+
+    this.listPollSub = this.demoService.pollPendingDemos().subscribe({
+      next: (demos) => {
+        const previouslyPending = this.demos.filter(
+          (d) => d.status === 'pending' || d.status === 'processing'
+        );
+        this.demos = demos;
+
+        if (this.processingDemo) {
+          const updated = demos.find((d) => d.id === this.processingDemo!.id);
+          if (updated) {
+            this.processingDemo = updated;
+            this.pollStatus = updated.status;
+          }
+        }
+
+        for (const prev of previouslyPending) {
+          const now = demos.find((d) => d.id === prev.id);
+          if (now?.status === 'completed' && prev.status !== 'completed') {
+            this.notificationService.success(`Demo processada: ${now.fileName}`);
+          }
+        }
       }
     });
   }
@@ -82,24 +126,53 @@ export class DemoUploadComponent implements OnInit {
     this.uploadPrefillMatchId = '';
     this.processingDemo = demo;
     this.pollStatus = demo.status;
-    this.startPolling(demo.id);
     this.loadDemos();
-  }
-
-  startPolling(demoId: string): void {
-    this.demoService.pollDemoStatus(demoId).subscribe({
-      next: (demo) => {
-        this.pollStatus = demo.status;
-        this.processingDemo = demo;
-        if (demo.status === 'completed' || demo.status === 'failed') {
-          this.loadDemos();
-        }
-      }
-    });
   }
 
   viewDemo(demoId: string): void {
     this.router.navigate(['/demo', demoId]);
+  }
+
+  reprocessDemo(demo: Demo, event?: Event): void {
+    event?.stopPropagation();
+    this.reprocessingId = demo.id;
+    this.demoService.reprocessDemo(demo.id).subscribe({
+      next: (updated) => {
+        this.reprocessingId = null;
+        this.processingDemo = updated;
+        this.pollStatus = updated.status;
+        this.notificationService.info('Demo reenfileirada para processamento.');
+        this.loadDemos();
+      },
+      error: (err) => {
+        this.reprocessingId = null;
+        this.notificationService.error(err.error?.error || 'Erro ao reprocessar demo');
+      }
+    });
+  }
+
+  deleteDemo(demo: Demo, event?: Event): void {
+    event?.stopPropagation();
+    this.deletingId = demo.id;
+    this.demoService.deleteDemo(demo.id).subscribe({
+      next: () => {
+        this.deletingId = null;
+        this.notificationService.success('Demo excluída.');
+        this.loadDemos();
+      },
+      error: (err) => {
+        this.deletingId = null;
+        this.notificationService.error(err.error?.error || 'Erro ao excluir demo');
+      }
+    });
+  }
+
+  canReprocess(demo: Demo): boolean {
+    return demo.status === 'pending' || demo.status === 'failed';
+  }
+
+  canDelete(demo: Demo): boolean {
+    return demo.status !== 'processing' && !(demo.status === 'completed' && demo.matchId);
   }
 
   openAssociate(demo: Demo): void {
@@ -154,5 +227,10 @@ export class DemoUploadComponent implements OnInit {
       failed: 'Falhou',
     };
     return labels[status] || status;
+  }
+
+  getMatchLabel(demo: Demo): string {
+    if (!demo.match) return '';
+    return `${demo.match.team1?.name} vs ${demo.match.team2?.name}`;
   }
 }

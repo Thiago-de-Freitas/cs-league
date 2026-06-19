@@ -1,35 +1,222 @@
-<div class="page-container">
-  <div class="page-inner max-width-narrow">
-    <h1 class="page-title">Meu <span style="color: var(--gc-orange)">Perfil</span></h1>
+<div class="page-container profile-page">
+  <div class="profile-dashboard">
+    <aside class="profile-sidebar gc-card">
+      <div class="sidebar-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+      <h1 class="sidebar-name">{{ userName }}</h1>
+      <p class="sidebar-email">{{ email }}</p>
+      <span class="badge badge-orange sidebar-role">{{ role }}</span>
 
-    <div class="profile-card gc-card">
-      <div class="profile-header">
-        <div class="profile-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
-        <div class="profile-info">
-          <div class="profile-name">{{ userName }}</div>
-          <div class="profile-email">{{ email }}</div>
-          <span class="badge badge-orange">{{ role }}</span>
+      <div class="sidebar-steam" *ngIf="steamId">
+        <span class="sidebar-label">Steam ID</span>
+        <span class="sidebar-value">{{ steamId }}</span>
+      </div>
+      <p class="sidebar-hint" *ngIf="!steamId">Configure o Steam ID para analisar demos pessoais.</p>
+
+      <div class="sidebar-summary" *ngIf="summary">
+        <div class="sidebar-stat">
+          <span class="sidebar-stat-value">{{ summary.demosCompleted }}</span>
+          <span class="sidebar-stat-label">Demos analisadas</span>
+        </div>
+        <div class="sidebar-stat">
+          <span class="sidebar-stat-value">{{ summary.kills }}</span>
+          <span class="sidebar-stat-label">Kills totais</span>
         </div>
       </div>
 
-      <div *ngIf="successMsg" class="success-message">{{ successMsg }}</div>
+      <button type="button" class="btn btn-primary w-full sidebar-btn" (click)="openUploadModal()">
+        + Enviar Demo
+      </button>
+    </aside>
+
+    <main class="profile-main">
+      <nav class="profile-tabs" aria-label="Seções do perfil">
+        <button type="button" class="profile-tab" [class.active]="activeTab === 'stats'" (click)="setTab('stats')">Stats</button>
+        <button type="button" class="profile-tab" [class.active]="activeTab === 'demos'" (click)="setTab('demos')">Demos</button>
+        <button type="button" class="profile-tab" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">Configurações</button>
+      </nav>
+
       <div *ngIf="errorMsg" class="error-message mb-4">{{ errorMsg }}</div>
 
-      <h2 class="section-title">Editar Perfil</h2>
-      <form [formGroup]="profileForm" (ngSubmit)="onUpdateProfile()" class="form-group-spacing">
-        <div class="form-group">
-          <label for="displayName" class="form-label">Nome de Exibição</label>
-          <input type="text" id="displayName" formControlName="displayName" class="input-field">
+      <!-- STATS -->
+      <section *ngIf="activeTab === 'stats'" class="stats-section">
+        <div *ngIf="statsLoading" class="loading">Carregando estatísticas...</div>
+
+        <div *ngIf="!statsLoading && !hasStats" class="stats-empty gc-card">
+          <h2 class="section-title">Sem estatísticas ainda</h2>
+          <p class="meta">Envie uma demo pessoal para ver seu dashboard de performance.</p>
+          <button type="button" class="btn btn-primary mt-4" (click)="openUploadModal()">Enviar primeira demo</button>
         </div>
-        <div class="form-group">
-          <label for="steamId" class="form-label">Steam ID</label>
-          <input type="text" id="steamId" formControlName="steamId" class="input-field" placeholder="76561198...">
+
+        <div *ngIf="!statsLoading && hasStats && summary" class="stats-grid">
+          <div class="stat-card stat-card-gauge">
+            <span class="stat-card-label">K/D</span>
+            <div class="gauge" [style.--pct]="kdGaugePercent() + '%'">
+              <div class="gauge-inner">
+                <span class="gauge-value">{{ summary.kd }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-gauge">
+            <span class="stat-card-label">Rating</span>
+            <div class="gauge gauge-green" [style.--pct]="ratingGaugePercent() + '%'">
+              <div class="gauge-inner">
+                <span class="gauge-value">{{ summary.rating }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-gauge">
+            <span class="stat-card-label">KAST</span>
+            <div class="gauge gauge-blue" [style.--pct]="kastGaugePercent() + '%'">
+              <div class="gauge-inner">
+                <span class="gauge-value">{{ summary.kast }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card stat-card-matches">
+            <span class="stat-card-label">Demos</span>
+            <div class="match-dots" *ngIf="recentDemos.length > 0">
+              <span
+                *ngFor="let d of recentDemos"
+                class="match-dot"
+                [ngClass]="demoGridClass(d.status)"
+                [title]="d.fileName">
+              </span>
+            </div>
+            <p class="stat-card-meta">{{ summary.demosCompleted }} analisadas de {{ summary.demosTotal }}</p>
+          </div>
+
+          <div class="stat-card stat-card-metric">
+            <span class="stat-card-label">HS%</span>
+            <div class="metric-head">
+              <span class="metric-icon">◎</span>
+              <span class="metric-value">{{ summary.hsPercent }}%</span>
+            </div>
+            <div class="metric-bar"><div class="metric-bar-fill" [style.width.%]="hsGaugePercent()"></div></div>
+            <ul class="metric-details">
+              <li><span>Kills</span><strong>{{ summary.kills }}</strong></li>
+              <li><span>Deaths</span><strong>{{ summary.deaths }}</strong></li>
+            </ul>
+          </div>
+
+          <div class="stat-card stat-card-metric">
+            <span class="stat-card-label">ADR</span>
+            <div class="metric-head">
+              <span class="metric-icon">✛</span>
+              <span class="metric-value">{{ summary.adr }}</span>
+            </div>
+            <div class="metric-bar"><div class="metric-bar-fill metric-bar-orange" [style.width.%]="adrGaugePercent()"></div></div>
+            <ul class="metric-details">
+              <li><span>Demos</span><strong>{{ summary.demosCompleted }}</strong></li>
+              <li><span>K/D</span><strong>{{ summary.kd }}</strong></li>
+            </ul>
+          </div>
+
+          <div class="stat-card stat-card-wide">
+            <span class="stat-card-label">Histórico por demo</span>
+            <div class="table-container">
+              <table class="stats-table profile-history-table">
+                <thead>
+                  <tr>
+                    <th>Demo</th>
+                    <th>Data</th>
+                    <th>K</th>
+                    <th>D</th>
+                    <th>K/D</th>
+                    <th>ADR</th>
+                    <th>HS%</th>
+                    <th>KAST</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let d of demoStats" [class.row-muted]="d.status !== 'completed'">
+                    <td>
+                      <button type="button" class="demo-link" (click)="viewDemo(d.demoId)" [disabled]="d.status !== 'completed'">
+                        {{ shortFileName(d.fileName) }}
+                      </button>
+                      <span class="badge status-{{ d.status }} badge-tiny" *ngIf="d.status !== 'completed'">{{ getStatusLabel(d.status) }}</span>
+                    </td>
+                    <td>{{ formatDate(d.createdAt) }}</td>
+                    <td>{{ d.status === 'completed' ? d.kills : '—' }}</td>
+                    <td>{{ d.status === 'completed' ? d.deaths : '—' }}</td>
+                    <td class="stat-highlight">{{ d.status === 'completed' ? d.kd : '—' }}</td>
+                    <td>{{ d.status === 'completed' ? d.adr : '—' }}</td>
+                    <td>{{ d.status === 'completed' ? d.hsPercent + '%' : '—' }}</td>
+                    <td>{{ d.status === 'completed' ? d.kast + '%' : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <button type="button" class="btn btn-ghost w-full mb-4" (click)="connectSteam()">
-          Conectar Steam (em breve)
-        </button>
-        <button type="submit" class="btn btn-primary w-full">Salvar Alterações</button>
-      </form>
-    </div>
+      </section>
+
+      <!-- DEMOS -->
+      <section *ngIf="activeTab === 'demos'" class="demos-section gc-card">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Demos Pessoais</h2>
+            <p class="meta">Arquivos .dem vinculados ao seu perfil.</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-small" (click)="openUploadModal()">+ Enviar</button>
+        </div>
+
+        <div *ngIf="demosLoading" class="loading">Carregando demos...</div>
+
+        <ul class="gc-list" *ngIf="!demosLoading && personalDemos.length > 0; else noPersonalDemos">
+          <li *ngFor="let demo of personalDemos" class="gc-list-item personal-demo-item">
+            <div class="personal-demo-row">
+              <div class="personal-demo-info">
+                <span class="demo-name">{{ demo.fileName }}</span>
+                <span class="meta">{{ formatDate(demo.createdAt) }}</span>
+              </div>
+              <div class="personal-demo-actions">
+                <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+                <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">Ver</button>
+                <button *ngIf="canReprocess(demo)" class="btn btn-ghost btn-small" (click)="reprocessDemo(demo)" [disabled]="reprocessingId === demo.id">
+                  {{ reprocessingId === demo.id ? '...' : 'Reprocessar' }}
+                </button>
+                <button *ngIf="canDelete(demo)" class="btn btn-ghost btn-small btn-danger-text" (click)="deleteDemo(demo)" [disabled]="deletingId === demo.id">
+                  {{ deletingId === demo.id ? '...' : 'Excluir' }}
+                </button>
+              </div>
+            </div>
+            <p *ngIf="demo.errorMessage" class="error-message demo-error">{{ demo.errorMessage }}</p>
+          </li>
+        </ul>
+        <ng-template #noPersonalDemos>
+          <p class="meta" *ngIf="!demosLoading">Nenhuma demo pessoal ainda.</p>
+        </ng-template>
+      </section>
+
+      <!-- SETTINGS -->
+      <section *ngIf="activeTab === 'settings'" class="settings-section gc-card">
+        <h2 class="section-title">Editar Perfil</h2>
+        <div *ngIf="successMsg" class="success-message">{{ successMsg }}</div>
+
+        <form [formGroup]="profileForm" (ngSubmit)="onUpdateProfile()" class="form-group-spacing">
+          <div class="form-group">
+            <label for="displayName" class="form-label">Nome de Exibição</label>
+            <input type="text" id="displayName" formControlName="displayName" class="input-field">
+          </div>
+          <div class="form-group">
+            <label for="steamId" class="form-label">Steam ID</label>
+            <input type="text" id="steamId" formControlName="steamId" class="input-field" placeholder="76561198...">
+            <p class="form-hint">Usado para extrair suas estatísticas nas demos pessoais.</p>
+          </div>
+          <button type="button" class="btn btn-ghost w-full mb-4" (click)="connectSteam()">Conectar Steam (em breve)</button>
+          <button type="submit" class="btn btn-primary w-full">Salvar Alterações</button>
+        </form>
+      </section>
+    </main>
   </div>
 </div>
+
+<app-demo-upload-modal
+  *ngIf="showUploadModal"
+  [allowedModes]="['personal']"
+  (closed)="closeUploadModal()"
+  (uploaded)="onDemoUploaded($event)">
+</app-demo-upload-modal>

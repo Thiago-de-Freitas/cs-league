@@ -36,6 +36,24 @@
   letter-spacing: 0.05em;
 }
 
+.bracket-hint {
+  font-size: 0.75rem;
+  color: var(--gc-text-secondary);
+  margin-left: auto;
+}
+
+.bracket-hint-locked {
+  color: var(--gc-green);
+}
+
+.bracket-team-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  height: auto;
+}
+
 .bracket-scroll {
   overflow-x: auto;
   padding: 1.5rem 1rem 2rem;

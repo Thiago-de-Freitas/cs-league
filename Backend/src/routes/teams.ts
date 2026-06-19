@@ -1,8 +1,55 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+const logoStoragePath = process.env.TEAM_LOGO_STORAGE_PATH
+  || path.join(__dirname, '../../data/team-logos');
+
+if (!fs.existsSync(logoStoragePath)) {
+  fs.mkdirSync(logoStoragePath, { recursive: true });
+}
+
+const logoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, logoStoragePath),
+    filename: (_req, file, cb) => {
+      cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'));
+    }
+  },
+});
+
+function publicLogoUrl(fileName: string): string {
+  return `/uploads/team-logos/${fileName}`;
+}
+
+function logoFilePathFromUrl(logoUrl: string | null): string | null {
+  if (!logoUrl?.startsWith('/uploads/team-logos/')) return null;
+  const fileName = path.basename(logoUrl);
+  return path.join(logoStoragePath, fileName);
+}
+
+function deleteLogoFile(logoUrl: string | null): void {
+  const filePath = logoFilePathFromUrl(logoUrl);
+  if (filePath && fs.existsSync(filePath)) {
+    fs.unlink(filePath, () => {});
+  }
+}
 
 async function getTeamWithDetails(teamId: string) {
   return prisma.team.findUnique({
@@ -34,6 +81,7 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
     id: team.id,
     name: team.name,
     tag: team.tag,
+    logoUrl: team.logoUrl,
     ownerId: team.ownerId,
     owner: team.owner,
     wins,
@@ -82,6 +130,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         id: team.id,
         name: team.name,
         tag: team.tag,
+        logoUrl: team.logoUrl,
         ownerId: team.ownerId,
         players: team.members.map((m) => ({
           id: m.user.id,
@@ -178,6 +227,65 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.post('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req: AuthRequest, res: Response) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+    if (team.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'Arquivo de imagem é obrigatório' });
+      return;
+    }
+
+    const logoUrl = publicLogoUrl(req.file.filename);
+    deleteLogoFile(team.logoUrl);
+
+    await prisma.team.update({
+      where: { id: req.params.id },
+      data: { logoUrl },
+    });
+
+    const full = await getTeamWithDetails(req.params.id);
+    res.json(formatTeam(full!));
+  } catch (err) {
+    console.error(err);
+    if (req.file) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ error: 'Erro ao enviar logo' });
+  }
+});
+
+router.delete('/:id/logo', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+    if (team.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    deleteLogoFile(team.logoUrl);
+    await prisma.team.update({
+      where: { id: req.params.id },
+      data: { logoUrl: null },
+    });
+
+    const full = await getTeamWithDetails(req.params.id);
+    res.json(formatTeam(full!));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover logo' });
+  }
+});
+
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const team = await prisma.team.findUnique({ where: { id: req.params.id } });
@@ -201,6 +309,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     }
 
     await prisma.team.delete({ where: { id: req.params.id } });
+    deleteLogoFile(team.logoUrl);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

@@ -8,8 +8,9 @@ import { LeagueService } from '../../Services/league.service';
 import { AuthService } from '../../Services/auth.service';
 import { MatchService } from '../../Services/match.service';
 import { LeagueTeamsTableComponent } from './league-teams-table.component';
-import { LeagueBracketComponent } from '../../Components/league-bracket/league-bracket.component';
+import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components/league-bracket/league-bracket.component';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
+import { NotificationService } from '../../Services/notification.service';
 import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
 
 interface ConfirmConfig {
@@ -47,12 +48,8 @@ export class LeagueDetailsComponent implements OnInit {
   isAdmin = false;
   errorMsg = '';
   showAddTeam = false;
-  showCreateMatch = false;
   selectedTeamIds: string[] = [];
   addingTeams = false;
-  matchTeam1Id = '';
-  matchTeam2Id = '';
-  matchMap = '';
   availableTeams: Pick<Team, 'id' | 'name' | 'tag'>[] = [];
   bracketSizes = ALLOWED_BRACKET_SIZES;
   editMaxTeams = false;
@@ -69,7 +66,8 @@ export class LeagueDetailsComponent implements OnInit {
     private router: Router,
     private leagueService: LeagueService,
     private matchService: MatchService,
-    private authService: AuthService
+    private authService: AuthService,
+    private notify: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -122,6 +120,64 @@ export class LeagueDetailsComponent implements OnInit {
     return (this.league.maxTeams || 8) - this.league.teams.length;
   }
 
+  get selectionOverLimit(): boolean {
+    return this.selectedTeamIds.length > this.remainingSlots;
+  }
+
+  get canSubmitTeamSelection(): boolean {
+    return this.selectedTeamIds.length > 0 && !this.selectionOverLimit && this.remainingSlots > 0;
+  }
+
+  private apiError(err: unknown, fallback: string): void {
+    const msg = (err as { error?: { error?: string } })?.error?.error || fallback;
+    this.notify.error(msg);
+  }
+
+  get hasBracketGenerated(): boolean {
+    const matches = this.league?.matches || [];
+    return matches.some((m) => m.round != null && m.round > 0);
+  }
+
+  onBracketSeedAssign(event: BracketSeedAssignEvent): void {
+    if (!this.leagueId || !this.league || this.hasBracketGenerated) return;
+
+    const teams = this.league.teams.map((t) => ({ ...t }));
+
+    if (!event.teamId) {
+      const holder = teams.find((t) => t.seed === event.seed);
+      if (!holder) return;
+      const usedSeeds = new Set(teams.map((t) => t.seed).filter((s): s is number => s != null));
+      let next = 1;
+      while (usedSeeds.has(next) || next === event.seed) next++;
+      holder.seed = next;
+      this.persistTeamSeeds(teams);
+      return;
+    }
+
+    const target = teams.find((t) => t.id === event.teamId);
+    const holder = teams.find((t) => t.seed === event.seed);
+    if (!target) return;
+
+    const previousSeed = target.seed;
+    target.seed = event.seed;
+    if (holder && holder.id !== event.teamId) {
+      holder.seed = previousSeed;
+    }
+
+    this.persistTeamSeeds(teams);
+  }
+
+  private persistTeamSeeds(teams: Team[]): void {
+    if (!this.leagueId) return;
+    const payload = teams
+      .filter((t) => t.seed != null)
+      .map((t) => ({ teamId: t.id, seed: t.seed! }));
+    this.leagueService.updateTeamsOrder(this.leagueId, payload).subscribe({
+      next: () => this.fetchLeagueDetails(this.leagueId!),
+      error: (err) => this.apiError(err, 'Erro ao atualizar chaveamento'),
+    });
+  }
+
   updateMaxTeams(): void {
     if (!this.leagueId) return;
     this.leagueService.updateLeague(this.leagueId, { maxTeams: Number(this.newMaxTeams) }).subscribe({
@@ -129,7 +185,7 @@ export class LeagueDetailsComponent implements OnInit {
         this.league = league;
         this.editMaxTeams = false;
       },
-      error: (err) => alert(err.error?.error || 'Erro ao atualizar limite de times')
+      error: (err) => this.apiError(err, 'Erro ao atualizar limite de times')
     });
   }
 
@@ -143,7 +199,7 @@ export class LeagueDetailsComponent implements OnInit {
       },
       error: (err) => {
         this.generatingBracket = false;
-        alert(err.error?.error || 'Erro ao gerar chaveamento');
+        this.apiError(err, 'Erro ao gerar chaveamento');
       }
     });
   }
@@ -151,7 +207,11 @@ export class LeagueDetailsComponent implements OnInit {
   openAddTeam(): void {
     if (!this.leagueId) return;
     if (this.teamsAtCapacity) {
-      alert(`Limite de ${this.league?.maxTeams} times atingido.`);
+      this.notify.warning(
+        `Esta liga já atingiu o limite de ${this.league?.maxTeams} times.`,
+        'Limite atingido',
+        { highlight: `${this.league?.teams.length} / ${this.league?.maxTeams} vagas` }
+      );
       return;
     }
     this.showAddTeam = true;
@@ -162,7 +222,7 @@ export class LeagueDetailsComponent implements OnInit {
         this.availableTeams = teams;
       },
       error: () => {
-        alert('Erro ao carregar times disponíveis.');
+        this.notify.error('Erro ao carregar times disponíveis.');
         this.showAddTeam = false;
       }
     });
@@ -171,26 +231,39 @@ export class LeagueDetailsComponent implements OnInit {
   addTeamsToLeague(): void {
     if (!this.leagueId || this.selectedTeamIds.length === 0) return;
 
-    const toAdd = this.selectedTeamIds.slice(0, this.remainingSlots);
-    if (toAdd.length === 0) {
-      alert('Limite de times da liga atingido.');
+    if (this.remainingSlots <= 0) {
+      this.notify.warning('Limite de times da liga atingido.', 'Sem vagas');
       return;
     }
-    if (toAdd.length < this.selectedTeamIds.length) {
-      alert(`Só é possível adicionar mais ${this.remainingSlots} time(s).`);
+
+    if (this.selectionOverLimit) {
+      this.notify.warning(
+        `Você selecionou ${this.selectedTeamIds.length} time(s), mas só há ${this.remainingSlots} vaga(s) disponível(is).`,
+        'Seleção excede o limite',
+        {
+          hint: 'Desmarque alguns times ou altere o limite da liga.',
+          highlight: `${this.selectedTeamIds.length} selecionados · ${this.remainingSlots} vaga(s)`,
+        }
+      );
+      return;
     }
 
     this.addingTeams = true;
-    this.leagueService.addTeamsToLeague(this.leagueId, toAdd).subscribe({
+    const count = this.selectedTeamIds.length;
+    this.leagueService.addTeamsToLeague(this.leagueId, this.selectedTeamIds).subscribe({
       next: (league) => {
         this.league = league;
         this.showAddTeam = false;
         this.selectedTeamIds = [];
         this.addingTeams = false;
+        this.notify.success(
+          `${count} time(s) adicionado(s) à liga.`,
+          'Times adicionados'
+        );
       },
       error: (err) => {
         this.addingTeams = false;
-        alert(err.error?.error || 'Erro ao adicionar times');
+        this.apiError(err, 'Erro ao adicionar times');
         if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
       }
     });
@@ -201,31 +274,17 @@ export class LeagueDetailsComponent implements OnInit {
     this.selectedTeamIds = [];
   }
 
-  createMatch(): void {
-    if (!this.leagueId || !this.matchTeam1Id || !this.matchTeam2Id) return;
-    this.leagueService.createMatch(this.leagueId, this.matchTeam1Id, this.matchTeam2Id, this.matchMap).subscribe({
-      next: () => {
-        this.showCreateMatch = false;
-        this.matchTeam1Id = '';
-        this.matchTeam2Id = '';
-        this.matchMap = '';
-        if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
-      },
-      error: (err) => alert(err.error?.error || 'Erro ao criar partida')
-    });
-  }
-
   registerResult(match: Match, winnerId: string): void {
     this.matchService.registerResult(match.id, winnerId).subscribe({
       next: () => {
         if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
       },
-      error: (err) => alert(err.error?.error || 'Erro ao registrar resultado')
+      error: (err) => this.apiError(err, 'Erro ao registrar resultado')
     });
   }
 
   onTeamsReordered(teams: Team[]): void {
-    if (!this.leagueId) return;
+    if (!this.leagueId || this.hasBracketGenerated) return;
     const payload = teams.map((t, i) => ({ teamId: t.id, seed: i + 1 }));
     this.leagueService.updateTeamsOrder(this.leagueId, payload).subscribe();
   }
@@ -260,7 +319,7 @@ export class LeagueDetailsComponent implements OnInit {
           error: (err) => {
             this.confirmLoading = false;
             this.confirmConfig = null;
-            alert(err.error?.error || 'Erro ao remover time');
+            this.apiError(err, 'Erro ao remover time');
           }
         });
       }
@@ -290,7 +349,7 @@ export class LeagueDetailsComponent implements OnInit {
             this.deletingLeague = false;
             this.confirmLoading = false;
             this.confirmConfig = null;
-            alert(err.error?.error || 'Erro ao excluir liga');
+            this.apiError(err, 'Erro ao excluir liga');
           }
         });
       }
@@ -315,7 +374,7 @@ export class LeagueDetailsComponent implements OnInit {
             this.archivingLeague = false;
             this.confirmLoading = false;
             this.confirmConfig = null;
-            alert(err.error?.error || 'Erro ao arquivar liga');
+            this.apiError(err, 'Erro ao arquivar liga');
           }
         });
       }
@@ -344,7 +403,7 @@ export class LeagueDetailsComponent implements OnInit {
             this.unarchivingLeague = false;
             this.confirmLoading = false;
             this.confirmConfig = null;
-            alert(err.error?.error || 'Erro ao desarquivar liga');
+            this.apiError(err, 'Erro ao desarquivar liga');
           }
         });
       }

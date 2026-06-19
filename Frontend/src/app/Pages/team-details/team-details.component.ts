@@ -6,6 +6,7 @@ import { TeamService } from '../../Services/team.service';
 import { AuthService } from '../../Services/auth.service';
 import { Team, TeamInvite, User } from '../../Models/interfaces';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
+import { NotificationService } from '../../Services/notification.service';
 
 @Component({
   selector: 'app-team-details',
@@ -27,12 +28,14 @@ export class TeamDetailsComponent implements OnInit {
   inviteError = '';
   deletingTeam = false;
   showDeleteConfirm = false;
+  uploadingLogo = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private teamService: TeamService,
-    private authService: AuthService
+    private authService: AuthService,
+    private notify: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -123,7 +126,7 @@ export class TeamDetailsComponent implements OnInit {
       error: (err) => {
         this.deletingTeam = false;
         this.showDeleteConfirm = false;
-        alert(err.error?.error || 'Erro ao excluir time');
+        this.notify.error(err.error?.error || 'Erro ao excluir time');
       }
     });
   }
@@ -132,5 +135,49 @@ export class TeamDetailsComponent implements OnInit {
     if (!this.deletingTeam) {
       this.showDeleteConfirm = false;
     }
+  }
+
+  onLogoSelected(event: Event): void {
+    if (!this.teamId) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.notify.warning('A imagem deve ter no máximo 2 MB.', 'Arquivo grande');
+      input.value = '';
+      return;
+    }
+
+    this.uploadingLogo = true;
+    this.teamService.uploadLogo(this.teamId, file).subscribe({
+      next: (team) => {
+        this.team = team;
+        this.uploadingLogo = false;
+        input.value = '';
+        this.notify.success('Logo atualizada com sucesso.', 'Logo do time');
+      },
+      error: (err) => {
+        this.uploadingLogo = false;
+        input.value = '';
+        this.notify.error(err.error?.error || 'Erro ao enviar logo.');
+      }
+    });
+  }
+
+  removeLogo(): void {
+    if (!this.teamId || !this.team?.logoUrl) return;
+    this.uploadingLogo = true;
+    this.teamService.removeLogo(this.teamId).subscribe({
+      next: (team) => {
+        this.team = team;
+        this.uploadingLogo = false;
+        this.notify.success('Logo removida.', 'Logo do time');
+      },
+      error: (err) => {
+        this.uploadingLogo = false;
+        this.notify.error(err.error?.error || 'Erro ao remover logo.');
+      }
+    });
   }
 }

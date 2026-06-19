@@ -31,17 +31,20 @@ npm run dev
 
 API em http://localhost:3000
 
-### 3. Worker (opcional, para processar demos)
+### 3. Worker (necessário para processar demos)
+
+As demos ficam em **Aguardando** até o worker consumir a fila Redis. Rode em um terminal separado:
 
 ```powershell
 cd Worker
 pip install -r requirements.txt
-# PowerShell:
+# PowerShell — use o mesmo DATABASE_URL e REDIS_URL do Backend/.env
 $env:DATABASE_URL="postgresql://csleague:csleague@localhost:5432/csleague"
 $env:REDIS_URL="redis://localhost:6379"
-$env:DEMO_STORAGE_PATH="../data/demos"
 python worker.py
 ```
+
+O backend grava o caminho absoluto do arquivo `.dem` na fila; o worker precisa rodar na **mesma máquina** que a API.
 
 ### 4. Frontend
 
