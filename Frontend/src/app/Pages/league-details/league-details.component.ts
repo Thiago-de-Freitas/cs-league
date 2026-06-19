@@ -11,6 +11,7 @@ import { TeamService } from '../../Services/team.service';
 import { LeagueTeamsTableComponent } from './league-teams-table.component';
 import { LeagueBracketComponent } from '../../Components/league-bracket/league-bracket.component';
 import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
+import { concatMap, from, last } from 'rxjs';
 
 @Component({
   selector: 'app-league-details',
@@ -35,7 +36,8 @@ export class LeagueDetailsComponent implements OnInit {
   errorMsg = '';
   showAddTeam = false;
   showCreateMatch = false;
-  selectedTeamId = '';
+  selectedTeamIds: string[] = [];
+  addingTeams = false;
   matchTeam1Id = '';
   matchTeam2Id = '';
   matchMap = '';
@@ -85,6 +87,11 @@ export class LeagueDetailsComponent implements OnInit {
     return this.league.teams.length >= (this.league.maxTeams || 8);
   }
 
+  get remainingSlots(): number {
+    if (!this.league) return 0;
+    return (this.league.maxTeams || 8) - this.league.teams.length;
+  }
+
   updateMaxTeams(): void {
     if (!this.leagueId) return;
     this.leagueService.updateLeague(this.leagueId, { maxTeams: Number(this.newMaxTeams) }).subscribe({
@@ -117,6 +124,7 @@ export class LeagueDetailsComponent implements OnInit {
       return;
     }
     this.showAddTeam = true;
+    this.selectedTeamIds = [];
     this.teamService.getTeams().subscribe({
       next: (teams) => {
         const inLeague = new Set(this.league?.teams.map((t) => t.id) || []);
@@ -125,16 +133,40 @@ export class LeagueDetailsComponent implements OnInit {
     });
   }
 
-  addTeamToLeague(): void {
-    if (!this.leagueId || !this.selectedTeamId) return;
-    this.leagueService.addTeamToLeague(this.leagueId, this.selectedTeamId).subscribe({
+  addTeamsToLeague(): void {
+    if (!this.leagueId || this.selectedTeamIds.length === 0) return;
+
+    const toAdd = this.selectedTeamIds.slice(0, this.remainingSlots);
+    if (toAdd.length === 0) {
+      alert('Limite de times da liga atingido.');
+      return;
+    }
+    if (toAdd.length < this.selectedTeamIds.length) {
+      alert(`Só é possível adicionar mais ${this.remainingSlots} time(s).`);
+    }
+
+    this.addingTeams = true;
+    from(toAdd).pipe(
+      concatMap((teamId) => this.leagueService.addTeamToLeague(this.leagueId!, teamId)),
+      last()
+    ).subscribe({
       next: (league) => {
         this.league = league;
         this.showAddTeam = false;
-        this.selectedTeamId = '';
+        this.selectedTeamIds = [];
+        this.addingTeams = false;
       },
-      error: (err) => alert(err.error?.error || 'Erro ao adicionar time')
+      error: (err) => {
+        this.addingTeams = false;
+        alert(err.error?.error || 'Erro ao adicionar times');
+        if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
+      }
     });
+  }
+
+  cancelAddTeams(): void {
+    this.showAddTeam = false;
+    this.selectedTeamIds = [];
   }
 
   createMatch(): void {

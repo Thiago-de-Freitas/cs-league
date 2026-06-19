@@ -43,8 +43,17 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API rodando na porta ${PORT}`);
 });
+
+function shutdown() {
+  server.close(() => {
+    prisma.$disconnect().finally(() => process.exit(0));
+  });
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export default app;

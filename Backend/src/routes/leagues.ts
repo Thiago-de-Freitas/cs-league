@@ -132,7 +132,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
     res.json(formatLeague(league));
   } catch (err) {
-    console.error(err);
+    console.error('GET /api/leagues/:id', err);
     res.status(500).json({ error: 'Erro ao buscar liga' });
   }
 });

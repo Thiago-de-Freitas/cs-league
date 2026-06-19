@@ -44,12 +44,26 @@
       <p class="admin-hint">O chaveamento usa seeding justo: com jogos disputados, ordena por pontos/vitórias; senão, pela ordem manual dos seeds.</p>
 
       <div *ngIf="showAddTeam" class="admin-form">
-        <select [(ngModel)]="selectedTeamId" class="input-field">
-          <option value="">Selecione um time</option>
+        <label class="form-label" for="team-multi-select">Times disponíveis</label>
+        <select
+          id="team-multi-select"
+          multiple
+          [(ngModel)]="selectedTeamIds"
+          class="input-field multi-select"
+          [size]="availableTeams.length > 6 ? 6 : (availableTeams.length || 3)">
           <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
         </select>
-        <button class="btn btn-primary" (click)="addTeamToLeague()">Confirmar</button>
-        <button class="btn btn-secondary" (click)="showAddTeam = false">Cancelar</button>
+        <p class="admin-hint">
+          Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
+          {{ selectedTeamIds.length }} selecionado(s) · {{ remainingSlots }} vaga(s) restante(s)
+        </p>
+        <button
+          class="btn btn-primary"
+          (click)="addTeamsToLeague()"
+          [disabled]="addingTeams || selectedTeamIds.length === 0">
+          {{ addingTeams ? 'Adicionando...' : (selectedTeamIds.length ? 'Adicionar ' + selectedTeamIds.length + ' time(s)' : 'Adicionar times') }}
+        </button>
+        <button class="btn btn-secondary" (click)="cancelAddTeams()" [disabled]="addingTeams">Cancelar</button>
       </div>
 
       <div *ngIf="showCreateMatch" class="admin-form">

@@ -28,6 +28,9 @@ export function getFirstRoundPairings(bracketSize: number): [number, number][] {
 
 export interface BracketSlot {
   name: string;
+  shortName?: string;
+  tag?: string;
+  seed?: number;
   teamId?: string;
   isBye: boolean;
   isWinner?: boolean;
@@ -37,9 +40,12 @@ export interface BracketMatchView {
   teamA: BracketSlot;
   teamB: BracketSlot;
   matchId?: string;
+  status?: string;
 }
 
-export interface BracketRoundView {
+export interface BracketColumnView {
+  round: number;
+  label: string;
   matches: BracketMatchView[];
 }
 
@@ -75,37 +81,65 @@ export function rankTeamsForSeeding(teams: TeamSeedInput[]): TeamSeedInput[] {
   });
 }
 
-function slotFromSeed(
-  seed: number,
-  seedMap: Map<number, TeamSeedInput>
-): BracketSlot {
-  const team = seedMap.get(seed);
-  if (!team) {
-    return { name: 'BYE', isBye: true };
-  }
-  return { name: team.tag ? `${team.name} [${team.tag}]` : team.name, teamId: team.id, isBye: false };
+function roundLabel(round: number, totalRounds: number): string {
+  const remaining = totalRounds - round + 1;
+  if (remaining === 1) return 'Final';
+  if (remaining === 2) return 'Semifinais';
+  if (remaining === 3) return 'Quartas de final';
+  if (remaining === 4) return 'Oitavas de final';
+  if (remaining === 5) return 'Round de 32';
+  return `Rodada ${round}`;
 }
 
-function emptyMatch(): BracketMatchView {
+function slotFromSeed(seed: number, seedMap: Map<number, TeamSeedInput>): BracketSlot {
+  const team = seedMap.get(seed);
+  if (!team) {
+    return { name: 'BYE', shortName: 'BYE', isBye: true };
+  }
   return {
-    teamA: { name: '—', isBye: false },
-    teamB: { name: '—', isBye: false },
+    name: team.name,
+    shortName: team.name,
+    tag: team.tag,
+    seed,
+    teamId: team.id,
+    isBye: false,
   };
 }
 
-function winnerName(match: BracketMatchView): string {
-  if (match.teamA.isWinner) return match.teamA.name;
-  if (match.teamB.isWinner) return match.teamB.name;
-  return '—';
+function emptySlot(): BracketSlot {
+  return { name: '—', shortName: '—', isBye: false };
+}
+
+function winnerSlot(match: BracketMatchView): BracketSlot | null {
+  if (match.teamA.isWinner) return match.teamA;
+  if (match.teamB.isWinner) return match.teamB;
+  return null;
 }
 
 function applyMatchResult(match: BracketMatchView, m: MatchInput): BracketMatchView {
-  const updated = { ...match, matchId: m.id };
+  const updated: BracketMatchView = {
+    ...match,
+    matchId: m.id,
+    status: m.status,
+  };
   if (m.status === 'completed' && m.winnerId) {
     updated.teamA = { ...updated.teamA, isWinner: m.winnerId === updated.teamA.teamId };
     updated.teamB = { ...updated.teamB, isWinner: m.winnerId === updated.teamB.teamId };
   }
   return updated;
+}
+
+function advanceRound(matches: BracketMatchView[]): BracketMatchView[] {
+  const next: BracketMatchView[] = [];
+  for (let i = 0; i < matches.length; i += 2) {
+    const w1 = winnerSlot(matches[i]);
+    const w2 = matches[i + 1] ? winnerSlot(matches[i + 1]) : null;
+    next.push({
+      teamA: w1 ?? emptySlot(),
+      teamB: w2 ?? emptySlot(),
+    });
+  }
+  return next;
 }
 
 export function buildBracketView(
@@ -114,19 +148,17 @@ export function buildBracketView(
   matches: MatchInput[] = []
 ): {
   bracketSize: number;
-  leftRounds: BracketRoundView[];
-  rightRounds: BracketRoundView[];
-  semiFinals: BracketRoundView;
-  finalRound: BracketRoundView;
+  columns: BracketColumnView[];
   totalRounds: number;
 } {
   const bracketSize = maxTeams || 8;
+  const totalRounds = Math.log2(bracketSize);
   const ranked = rankTeamsForSeeding(teams);
   const seedMap = new Map<number, TeamSeedInput>();
   ranked.forEach((t, i) => seedMap.set(i + 1, t));
 
   const pairings = getFirstRoundPairings(bracketSize);
-  const r1Matches: BracketMatchView[] = pairings.map(([s1, s2], idx) => {
+  let currentRound: BracketMatchView[] = pairings.map(([s1, s2], idx) => {
     const base: BracketMatchView = {
       teamA: slotFromSeed(s1, seedMap),
       teamB: slotFromSeed(s2, seedMap),
@@ -135,73 +167,17 @@ export function buildBracketView(
     return dbMatch ? applyMatchResult(base, dbMatch) : base;
   });
 
-  const half = bracketSize / 4;
-  const leftR1 = r1Matches.slice(0, half);
-  const rightR1 = [...r1Matches.slice(half)].reverse();
-
-  const totalRounds = Math.log2(bracketSize);
-  const leftRounds: BracketRoundView[] = [{ matches: leftR1 }];
-  const rightRounds: BracketRoundView[] = [{ matches: rightR1 }];
-
-  let leftPrev = leftR1;
-  let rightPrev = rightR1;
-
-  for (let r = 2; r < totalRounds; r++) {
-    const count = leftPrev.length / 2;
-    const leftNext: BracketMatchView[] = [];
-    const rightNext: BracketMatchView[] = [];
-
-    for (let i = 0; i < count; i++) {
-      const lm = emptyMatch();
-      const rm = emptyMatch();
-      const w1 = winnerName(leftPrev[i * 2]);
-      const w2 = winnerName(leftPrev[i * 2 + 1]);
-      if (w1 !== '—') lm.teamA = { name: w1, isBye: false };
-      if (w2 !== '—') lm.teamB = { name: w2, isBye: false };
-
-      const rw1 = winnerName(rightPrev[i * 2]);
-      const rw2 = winnerName(rightPrev[i * 2 + 1]);
-      if (rw1 !== '—') rm.teamA = { name: rw1, isBye: false };
-      if (rw2 !== '—') rm.teamB = { name: rw2, isBye: false };
-
-      leftNext.push(lm);
-      rightNext.push(rm);
+  const columns: BracketColumnView[] = [];
+  for (let round = 1; round <= totalRounds; round++) {
+    columns.push({
+      round,
+      label: roundLabel(round, totalRounds),
+      matches: currentRound,
+    });
+    if (round < totalRounds) {
+      currentRound = advanceRound(currentRound);
     }
-
-    leftRounds.push({ matches: leftNext });
-    rightRounds.unshift({ matches: rightNext });
-    leftPrev = leftNext;
-    rightPrev = rightNext;
   }
 
-  const semiFinals: BracketRoundView = {
-    matches: [
-      {
-        teamA: leftPrev[0] ? { name: winnerName(leftPrev[0]), isBye: false } : { name: '—', isBye: false },
-        teamB: { name: '—', isBye: false },
-      },
-      {
-        teamA: rightPrev[0] ? { name: winnerName(rightPrev[0]), isBye: false } : { name: '—', isBye: false },
-        teamB: { name: '—', isBye: false },
-      },
-    ],
-  };
-
-  const finalRound: BracketRoundView = {
-    matches: [
-      {
-        teamA: { name: winnerName(semiFinals.matches[0]), isBye: false },
-        teamB: { name: winnerName(semiFinals.matches[1]), isBye: false },
-      },
-    ],
-  };
-
-  return {
-    bracketSize,
-    leftRounds,
-    rightRounds,
-    semiFinals,
-    finalRound,
-    totalRounds,
-  };
+  return { bracketSize, columns, totalRounds };
 }

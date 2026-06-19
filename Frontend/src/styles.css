@@ -35,7 +35,31 @@ a { color: inherit; text-decoration: none; }
   color: var(--gc-text-secondary);
 }
 
-.teams-capacity {
+.admin-hint kbd {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  background: var(--gc-surface-elevated);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  color: var(--gc-text-secondary);
+}
+
+.multi-select {
+  min-height: 9rem;
+  padding: 0.25rem;
+}
+
+.multi-select option {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.multi-select option:checked {
+  background: linear-gradient(var(--gc-orange-dim), var(--gc-orange-dim));
   color: var(--gc-orange);
   font-weight: 600;
 }

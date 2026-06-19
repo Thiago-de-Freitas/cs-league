@@ -1,45 +1,42 @@
 <div class="playoff-bracket" *ngIf="hasTeams; else emptyBracket">
-  <div class="bracket-header">
+  <div class="bracket-toolbar">
     <span class="teams-count">{{ teams.length }} / {{ bracketSize }} times</span>
+    <span class="bracket-format">Eliminatória simples</span>
   </div>
 
-  <div class="bracket-body">
-    <div class="bracket-half left-half">
-      <div class="bracket-round" *ngFor="let round of leftRounds; let ri = index" [class]="'round-' + (ri + 1)">
-        <div class="bracket-match" *ngFor="let match of round.matches">
-          <div class="team-placeholder" [class.bye]="match.teamA.isBye" [class.winner]="match.teamA.isWinner">
-            {{ match.teamA.name }}
-          </div>
-          <div class="team-placeholder" [class.bye]="match.teamB.isBye" [class.winner]="match.teamB.isWinner">
-            {{ match.teamB.name }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="bracket-middle">
-      <div class="bracket-round semi-finals">
-        <div class="bracket-match" *ngFor="let match of semiFinals.matches">
-          <div class="team-placeholder" [class.winner]="match.teamA.isWinner">{{ match.teamA.name }}</div>
-          <div class="team-placeholder" [class.winner]="match.teamB.isWinner">{{ match.teamB.name }}</div>
-        </div>
-      </div>
-      <div class="bracket-round final-round">
-        <div class="bracket-match final-match" *ngFor="let match of finalRound.matches">
-          <div class="team-placeholder" [class.winner]="match.teamA.isWinner">{{ match.teamA.name }}</div>
-          <div class="team-placeholder" [class.winner]="match.teamB.isWinner">{{ match.teamB.name }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="bracket-half right-half">
-      <div class="bracket-round" *ngFor="let round of rightRounds; let ri = index" [class]="'round-' + (rightRounds.length - ri)">
-        <div class="bracket-match" *ngFor="let match of round.matches">
-          <div class="team-placeholder" [class.bye]="match.teamA.isBye" [class.winner]="match.teamA.isWinner">
-            {{ match.teamA.name }}
-          </div>
-          <div class="team-placeholder" [class.bye]="match.teamB.isBye" [class.winner]="match.teamB.isWinner">
-            {{ match.teamB.name }}
+  <div class="bracket-scroll">
+    <div class="bracket-tree" [style.min-height.px]="treeHeight">
+      <div
+        class="bracket-column"
+        *ngFor="let col of columns; let last = last"
+        [class.is-final]="col.label === 'Final'"
+        [class.is-last]="last">
+        <div class="round-label">{{ col.label }}</div>
+        <div class="round-matches" [style.min-height.px]="treeHeight - 40">
+          <div
+            class="bracket-match"
+            *ngFor="let match of col.matches"
+            [class.is-completed]="match.status === 'completed'"
+            [class.is-live]="match.status === 'in_progress'">
+            <div class="match-status" *ngIf="match.status">{{ statusLabel(match.status) }}</div>
+            <div
+              class="team-row"
+              [class.bye]="match.teamA.isBye"
+              [class.winner]="match.teamA.isWinner"
+              [class.loser]="match.status === 'completed' && !match.teamA.isWinner && !match.teamA.isBye">
+              <span class="team-seed" *ngIf="match.teamA.seed">{{ match.teamA.seed }}</span>
+              <span class="team-name">{{ match.teamA.tag ? match.teamA.name + ' [' + match.teamA.tag + ']' : match.teamA.name }}</span>
+              <span class="team-badge" *ngIf="match.teamA.isWinner">W</span>
+            </div>
+            <div
+              class="team-row"
+              [class.bye]="match.teamB.isBye"
+              [class.winner]="match.teamB.isWinner"
+              [class.loser]="match.status === 'completed' && !match.teamB.isWinner && !match.teamB.isBye">
+              <span class="team-seed" *ngIf="match.teamB.seed">{{ match.teamB.seed }}</span>
+              <span class="team-name">{{ match.teamB.tag ? match.teamB.name + ' [' + match.teamB.tag + ']' : match.teamB.name }}</span>
+              <span class="team-badge" *ngIf="match.teamB.isWinner">W</span>
+            </div>
           </div>
         </div>
       </div>

@@ -1,10 +1,7 @@
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Team, Match } from '../../Models/interfaces';
-import {
-  BracketRoundView,
-  buildBracketView,
-} from '../../Utils/bracket.util';
+import { BracketColumnView, buildBracketView } from '../../Utils/bracket.util';
 
 @Component({
   selector: 'app-league-bracket',
@@ -19,15 +16,23 @@ export class LeagueBracketComponent implements OnChanges {
   @Input() matches: Match[] = [];
 
   bracketSize = 8;
-  leftRounds: BracketRoundView[] = [];
-  rightRounds: BracketRoundView[] = [];
-  semiFinals: BracketRoundView = { matches: [] };
-  finalRound: BracketRoundView = { matches: [] };
+  columns: BracketColumnView[] = [];
   hasTeams = false;
+  treeHeight = 0;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['teams'] || changes['maxTeams'] || changes['matches']) {
       this.rebuild();
+    }
+  }
+
+  statusLabel(status?: string): string {
+    switch (status) {
+      case 'completed': return 'Finalizada';
+      case 'in_progress': return 'Em andamento';
+      case 'scheduled': return 'Agendada';
+      case 'cancelled': return 'Cancelada';
+      default: return '';
     }
   }
 
@@ -37,9 +42,8 @@ export class LeagueBracketComponent implements OnChanges {
 
     const view = buildBracketView(this.teams, this.maxTeams, this.matches);
     this.bracketSize = view.bracketSize;
-    this.leftRounds = view.leftRounds;
-    this.rightRounds = view.rightRounds;
-    this.semiFinals = view.semiFinals;
-    this.finalRound = view.finalRound;
+    this.columns = view.columns;
+    const firstRoundMatches = view.columns[0]?.matches.length ?? 1;
+    this.treeHeight = firstRoundMatches * 76 + Math.max(0, firstRoundMatches - 1) * 20;
   }
 }
