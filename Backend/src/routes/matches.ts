@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
+import { tryCompleteLeague } from '../lib/leagueComplete';
 
 const router = Router();
 
@@ -130,6 +131,8 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         { ...match, winnerId },
         match.league.maxTeams
       );
+
+      await tryCompleteLeague(tx, match.leagueId);
     });
 
     const updated = await prisma.match.findUnique({

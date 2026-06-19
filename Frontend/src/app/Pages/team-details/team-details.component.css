@@ -13,3 +13,4 @@
 .member-name { font-weight: 600; }
 .mt-4 { margin-top: 1.5rem; }
 .mb-4 { margin-bottom: 1rem; }
+.danger-zone { padding-top: 1rem; border-top: 1px solid var(--gc-border); }

@@ -6,8 +6,9 @@
       <span class="teams-capacity">{{ league.teams.length }} / {{ league.maxTeams || 8 }} times</span>
       <span *ngIf="league.startDate">Início: {{ league.startDate | date:'mediumDate' }}</span>
       <span *ngIf="league.endDate">Fim: {{ league.endDate | date:'mediumDate' }}</span>
-      <span class="status-badge status-{{ league.status }}">{{ league.status | uppercase }}</span>
+      <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
     </div>
+    <p *ngIf="isArchived" class="archived-notice">Esta liga está arquivada e não aparece na página inicial.</p>
   </header>
 
   <section class="league-content">
@@ -21,7 +22,7 @@
       </app-league-teams-table>
     </div>
 
-    <div class="section-card" *ngIf="isAdmin">
+    <div class="section-card" *ngIf="isAdmin && !isArchived">
       <h2 class="section-title">Administração</h2>
       <div class="admin-meta">
         <span>Capacidade: <strong>{{ league.teams.length }} / {{ league.maxTeams || 8 }}</strong></span>
@@ -78,6 +79,28 @@
         <input [(ngModel)]="matchMap" class="input-field" placeholder="Mapa (opcional)">
         <button class="btn btn-primary" (click)="createMatch()">Criar</button>
         <button class="btn btn-secondary" (click)="showCreateMatch = false">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="section-card danger-zone" *ngIf="isAdmin">
+      <h2 class="section-title">Zona de Perigo</h2>
+      <p *ngIf="canArchive" class="admin-hint">
+        Todos os jogos foram finalizados. Você pode arquivar a liga para removê-la da página inicial.
+      </p>
+      <div class="danger-actions">
+        <button
+          *ngIf="canArchive"
+          class="btn btn-secondary"
+          (click)="archiveLeague()"
+          [disabled]="archivingLeague">
+          {{ archivingLeague ? 'Arquivando...' : 'Arquivar Liga' }}
+        </button>
+        <button
+          class="btn btn-danger"
+          (click)="deleteLeague()"
+          [disabled]="deletingLeague">
+          {{ deletingLeague ? 'Excluindo...' : 'Excluir Liga' }}
+        </button>
       </div>
     </div>
 

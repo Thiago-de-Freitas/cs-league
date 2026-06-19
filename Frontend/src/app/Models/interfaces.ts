@@ -46,7 +46,7 @@ export interface League {
   endDate?: Date | string | null;
   teams: Team[];
   matches?: Match[];
-  status: 'upcoming' | 'ongoing' | 'completed' | string;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'archived' | string;
   ownerId?: string;
   owner?: { id: string; displayName: string };
   teamCount?: number;
@@ -75,10 +75,17 @@ export interface Demo {
   status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   errorMessage?: string | null;
   matchId?: string | null;
+  isPersonal?: boolean;
   match?: Match | null;
   stats?: MatchPlayerStat[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PersonalDemoValidation {
+  valid: boolean;
+  error?: string;
+  code?: string;
 }
 
 export interface MatchPlayerStat {

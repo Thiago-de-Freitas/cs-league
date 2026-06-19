@@ -179,6 +179,16 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       return;
     }
 
+    const matchCount = await prisma.match.count({
+      where: { OR: [{ team1Id: req.params.id }, { team2Id: req.params.id }] },
+    });
+    if (matchCount > 0) {
+      res.status(400).json({
+        error: 'Não é possível excluir um time com partidas registradas. Remova-o das ligas ou arquive as ligas primeiro.',
+      });
+      return;
+    }
+
     await prisma.team.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {

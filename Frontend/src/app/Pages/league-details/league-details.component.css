@@ -52,6 +52,7 @@
   .status-upcoming { background-color: var(--gc-yellow); color: var(--gc-text-on-success); } /* Amarelo */
   .status-ongoing { background-color: var(--gc-green); color: var(--gc-text-on-primary); } /* Verde */
   .status-completed { background-color: var(--gc-text-muted); color: var(--gc-text-on-primary); } /* Cinza */
+  .status-archived { background-color: var(--gc-bg-secondary); color: var(--gc-text-muted); }
   
   /* Seções de Conteúdo (Chaveamento, Gerenciamento de Equipes) */
   .section-card {
@@ -678,4 +679,25 @@
 .btn-small {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
+}
+
+.danger-zone {
+  border-color: var(--gc-red-dim, rgba(220, 53, 69, 0.3));
+}
+
+.danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.archived-notice {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
+  color: var(--gc-text-secondary);
+  font-size: 0.9rem;
 }

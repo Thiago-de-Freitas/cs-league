@@ -48,6 +48,17 @@
           </ul>
         </div>
       </div>
+
+      <div *ngIf="isOwner" class="danger-zone mt-4">
+        <h2 class="section-title">Zona de Perigo</h2>
+        <p class="meta">Excluir o time remove todos os membros e convites. Times com partidas registradas não podem ser excluídos.</p>
+        <button
+          class="btn btn-danger"
+          (click)="deleteTeam()"
+          [disabled]="deletingTeam">
+          {{ deletingTeam ? 'Excluindo...' : 'Excluir Time' }}
+        </button>
+      </div>
     </div>
 
     <div *ngIf="pendingInvites.length > 0" class="details-card gc-card mt-4">

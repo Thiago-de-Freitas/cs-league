@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { TeamService } from '../../Services/team.service';
 import { AuthService } from '../../Services/auth.service';
 import { Team, TeamInvite, User } from '../../Models/interfaces';
@@ -24,9 +24,11 @@ export class TeamDetailsComponent implements OnInit {
   searchResults: User[] = [];
   inviteMsg = '';
   inviteError = '';
+  deletingTeam = false;
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private teamService: TeamService,
     private authService: AuthService
   ) {}
@@ -99,6 +101,18 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.rejectInvite(invite.team.id, invite.id).subscribe({
       next: () => {
         this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
+      }
+    });
+  }
+
+  deleteTeam(): void {
+    if (!this.teamId || !confirm('Excluir este time permanentemente? Esta ação não pode ser desfeita.')) return;
+    this.deletingTeam = true;
+    this.teamService.deleteTeam(this.teamId).subscribe({
+      next: () => this.router.navigate(['/create-team']),
+      error: (err) => {
+        this.deletingTeam = false;
+        alert(err.error?.error || 'Erro ao excluir time');
       }
     });
   }

@@ -30,7 +30,7 @@ export class CreateLeagueComponent implements OnInit {
 
   loadLeagues(): void {
     this.loading = true;
-    this.leagueService.getLeagues().subscribe({
+    this.leagueService.getLeagues(true).subscribe({
       next: (leagues) => {
         this.leagues = leagues;
         this.loading = false;
@@ -73,6 +73,7 @@ export class CreateLeagueComponent implements OnInit {
       upcoming: 'Em breve',
       ongoing: 'Em andamento',
       completed: 'Finalizada',
+      archived: 'Arquivada',
     };
     return labels[status] || status;
   }

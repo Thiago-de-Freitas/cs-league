@@ -27,6 +27,7 @@ enum LeagueStatus {
   UPCOMING
   ONGOING
   COMPLETED
+  ARCHIVED
 }
 
 enum MatchStatus {
@@ -162,6 +163,7 @@ model Demo {
   filePath     String
   fileName     String
   status       DemoStatus @default(PENDING)
+  isPersonal   Boolean    @default(false)
   errorMessage String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt

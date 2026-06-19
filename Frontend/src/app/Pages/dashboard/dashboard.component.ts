@@ -82,4 +82,14 @@ export class DashboardComponent implements OnInit {
     });
     this.router.navigate(['/team-details', event.team.id]);
   }
+
+  getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      upcoming: 'Em breve',
+      ongoing: 'Em andamento',
+      completed: 'Finalizada',
+      archived: 'Arquivada',
+    };
+    return labels[status] || status;
+  }
 }

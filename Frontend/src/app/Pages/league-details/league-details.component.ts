@@ -45,6 +45,8 @@ export class LeagueDetailsComponent implements OnInit {
   editMaxTeams = false;
   newMaxTeams = 8;
   generatingBracket = false;
+  deletingLeague = false;
+  archivingLeague = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -84,6 +86,20 @@ export class LeagueDetailsComponent implements OnInit {
   get teamsAtCapacity(): boolean {
     if (!this.league) return false;
     return this.league.teams.length >= (this.league.maxTeams || 8);
+  }
+
+  get isArchived(): boolean {
+    return this.league?.status === 'archived';
+  }
+
+  get allMatchesCompleted(): boolean {
+    const matches = this.league?.matches || [];
+    if (matches.length === 0) return false;
+    return matches.every((m) => m.status === 'completed');
+  }
+
+  get canArchive(): boolean {
+    return this.isAdmin && !this.isArchived && this.allMatchesCompleted;
   }
 
   get remainingSlots(): number {
@@ -208,5 +224,39 @@ export class LeagueDetailsComponent implements OnInit {
 
   goToMatch(matchId: string): void {
     this.router.navigate(['/match', matchId]);
+  }
+
+  deleteLeague(): void {
+    if (!this.leagueId || !confirm('Excluir esta liga permanentemente? Esta ação não pode ser desfeita.')) return;
+    this.deletingLeague = true;
+    this.leagueService.deleteLeague(this.leagueId).subscribe({
+      next: () => this.router.navigate(['/create-league']),
+      error: (err) => {
+        this.deletingLeague = false;
+        alert(err.error?.error || 'Erro ao excluir liga');
+      }
+    });
+  }
+
+  archiveLeague(): void {
+    if (!this.leagueId || !confirm('Arquivar esta liga? Ela deixará de aparecer na página inicial.')) return;
+    this.archivingLeague = true;
+    this.leagueService.archiveLeague(this.leagueId).subscribe({
+      next: () => this.router.navigate(['/dashboard']),
+      error: (err) => {
+        this.archivingLeague = false;
+        alert(err.error?.error || 'Erro ao arquivar liga');
+      }
+    });
+  }
+
+  getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      upcoming: 'Em breve',
+      ongoing: 'Em andamento',
+      completed: 'Finalizada',
+      archived: 'Arquivada',
+    };
+    return labels[status] || status;
   }
 }

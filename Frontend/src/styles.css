@@ -283,6 +283,7 @@ h1, h2, h3, .display-title {
 .status-upcoming { background: rgba(255,193,7,0.15); color: var(--gc-yellow); }
 .status-ongoing { background: var(--gc-green-dim); color: var(--gc-green); }
 .status-completed { background: var(--gc-surface-elevated); color: var(--gc-text-secondary); }
+.status-archived { background: var(--gc-surface-elevated); color: var(--gc-text-muted); }
 .status-scheduled { background: var(--gc-orange-dim); color: var(--gc-orange); }
 
 /* ===== Listas ===== */

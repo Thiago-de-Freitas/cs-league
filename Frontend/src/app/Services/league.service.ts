@@ -9,8 +9,9 @@ export class LeagueService {
 
   constructor(private http: HttpClient) {}
 
-  getLeagues(): Observable<League[]> {
-    return this.http.get<League[]>(this.apiUrl);
+  getLeagues(includeArchived = false): Observable<League[]> {
+    const params = includeArchived ? '?includeArchived=true' : '';
+    return this.http.get<League[]>(`${this.apiUrl}${params}`);
   }
 
   getLeagueById(id: string): Observable<League> {
@@ -34,6 +35,10 @@ export class LeagueService {
 
   deleteLeague(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  archiveLeague(id: string): Observable<{ id: string; status: string; message: string }> {
+    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/archive`, {});
   }
 
   addTeamsToLeague(leagueId: string, teamIds: string[]): Observable<League> {

@@ -97,11 +97,17 @@ async function assertLeagueOwner(leagueId: string, userId: string, role: string)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const includeArchived = req.query.includeArchived === 'true';
     const leagues = await prisma.league.findMany({
       where: {
-        OR: [
-          { ownerId: userId },
-          { teams: { some: { team: { members: { some: { userId } } } } } },
+        AND: [
+          {
+            OR: [
+              { ownerId: userId },
+              { teams: { some: { team: { members: { some: { userId } } } } } },
+            ],
+          },
+          ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
         ],
       },
       include: {
@@ -240,6 +246,45 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao excluir liga' });
+  }
+});
+
+router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.status === 'ARCHIVED') {
+      res.status(400).json({ error: 'Liga já está arquivada' });
+      return;
+    }
+
+    const matches = await prisma.match.findMany({ where: { leagueId: req.params.id } });
+    if (matches.length === 0) {
+      res.status(400).json({ error: 'A liga não possui partidas para arquivar' });
+      return;
+    }
+    if (!matches.every((m) => m.status === 'COMPLETED')) {
+      res.status(400).json({ error: 'Todas as partidas devem estar finalizadas para arquivar a liga' });
+      return;
+    }
+
+    const league = await prisma.league.update({
+      where: { id: req.params.id },
+      data: { status: 'ARCHIVED' },
+    });
+
+    res.json({
+      id: league.id,
+      status: league.status.toLowerCase(),
+      message: 'Liga arquivada com sucesso',
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao arquivar liga' });
   }
 });
 

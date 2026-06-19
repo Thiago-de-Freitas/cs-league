@@ -18,7 +18,7 @@
       <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
         <li *ngFor="let league of leagues" class="gc-list-item">
           <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
-          <span class="badge status-{{ league.status }}">{{ league.status }}</span>
+          <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
           <span class="meta">{{ league.teamCount || 0 }} times</span>
         </li>
       </ul>
