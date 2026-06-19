@@ -6,11 +6,12 @@ import { MatchService } from '../../Services/match.service';
 import { DemoService } from '../../Services/demo.service';
 import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
+import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 
 @Component({
   selector: 'app-match-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, DemoUploadModalComponent],
+  imports: [CommonModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
   templateUrl: './match-details.component.html',
   styleUrls: ['./match-details.component.css']
 })
@@ -182,6 +183,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
 
   getKd(stat: MatchPlayerStat): string {
     return stat.deaths > 0 ? (stat.kills / stat.deaths).toFixed(2) : stat.kills.toString();
+  }
+
+  isDemoProcessing(demo: Demo): boolean {
+    return demo.status === 'pending' || demo.status === 'processing';
   }
 
   getStatusLabel(status: string): string {

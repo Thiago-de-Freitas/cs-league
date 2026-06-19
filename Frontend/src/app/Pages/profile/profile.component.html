@@ -41,6 +41,10 @@
       <section *ngIf="activeTab === 'stats'" class="stats-section">
         <div *ngIf="statsLoading" class="loading">Carregando estatísticas...</div>
 
+        <div *ngIf="hasPendingDemos && !statsLoading" class="gc-card stats-updating-banner">
+          <app-demo-status-loader [block]="true" status="processing" message="Atualizando estatísticas..."></app-demo-status-loader>
+        </div>
+
         <div *ngIf="!statsLoading && !hasStats" class="stats-empty gc-card">
           <h2 class="section-title">Sem estatísticas ainda</h2>
           <p class="meta">Envie uma demo pessoal para ver seu dashboard de performance.</p>
@@ -163,6 +167,8 @@
           <button type="button" class="btn btn-primary btn-small" (click)="openUploadModal()">+ Enviar</button>
         </div>
 
+        <app-demo-status-loader *ngIf="hasPendingDemos && !demosLoading" [block]="true" status="processing"></app-demo-status-loader>
+
         <div *ngIf="demosLoading" class="loading">Carregando demos...</div>
 
         <ul class="gc-list" *ngIf="!demosLoading && personalDemos.length > 0; else noPersonalDemos">
@@ -173,7 +179,9 @@
                 <span class="meta">{{ formatDate(demo.createdAt) }}</span>
               </div>
               <div class="personal-demo-actions">
-                <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+                <app-demo-status-loader *ngIf="isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
+                <app-demo-status-loader *ngIf="reprocessingId === demo.id" [compact]="true" message="Reenfileirando..."></app-demo-status-loader>
+                <span *ngIf="!isDemoProcessing(demo) && reprocessingId !== demo.id" class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
                 <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">Ver</button>
                 <button *ngIf="canReprocess(demo)" class="btn btn-ghost btn-small" (click)="reprocessDemo(demo)" [disabled]="reprocessingId === demo.id">
                   {{ reprocessingId === demo.id ? '...' : 'Reprocessar' }}

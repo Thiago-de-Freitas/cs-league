@@ -1,0 +1,42 @@
+.demo-status-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gc-orange);
+  font-size: 0.85rem;
+}
+
+.demo-status-loader.compact {
+  font-size: 0.75rem;
+}
+
+.demo-status-loader.block {
+  display: flex;
+  padding: 0.75rem 0;
+}
+
+.demo-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--gc-border);
+  border-top-color: var(--gc-orange);
+  border-radius: 50%;
+  animation: demo-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.demo-status-loader.compact .demo-spinner {
+  width: 14px;
+  height: 14px;
+}
+
+.demo-status-text {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes demo-spin {
+  to { transform: rotate(360deg); }
+}

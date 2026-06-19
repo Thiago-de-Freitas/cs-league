@@ -8,11 +8,12 @@ import { LeagueService } from '../../Services/league.service';
 import { NotificationService } from '../../Services/notification.service';
 import { Demo, League, Match } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
+import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 
 @Component({
   selector: 'app-demo-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, DemoUploadModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
   templateUrl: './demo-upload.component.html',
   styleUrls: ['./demo-upload.component.css']
 })
@@ -173,6 +174,10 @@ export class DemoUploadComponent implements OnInit, OnDestroy {
 
   canDelete(demo: Demo): boolean {
     return demo.status !== 'processing' && !(demo.status === 'completed' && demo.matchId);
+  }
+
+  isDemoProcessing(demo: Demo): boolean {
+    return demo.status === 'pending' || demo.status === 'processing';
   }
 
   openAssociate(demo: Demo): void {

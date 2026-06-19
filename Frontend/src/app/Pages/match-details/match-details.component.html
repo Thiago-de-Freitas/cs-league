@@ -15,7 +15,7 @@
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
         <button class="btn btn-primary btn-small" (click)="openUploadModal()">Enviar Demo</button>
       </div>
-      <p *ngIf="pollingDemo" class="meta mt-2">Processando demo...</p>
+      <app-demo-status-loader *ngIf="pollingDemo" [block]="true" status="processing"></app-demo-status-loader>
     </div>
 
     <div *ngIf="match?.demos && match!.demos!.length > 0 && !loading" class="gc-card mt-4">
@@ -25,7 +25,8 @@
           <div class="demo-info">
             <span class="demo-name">{{ demo.fileName }}</span>
             <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
-            <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+            <app-demo-status-loader *ngIf="isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
+            <span *ngIf="!isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
           </div>
           <button
             *ngIf="demo.status === 'completed'"
@@ -43,7 +44,8 @@
     <div *ngIf="isDemoView && demo && !loading" class="details-card gc-card">
       <h1 class="page-title">Demo: {{ demo.fileName }}</h1>
       <div class="match-meta">
-        <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+        <app-demo-status-loader *ngIf="pollingDemo || isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
+        <span *ngIf="!pollingDemo && !isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
         <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
         <span class="meta" *ngIf="demo.matchId && !demo.isPersonal">
           Partida: <a [routerLink]="['/match', demo.matchId]">Ver partida</a>
@@ -52,16 +54,21 @@
           <a routerLink="/profile">Ver no perfil</a>
         </span>
       </div>
-      <div class="match-actions" *ngIf="demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
+      <div class="match-actions" *ngIf="!pollingDemo && demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
         <button class="btn btn-secondary btn-small" (click)="reprocessDemo()">Reprocessar</button>
         <a routerLink="/profile" class="btn btn-ghost btn-small">Voltar ao Perfil</a>
       </div>
-      <div class="match-actions" *ngIf="!demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
+      <div class="match-actions" *ngIf="!pollingDemo && !demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
         <button class="btn btn-secondary btn-small" (click)="reprocessDemo()">Reprocessar</button>
         <a routerLink="/demo-upload" class="btn btn-ghost btn-small">Voltar às Demos</a>
       </div>
-      <p *ngIf="pollingDemo" class="meta mt-2">Processando demo...</p>
-      <p *ngIf="demo.errorMessage" class="error-message">{{ demo.errorMessage }}</p>
+      <app-demo-status-loader
+        *ngIf="pollingDemo"
+        [block]="true"
+        [status]="demo.status"
+        message="Atualizando estatísticas da demo...">
+      </app-demo-status-loader>
+      <p *ngIf="demo.errorMessage && !pollingDemo" class="error-message">{{ demo.errorMessage }}</p>
     </div>
 
     <div *ngIf="stats.length > 0 && !loading" class="gc-card mt-4">

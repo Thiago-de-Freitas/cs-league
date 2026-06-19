@@ -8,13 +8,14 @@ import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
 import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
+import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 
 type ProfileTab = 'stats' | 'demos' | 'settings';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, DemoUploadModalComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']
 })
@@ -273,6 +274,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   canDelete(demo: Demo): boolean {
     return demo.status !== 'processing';
+  }
+
+  isDemoProcessing(demo: Demo): boolean {
+    return demo.status === 'pending' || demo.status === 'processing';
   }
 
   getStatusLabel(status: string): string {

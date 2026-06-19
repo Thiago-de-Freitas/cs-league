@@ -348,6 +348,11 @@
   text-align: center;
 }
 
+.stats-updating-banner {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
 /* Demos tab */
 .demos-section, .settings-section { padding: 1.5rem; }
 

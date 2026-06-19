@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import uuid
+from pathlib import Path
 
 import psycopg2
 import redis
@@ -16,6 +17,43 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
 DEMO_QUEUE = "demo:queue"
 POLL_TIMEOUT = 5
+WORKER_DIR = Path(__file__).resolve().parent
+BACKEND_DEMOS = WORKER_DIR.parent / "Backend" / "data" / "demos"
+
+
+def resolve_demo_path(file_path: str) -> str:
+    normalized = os.path.normpath(file_path)
+    if os.path.isabs(normalized) and os.path.exists(normalized):
+        return normalized
+
+    candidates = [
+        normalized,
+        os.path.abspath(normalized),
+        str(WORKER_DIR / normalized),
+        str(WORKER_DIR.parent / normalized),
+        str(BACKEND_DEMOS / Path(normalized).name),
+    ]
+
+    if "demos" in normalized.replace("\\", "/"):
+        parts = normalized.replace("\\", "/").split("demos/")
+        if len(parts) > 1:
+            candidates.append(str(BACKEND_DEMOS / parts[-1]))
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return os.path.normpath(candidate)
+
+    return normalized
+
+
+def create_redis_client():
+    # socket_timeout=None evita TimeoutError no brpop quando a fila está vazia
+    return redis.from_url(
+        REDIS_URL,
+        socket_connect_timeout=5,
+        socket_timeout=None,
+        decode_responses=True,
+    )
 
 
 def get_db_connection():
@@ -101,13 +139,23 @@ def parse_demo(file_path: str) -> list[dict]:
 
     parser = DemoParser(file_path)
 
-    deaths = parser.parse_event("player_death", player=["X", "Y"], other=["attacker_steamid", "user_steamid", "assister_steamid", "headshot"])
-    damages = parser.parse_event("player_hurt", player=["X", "Y"], other=["attacker_steamid", "user_steamid", "dmg_health", "hitgroup"])
+    deaths = parser.parse_event(
+        "player_death",
+        player=["X", "Y"],
+        other=["attacker_steamid", "user_steamid", "assister_steamid", "headshot", "total_rounds_played"],
+    )
+    damages = parser.parse_event(
+        "player_hurt",
+        player=["X", "Y"],
+        other=["attacker_steamid", "user_steamid", "dmg_health", "hitgroup", "total_rounds_played"],
+    )
     rounds = parser.parse_event("round_end", player=["X", "Y"])
 
     total_rounds = 1
-    if rounds is not None and len(rounds) > 0:
-        total_rounds = max(int(rounds["total_rounds_played"].max()), 1)
+    if rounds is not None and len(rounds) > 0 and "round" in rounds.columns:
+        total_rounds = max(int(rounds["round"].max()), 1)
+    elif deaths is not None and len(deaths) > 0 and "total_rounds_played" in deaths.columns:
+        total_rounds = max(int(deaths["total_rounds_played"].max()), 1)
 
     player_data: dict[str, dict] = {}
     deaths_by_round: dict[int, set[str]] = {}
@@ -208,6 +256,7 @@ def parse_demo(file_path: str) -> list[dict]:
 
 
 def process_job(demo_id: str, file_path: str):
+    file_path = resolve_demo_path(file_path)
     print(f"Processando demo {demo_id}: {file_path}")
     update_demo_status(demo_id, "PROCESSING")
 
@@ -242,7 +291,7 @@ def process_job(demo_id: str, file_path: str):
 
 def main():
     print("Worker iniciado, aguardando jobs...")
-    r = redis.from_url(REDIS_URL)
+    r = create_redis_client()
 
     while True:
         try:
@@ -266,7 +315,10 @@ def main():
         except redis.ConnectionError:
             print("Conexão Redis perdida, tentando reconectar em 5s...")
             time.sleep(5)
-            r = redis.from_url(REDIS_URL)
+            r = create_redis_client()
+        except redis.TimeoutError:
+            # Fila vazia — brpop expirou; continua aguardando
+            continue
         except KeyboardInterrupt:
             print("Worker encerrado")
             sys.exit(0)

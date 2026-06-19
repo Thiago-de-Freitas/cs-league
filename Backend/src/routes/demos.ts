@@ -7,15 +7,12 @@ import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
 import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload, canUserManageMatchDemo } from '../lib/demoValidation';
 import { buildPersonalStatsOverview } from '../lib/personalStats';
+import { getDemoStoragePath, resolveDemoFilePath } from '../lib/demoStorage';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-const storagePath = process.env.DEMO_STORAGE_PATH || path.join(__dirname, '../../data/demos');
-
-if (!fs.existsSync(storagePath)) {
-  fs.mkdirSync(storagePath, { recursive: true });
-}
+const storagePath = getDemoStoragePath();
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, storagePath),
@@ -154,7 +151,7 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
     const demo = await prisma.demo.create({
       data: {
         uploadedById: req.user!.userId,
-        filePath: req.file.path,
+        filePath: resolveDemoFilePath(req.file.path),
         fileName: req.file.originalname,
         status: 'PENDING',
         isPersonal,
@@ -248,17 +245,19 @@ router.post('/:id/reprocess', authMiddleware, async (req: AuthRequest, res: Resp
       return;
     }
 
-    if (!fs.existsSync(demo.filePath)) {
+    if (!fs.existsSync(resolveDemoFilePath(demo.filePath))) {
       res.status(400).json({ error: 'Arquivo da demo não encontrado no servidor' });
       return;
     }
 
+    const absolutePath = resolveDemoFilePath(demo.filePath);
+
     await prisma.demo.update({
       where: { id: demo.id },
-      data: { status: 'PENDING', errorMessage: null },
+      data: { status: 'PENDING', errorMessage: null, filePath: absolutePath },
     });
 
-    await enqueueDemoJob(demo.id, demo.filePath);
+    await enqueueDemoJob(demo.id, absolutePath);
 
     res.json({
       id: demo.id,
@@ -297,8 +296,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       return;
     }
 
-    if (fs.existsSync(demo.filePath)) {
-      fs.unlink(demo.filePath, () => {});
+    const filePath = resolveDemoFilePath(demo.filePath);
+    if (fs.existsSync(filePath)) {
+      fs.unlink(filePath, () => {});
     }
 
     await prisma.demo.delete({ where: { id: demo.id } });

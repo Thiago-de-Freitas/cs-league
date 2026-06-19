@@ -8,9 +8,21 @@
       <button class="btn btn-primary" (click)="openUploadModal()">+ Enviar Demo</button>
     </div>
 
-    <div *ngIf="processingDemo" class="processing-status mb-4">
-      <p class="meta mb-2">Último envio: <strong>{{ processingDemo.fileName }}</strong></p>
-      <div class="processing-bar">
+    <div *ngIf="processingDemo || hasPendingDemos" class="processing-status mb-4">
+      <app-demo-status-loader
+        *ngIf="processingDemo"
+        [status]="pollStatus"
+        [block]="true"
+        [message]="pollStatus === 'processing' ? 'Analisando demo...' : 'Aguardando processamento...'">
+      </app-demo-status-loader>
+      <app-demo-status-loader
+        *ngIf="!processingDemo && hasPendingDemos"
+        [block]="true"
+        status="processing"
+        message="Atualizando demos...">
+      </app-demo-status-loader>
+      <p *ngIf="processingDemo" class="meta mb-2 mt-2">Arquivo: <strong>{{ processingDemo.fileName }}</strong></p>
+      <div *ngIf="processingDemo" class="processing-bar">
         <div
           class="processing-bar-fill"
           [class.done]="pollStatus === 'completed'"
@@ -18,7 +30,7 @@
           [class.processing]="pollStatus === 'processing'">
         </div>
       </div>
-      <p>Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
+      <p *ngIf="processingDemo">Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
       <p *ngIf="processingDemo.errorMessage" class="error-message">{{ processingDemo.errorMessage }}</p>
     </div>
 
@@ -39,7 +51,19 @@
               </span>
             </div>
             <div class="demo-actions">
-              <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+              <app-demo-status-loader
+                *ngIf="isDemoProcessing(demo)"
+                [status]="demo.status"
+                [compact]="true">
+              </app-demo-status-loader>
+              <app-demo-status-loader
+                *ngIf="reprocessingId === demo.id"
+                [compact]="true"
+                message="Reenfileirando...">
+              </app-demo-status-loader>
+              <span *ngIf="!isDemoProcessing(demo) && reprocessingId !== demo.id" class="badge status-{{ demo.status }}">
+                {{ getStatusLabel(demo.status) }}
+              </span>
               <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
                 Ver Stats
               </button>
