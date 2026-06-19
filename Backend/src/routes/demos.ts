@@ -5,6 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
+import { validatePersonalDemoUpload } from '../lib/demoValidation';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -35,11 +36,42 @@ const upload = multer({
   },
 });
 
+function parseIsPersonal(value: unknown): boolean {
+  return value === true || value === 'true' || value === '1';
+}
+
+router.get('/validate-personal', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const matchId = String(req.query.matchId || '');
+    const result = await validatePersonalDemoUpload(req.user!.userId, matchId);
+    if (!result.valid) {
+      res.json({ valid: false, error: result.error, code: result.code });
+      return;
+    }
+    res.json({ valid: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao validar demo pessoal' });
+  }
+});
+
 router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Arquivo .dem é obrigatório' });
       return;
+    }
+
+    const isPersonal = parseIsPersonal(req.body.isPersonal);
+    const matchId = req.body.matchId ? String(req.body.matchId) : undefined;
+
+    if (isPersonal) {
+      const validation = await validatePersonalDemoUpload(req.user!.userId, matchId || '');
+      if (!validation.valid) {
+        fs.unlink(req.file.path, () => {});
+        res.status(400).json({ error: validation.error, code: validation.code });
+        return;
+      }
     }
 
     const demo = await prisma.demo.create({
@@ -48,7 +80,8 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
         filePath: req.file.path,
         fileName: req.file.originalname,
         status: 'PENDING',
-        ...(req.body.matchId && { matchId: req.body.matchId }),
+        isPersonal,
+        ...(matchId && { matchId }),
       },
     });
 
@@ -59,6 +92,7 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
       fileName: demo.fileName,
       status: demo.status.toLowerCase(),
       matchId: demo.matchId,
+      isPersonal: demo.isPersonal,
       createdAt: demo.createdAt,
     });
   } catch (err) {
@@ -93,6 +127,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       status: demo.status.toLowerCase(),
       errorMessage: demo.errorMessage,
       matchId: demo.matchId,
+      isPersonal: demo.isPersonal,
       match: demo.match,
       stats: demo.stats,
       createdAt: demo.createdAt,
@@ -152,6 +187,7 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
       fileName: updated.fileName,
       status: updated.status.toLowerCase(),
       matchId: updated.matchId,
+      isPersonal: updated.isPersonal,
       stats: updated.stats,
     });
   } catch (err) {
@@ -170,6 +206,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         fileName: true,
         status: true,
         matchId: true,
+        isPersonal: true,
         createdAt: true,
       },
     });

@@ -15,3 +15,31 @@
 .file-input-label:hover { border-color: var(--gc-orange); color: var(--gc-text); }
 .file-icon { font-size: 1.5rem; }
 .mt-2 { margin-top: 0.5rem; }
+
+.upload-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.upload-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--gc-text);
+  font-size: 0.95rem;
+}
+
+.upload-mode-option input {
+  accent-color: var(--gc-orange);
+}
+
+.warning-message {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 165, 0, 0.1);
+  border: 1px solid var(--gc-orange);
+  border-radius: var(--radius-md);
+  color: var(--gc-text-secondary);
+  font-size: 0.9rem;
+}

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, interval, switchMap, takeWhile, map, startWith } from 'rxjs';
-import { Demo, MatchPlayerStat } from '../Models/interfaces';
+import { Demo, MatchPlayerStat, PersonalDemoValidation } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class DemoService {
@@ -9,13 +9,20 @@ export class DemoService {
 
   constructor(private http: HttpClient) {}
 
-  uploadDemo(file: File, matchId?: string): Observable<Demo> {
+  uploadDemo(file: File, options?: { matchId?: string; isPersonal?: boolean }): Observable<Demo> {
     const formData = new FormData();
     formData.append('demo', file);
-    if (matchId) {
-      formData.append('matchId', matchId);
+    if (options?.matchId) {
+      formData.append('matchId', options.matchId);
+    }
+    if (options?.isPersonal) {
+      formData.append('isPersonal', 'true');
     }
     return this.http.post<Demo>(`${this.apiUrl}/upload`, formData);
+  }
+
+  validatePersonalDemo(matchId: string): Observable<PersonalDemoValidation> {
+    return this.http.get<PersonalDemoValidation>(`${this.apiUrl}/validate-personal?matchId=${encodeURIComponent(matchId)}`);
   }
 
   getDemo(id: string): Observable<Demo> {

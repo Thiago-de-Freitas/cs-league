@@ -272,10 +272,17 @@ router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
-    const league = await prisma.league.update({
-      where: { id: req.params.id },
-      data: { status: 'ARCHIVED' },
-    });
+    await prisma.$executeRaw`
+      UPDATE "League"
+      SET status = 'ARCHIVED'::"LeagueStatus", "updatedAt" = NOW()
+      WHERE id = ${req.params.id}
+    `;
+
+    const league = await prisma.league.findUnique({ where: { id: req.params.id } });
+    if (!league) {
+      res.status(404).json({ error: 'Liga não encontrada' });
+      return;
+    }
 
     res.json({
       id: league.id,
@@ -283,7 +290,14 @@ router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Respon
       message: 'Liga arquivada com sucesso',
     });
   } catch (err) {
-    console.error(err);
+    console.error('POST /api/leagues/:id/archive', err);
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('ARCHIVED') || msg.includes('LeagueStatus')) {
+      res.status(500).json({
+        error: 'Status ARCHIVED indisponível. Execute as migrations e reinicie o servidor da API.',
+      });
+      return;
+    }
     res.status(500).json({ error: 'Erro ao arquivar liga' });
   }
 });

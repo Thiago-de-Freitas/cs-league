@@ -22,6 +22,31 @@ def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
+def get_demo_meta(demo_id: str) -> dict | None:
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT d."isPersonal", d."uploadedById", u."steamId"
+                FROM "Demo" d
+                JOIN "User" u ON u.id = d."uploadedById"
+                WHERE d.id = %s
+                """,
+                (demo_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "is_personal": bool(row[0]),
+                "uploaded_by_id": row[1],
+                "uploader_steam_id": row[2],
+            }
+    finally:
+        conn.close()
+
+
 def update_demo_status(demo_id: str, status: str, error_message: str | None = None):
     conn = get_db_connection()
     try:
@@ -176,7 +201,30 @@ def process_job(demo_id: str, file_path: str):
     print(f"Processando demo {demo_id}: {file_path}")
     update_demo_status(demo_id, "PROCESSING")
 
+    meta = get_demo_meta(demo_id)
     stats = parse_demo(file_path)
+
+    if meta and meta["is_personal"]:
+        uploader_steam = (meta.get("uploader_steam_id") or "").strip()
+        if not uploader_steam:
+            update_demo_status(
+                demo_id,
+                "FAILED",
+                "Configure seu Steam ID no perfil para enviar demo pessoal.",
+            )
+            return
+
+        player_steam_ids = {str(s.get("steam_id", "")).strip() for s in stats}
+        if uploader_steam not in player_steam_ids:
+            update_demo_status(
+                demo_id,
+                "FAILED",
+                "Você não participou desta partida. Seu Steam ID não foi encontrado no arquivo da demo.",
+            )
+            return
+
+        stats = [s for s in stats if str(s.get("steam_id", "")).strip() == uploader_steam]
+
     save_player_stats(demo_id, stats)
     update_demo_status(demo_id, "COMPLETED")
     print(f"Demo {demo_id} processada com {len(stats)} jogadores")

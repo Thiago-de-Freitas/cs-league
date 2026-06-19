@@ -10,6 +10,30 @@
 
     <div class="gc-modal-body">
       <div class="form-group">
+        <label class="form-label">Tipo de envio</label>
+        <div class="upload-mode-options">
+          <label class="upload-mode-option">
+            <input type="radio" name="uploadMode" value="general" [(ngModel)]="uploadMode" (ngModelChange)="onModeChange()">
+            <span>Demo geral</span>
+          </label>
+          <label class="upload-mode-option">
+            <input type="radio" name="uploadMode" value="personal" [(ngModel)]="uploadMode" (ngModelChange)="onModeChange()">
+            <span>Demo pessoal</span>
+          </label>
+        </div>
+        <p class="form-hint" *ngIf="!isPersonalMode">
+          Envio livre para análise. A associação com partida é opcional.
+        </p>
+        <p class="form-hint" *ngIf="isPersonalMode">
+          Atualiza <strong>suas</strong> estatísticas na partida selecionada. É necessário estar no time e ter Steam ID no perfil.
+        </p>
+      </div>
+
+      <div *ngIf="isPersonalMode && !hasSteamId" class="warning-message">
+        Configure seu <a routerLink="/profile" class="text-link" (click)="close()">Steam ID no perfil</a> para usar demo pessoal.
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Arquivo .dem</label>
         <div class="file-input-wrapper">
           <input type="file" accept=".dem" (change)="onFileSelected($event)" class="file-input" id="demo-file-modal">
@@ -21,24 +45,40 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Associar a partida (opcional)</label>
+        <label class="form-label">
+          {{ isPersonalMode ? 'Partida' : 'Associar a partida (opcional)' }}
+        </label>
         <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="input-field">
           <option value="">Selecione uma liga</option>
           <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
         </select>
-        <select *ngIf="matches.length > 0" [(ngModel)]="selectedMatchId" class="input-field mt-2">
+        <select
+          *ngIf="matches.length > 0"
+          [(ngModel)]="selectedMatchId"
+          (ngModelChange)="onMatchChange()"
+          class="input-field mt-2">
           <option value="">Selecione uma partida</option>
           <option *ngFor="let m of matches" [value]="m.id">
             {{ m.team1.name }} vs {{ m.team2.name }}
           </option>
         </select>
+
+        <p *ngIf="isPersonalMode && validatingMatch" class="form-hint mt-2">Validando partida...</p>
+        <p *ngIf="isPersonalMode && matchValidationOk" class="success-message mt-2">
+          Partida válida para demo pessoal.
+        </p>
+        <p *ngIf="isPersonalMode && matchValidationMsg" class="error-message mt-2">{{ matchValidationMsg }}</p>
       </div>
 
       <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
 
       <div class="gc-modal-footer">
         <button type="button" class="btn btn-ghost" (click)="close()" [disabled]="uploading">Cancelar</button>
-        <button type="button" class="btn btn-primary" (click)="upload()" [disabled]="uploading || !selectedFile">
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="upload()"
+          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !matchValidationOk))">
           {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
         </button>
       </div>

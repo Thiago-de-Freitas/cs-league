@@ -27,6 +27,7 @@
         <li *ngFor="let demo of demos" class="gc-list-item demo-list-item">
           <div class="demo-row">
             <span>{{ demo.fileName }}</span>
+            <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
             <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
             <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
               Ver Stats
