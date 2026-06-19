@@ -110,23 +110,37 @@ function emptySlot(): BracketSlot {
   return { name: '—', shortName: '—', isBye: false };
 }
 
+function slotFromTeam(team: { id: string; name: string; tag?: string }, isWinner = false): BracketSlot {
+  return {
+    name: team.name,
+    shortName: team.name,
+    tag: team.tag,
+    teamId: team.id,
+    isBye: false,
+    isWinner,
+  };
+}
+
 function winnerSlot(match: BracketMatchView): BracketSlot | null {
-  if (match.teamA.isWinner) return match.teamA;
-  if (match.teamB.isWinner) return match.teamB;
+  if (match.status === 'completed') {
+    if (match.teamA.isWinner) return match.teamA;
+    if (match.teamB.isWinner) return match.teamB;
+  }
+  if (match.teamA.isBye && !match.teamB.isBye && match.teamB.teamId) return match.teamB;
+  if (match.teamB.isBye && !match.teamA.isBye && match.teamA.teamId) return match.teamA;
   return null;
 }
 
 function applyMatchResult(match: BracketMatchView, m: MatchInput): BracketMatchView {
-  const updated: BracketMatchView = {
-    ...match,
+  const completed = m.status === 'completed';
+  const teamA = slotFromTeam(m.team1, completed && m.winnerId === m.team1.id);
+  const teamB = slotFromTeam(m.team2, completed && m.winnerId === m.team2.id);
+  return {
+    teamA,
+    teamB,
     matchId: m.id,
     status: m.status,
   };
-  if (m.status === 'completed' && m.winnerId) {
-    updated.teamA = { ...updated.teamA, isWinner: m.winnerId === updated.teamA.teamId };
-    updated.teamB = { ...updated.teamB, isWinner: m.winnerId === updated.teamB.teamId };
-  }
-  return updated;
 }
 
 function advanceRound(matches: BracketMatchView[]): BracketMatchView[] {
@@ -158,7 +172,7 @@ export function buildBracketView(
   ranked.forEach((t, i) => seedMap.set(i + 1, t));
 
   const pairings = getFirstRoundPairings(bracketSize);
-  let currentRound: BracketMatchView[] = pairings.map(([s1, s2], idx) => {
+  let previousRound: BracketMatchView[] = pairings.map(([s1, s2], idx) => {
     const base: BracketMatchView = {
       teamA: slotFromSeed(s1, seedMap),
       teamB: slotFromSeed(s2, seedMap),
@@ -169,14 +183,26 @@ export function buildBracketView(
 
   const columns: BracketColumnView[] = [];
   for (let round = 1; round <= totalRounds; round++) {
+    let roundMatches: BracketMatchView[];
+
+    if (round === 1) {
+      roundMatches = previousRound;
+    } else {
+      roundMatches = advanceRound(previousRound);
+    }
+
+    roundMatches = roundMatches.map((base, idx) => {
+      const dbMatch = matches.find((m) => m.round === round && m.bracketPosition === idx + 1);
+      return dbMatch ? applyMatchResult(base, dbMatch) : base;
+    });
+
     columns.push({
       round,
       label: roundLabel(round, totalRounds),
-      matches: currentRound,
+      matches: roundMatches,
     });
-    if (round < totalRounds) {
-      currentRound = advanceRound(currentRound);
-    }
+
+    previousRound = roundMatches;
   }
 
   return { bracketSize, columns, totalRounds };

@@ -136,3 +136,38 @@ export async function validateGeneralDemoUpload(matchId: string): Promise<Person
 
   return { valid: true };
 }
+
+export async function canUserManageMatchDemo(
+  userId: string,
+  role: string,
+  matchId: string
+): Promise<{ allowed: boolean; error?: string }> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { league: { select: { ownerId: true } } },
+  });
+
+  if (!match) {
+    return { allowed: false, error: 'Partida não encontrada.' };
+  }
+
+  if (role === 'ADMIN' || match.league.ownerId === userId) {
+    return { allowed: true };
+  }
+
+  const membership = await prisma.teamMember.findFirst({
+    where: {
+      userId,
+      teamId: { in: [match.team1Id, match.team2Id] },
+    },
+  });
+
+  if (membership) {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    error: 'Sem permissão para enviar ou associar demo nesta partida.',
+  };
+}

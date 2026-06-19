@@ -5,7 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
-import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload } from '../lib/demoValidation';
+import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload, canUserManageMatchDemo } from '../lib/demoValidation';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -81,6 +81,12 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
         return;
       }
     } else if (matchId) {
+      const permission = await canUserManageMatchDemo(req.user!.userId, req.user!.role, matchId);
+      if (!permission.allowed) {
+        fs.unlink(req.file.path, () => {});
+        res.status(403).json({ error: permission.error });
+        return;
+      }
       const validation = await validateGeneralDemoUpload(matchId);
       if (!validation.valid) {
         fs.unlink(req.file.path, () => {});
@@ -179,6 +185,11 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
       return;
     }
 
+    if (demo.uploadedById !== req.user!.userId && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Sem permissão para alterar esta demo' });
+      return;
+    }
+
     const { matchId } = req.body;
     if (!matchId) {
       res.status(400).json({ error: 'matchId é obrigatório' });
@@ -189,6 +200,26 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
     if (!match) {
       res.status(404).json({ error: 'Partida não encontrada' });
       return;
+    }
+
+    const permission = await canUserManageMatchDemo(req.user!.userId, req.user!.role, matchId);
+    if (!permission.allowed) {
+      res.status(403).json({ error: permission.error });
+      return;
+    }
+
+    if (!demo.isPersonal) {
+      const validation = await validateGeneralDemoUpload(matchId);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error, code: validation.code });
+        return;
+      }
+    } else {
+      const validation = await validatePersonalDemoUpload(req.user!.userId, matchId);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error, code: validation.code });
+        return;
+      }
     }
 
     const updated = await prisma.demo.update({

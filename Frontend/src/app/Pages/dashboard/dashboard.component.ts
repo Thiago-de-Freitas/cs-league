@@ -4,7 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
 import { AuthService } from '../../Services/auth.service';
-import { League, Team } from '../../Models/interfaces';
+import { League, Team, TeamInvite } from '../../Models/interfaces';
 import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
 import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/create-team-modal/create-team-modal.component';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
@@ -26,6 +26,7 @@ export class DashboardComponent implements OnInit {
   showCreateTeamModal = false;
   showUploadModal = false;
   showArchivedLeagues = false;
+  pendingInvites: TeamInvite[] = [];
 
   constructor(
     private leagueService: LeagueService,
@@ -52,6 +53,30 @@ export class DashboardComponent implements OnInit {
     });
     this.teamService.getTeams().subscribe({
       next: (teams) => (this.teams = teams)
+    });
+    this.teamService.getPendingInvites().subscribe({
+      next: (invites) => (this.pendingInvites = invites)
+    });
+  }
+
+  acceptInvite(invite: TeamInvite): void {
+    if (!invite.team) return;
+    this.teamService.acceptInvite(invite.team.id, invite.id).subscribe({
+      next: () => {
+        this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
+        this.teamService.getTeams().subscribe({
+          next: (teams) => (this.teams = teams)
+        });
+      }
+    });
+  }
+
+  rejectInvite(invite: TeamInvite): void {
+    if (!invite.team) return;
+    this.teamService.rejectInvite(invite.team.id, invite.id).subscribe({
+      next: () => {
+        this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
+      }
     });
   }
 

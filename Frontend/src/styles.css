@@ -367,6 +367,7 @@ h1, h2, h3, .display-title {
   padding: 0 1.5rem 2rem;
 }
 .dashboard-card { margin-bottom: 0; }
+.dashboard-card-full { grid-column: 1 / -1; }
 .dashboard-card .btn { margin-bottom: 1rem; }
 .stat-badge {
   font-family: var(--font-display);

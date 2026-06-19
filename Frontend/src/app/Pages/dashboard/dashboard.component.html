@@ -10,6 +10,19 @@
   <div *ngIf="loading" class="loading">Carregando...</div>
 
   <div class="dashboard-grid" *ngIf="!loading">
+    <section class="dashboard-card gc-card dashboard-card-full" *ngIf="pendingInvites.length > 0">
+      <h2 class="gc-card-title">Convites de Times</h2>
+      <ul class="gc-list">
+        <li *ngFor="let invite of pendingInvites" class="gc-list-item">
+          <span>{{ invite.team?.name }} <span class="badge badge-orange">{{ invite.team?.tag }}</span></span>
+          <div class="header-actions">
+            <button type="button" class="btn btn-primary btn-small" (click)="acceptInvite(invite)">Aceitar</button>
+            <button type="button" class="btn btn-ghost btn-small" (click)="rejectInvite(invite)">Recusar</button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <section class="dashboard-card gc-card">
       <div class="gc-card-header">
         <h2 class="gc-card-title">Minhas Ligas</h2>

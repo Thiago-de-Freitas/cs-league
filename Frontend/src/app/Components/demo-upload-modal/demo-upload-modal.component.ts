@@ -63,9 +63,6 @@ export class DemoUploadModalComponent implements OnInit {
         if (this.prefillLeagueId) {
           this.selectedLeagueId = this.prefillLeagueId;
           this.onLeagueChange(this.prefillMatchId);
-          if (this.prefillMatchId) {
-            this.uploadMode = 'personal';
-          }
         }
       }
     });
