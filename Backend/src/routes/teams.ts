@@ -20,17 +20,25 @@ async function getTeamWithDetails(teamId: string) {
           invitedUser: { select: { id: true, displayName: true, email: true } },
         },
       },
+      leagueTeams: true,
     },
   });
 }
 
 function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetails>>>) {
+  const wins = team.leagueTeams.reduce((sum, lt) => sum + lt.wins, 0);
+  const losses = team.leagueTeams.reduce((sum, lt) => sum + lt.losses, 0);
+  const points = team.leagueTeams.reduce((sum, lt) => sum + lt.points, 0);
+
   return {
     id: team.id,
     name: team.name,
     tag: team.tag,
     ownerId: team.ownerId,
     owner: team.owner,
+    wins,
+    losses,
+    points,
     players: team.members.map((m) => ({
       id: m.user.id,
       name: m.user.displayName,
@@ -48,9 +56,16 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
   };
 }
 
-router.get('/', authMiddleware, async (_req: AuthRequest, res: Response) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.userId;
     const teams = await prisma.team.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } },
+        ],
+      },
       include: {
         members: {
           include: {

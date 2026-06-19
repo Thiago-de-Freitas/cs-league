@@ -65,7 +65,7 @@ export interface Match {
   bracketPosition?: number | null;
   map?: string | null;
   playedAt?: string | null;
-  league?: { id: string; name: string; ownerId: string };
+  league?: { id: string; name: string; ownerId: string; maxTeams?: number };
   demos?: Demo[];
 }
 

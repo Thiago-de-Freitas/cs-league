@@ -63,14 +63,27 @@ docker compose up --build
 
 Em outro terminal: `cd Frontend && npm start`
 
+## Dados de teste (seed)
+
+```powershell
+cd Backend
+npm run db:seed
+```
+
+| Email | Senha | Papel |
+|-------|-------|-------|
+| `admin@test.com` | `123456` | Admin |
+| `thiago@csleague.com` | `123456` | Dono de ligas |
+| `player1@csleague.com` | `123456` | Capitão FURIA Academy |
+
 ## Fluxo de teste
 
 1. Cadastre-se em `/register`
 2. Crie um time em `/create-team`
 3. Crie uma liga em `/create-league`
-4. Na liga: adicione times, crie partidas, registre resultados
-5. Envie uma demo em `/demo-upload`
-6. Veja estatísticas em `/demo/:id` (K/D, ADR, HS%, KAST)
+4. Na liga: adicione times, gere o chaveamento, registre resultados (semifinal/final são criadas automaticamente)
+5. Na partida: clique em **Detalhes** → **Enviar Demo**
+6. Veja estatísticas na partida ou em `/demo/:id` (K/D, ADR, HS%, KAST)
 
 ## Solução de problemas
 

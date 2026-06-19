@@ -6,15 +6,47 @@
     <div *ngIf="match && !loading" class="details-card gc-card">
       <h1 class="page-title">{{ match.team1.name }} <span class="vs">VS</span> {{ match.team2.name }}</h1>
       <div class="match-meta">
-        <span class="badge status-{{ match.status }}">{{ match.status }}</span>
+        <span class="badge status-{{ match.status }}">{{ getStatusLabel(match.status) }}</span>
+        <span class="badge badge-orange" *ngIf="match.round">{{ getRoundLabel(match.round) }}</span>
         <span class="meta" *ngIf="match.map">Mapa: {{ match.map }}</span>
         <span class="meta" *ngIf="match.winner">Vencedor: <strong>{{ match.winner.name }}</strong></span>
       </div>
-      <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small mt-4">Voltar à Liga</a>
+      <div class="match-actions">
+        <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
+        <button class="btn btn-primary btn-small" (click)="goToUpload()">Enviar Demo</button>
+      </div>
     </div>
 
-    <div *ngIf="isDemoView && !loading" class="details-card gc-card">
-      <h1 class="page-title">Estatísticas da Demo</h1>
+    <div *ngIf="match?.demos && match!.demos!.length > 0 && !loading" class="gc-card mt-4">
+      <h2 class="section-title">Demos desta partida</h2>
+      <ul class="gc-list">
+        <li *ngFor="let demo of match!.demos" class="gc-list-item demo-list-item">
+          <div class="demo-info">
+            <span class="demo-name">{{ demo.fileName }}</span>
+            <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+          </div>
+          <button
+            *ngIf="demo.status === 'completed'"
+            class="btn btn-secondary btn-small"
+            (click)="viewDemoStats(demo)">
+            Ver Stats
+          </button>
+          <a *ngIf="demo.status === 'completed'" [routerLink]="['/demo', demo.id]" class="btn btn-ghost btn-small">
+            Abrir
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div *ngIf="isDemoView && demo && !loading" class="details-card gc-card">
+      <h1 class="page-title">Demo: {{ demo.fileName }}</h1>
+      <div class="match-meta">
+        <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+        <span class="meta" *ngIf="demo.matchId">
+          Partida: <a [routerLink]="['/match', demo.matchId]">Ver partida</a>
+        </span>
+      </div>
+      <p *ngIf="demo.errorMessage" class="error-message">{{ demo.errorMessage }}</p>
     </div>
 
     <div *ngIf="stats.length > 0 && !loading" class="gc-card mt-4">
@@ -47,8 +79,9 @@
       </div>
     </div>
 
-    <div *ngIf="!loading && stats.length === 0 && !errorMsg" class="not-found-message">
-      <p>Nenhuma estatística disponível. A demo pode ainda estar em processamento.</p>
+    <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView" class="not-found-message">
+      <p>Nenhuma demo associada. Envie um arquivo .dem para ver as estatísticas.</p>
+      <button class="btn btn-primary mt-4" (click)="goToUpload()">Enviar Demo</button>
     </div>
   </div>
 </div>

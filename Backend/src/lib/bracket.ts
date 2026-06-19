@@ -47,3 +47,18 @@ export function rankTeamsForSeeding<T extends LeagueTeamForSeed>(teams: T[]): T[
     return (a.seed ?? 9999) - (b.seed ?? 9999);
   });
 }
+
+/** Par de partidas da mesma rodada que alimenta um jogo da próxima */
+export function getFeederPositions(bracketPosition: number): [number, number] {
+  const base = bracketPosition % 2 === 1 ? bracketPosition : bracketPosition - 1;
+  return [base, base + 1];
+}
+
+export function getNextBracketSlot(
+  round: number,
+  bracketPosition: number
+): { round: number; bracketPosition: number } | null {
+  const nextRound = round + 1;
+  const nextPosition = Math.ceil(bracketPosition / 2);
+  return { round: nextRound, bracketPosition: nextPosition };
+}

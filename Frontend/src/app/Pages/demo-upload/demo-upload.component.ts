@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DemoService } from '../../Services/demo.service';
 import { LeagueService } from '../../Services/league.service';
 import { Demo, League, Match } from '../../Models/interfaces';
@@ -28,13 +28,21 @@ export class DemoUploadComponent implements OnInit {
   constructor(
     private demoService: DemoService,
     private leagueService: LeagueService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.loadDemos();
+    const params = this.route.snapshot.queryParams;
     this.leagueService.getLeagues().subscribe({
-      next: (leagues) => (this.leagues = leagues)
+      next: (leagues) => {
+        this.leagues = leagues;
+        if (params['leagueId']) {
+          this.selectedLeagueId = params['leagueId'];
+          this.onLeagueChange(params['matchId']);
+        }
+      }
     });
   }
 
@@ -52,13 +60,18 @@ export class DemoUploadComponent implements OnInit {
     }
   }
 
-  onLeagueChange(): void {
+  onLeagueChange(preselectMatchId?: string): void {
     if (!this.selectedLeagueId) {
       this.matches = [];
       return;
     }
     this.leagueService.getLeagueById(this.selectedLeagueId).subscribe({
-      next: (league) => (this.matches = league.matches || [])
+      next: (league) => {
+        this.matches = league.matches || [];
+        if (preselectMatchId) {
+          this.selectedMatchId = preselectMatchId;
+        }
+      }
     });
   }
 

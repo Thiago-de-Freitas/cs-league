@@ -1,8 +1,75 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { getFeederPositions, getNextBracketSlot } from '../lib/bracket';
 
 const router = Router();
+
+type Tx = Prisma.TransactionClient;
+
+async function tryAdvanceBracket(
+  tx: Tx,
+  match: {
+    id: string;
+    leagueId: string;
+    round: number;
+    bracketPosition: number | null;
+    winnerId: string | null;
+  },
+  maxTeams: number
+): Promise<void> {
+  if (!match.bracketPosition || !match.winnerId) return;
+
+  const nextSlot = getNextBracketSlot(match.round, match.bracketPosition);
+  if (!nextSlot) return;
+
+  const totalRounds = Math.log2(maxTeams);
+  if (nextSlot.round > totalRounds) return;
+
+  const [posA, posB] = getFeederPositions(match.bracketPosition);
+  const feeders = await tx.match.findMany({
+    where: {
+      leagueId: match.leagueId,
+      round: match.round,
+      bracketPosition: { in: [posA, posB] },
+    },
+  });
+
+  if (feeders.length < 2) return;
+  const allDone = feeders.every((m) => m.status === 'COMPLETED' && m.winnerId);
+  if (!allDone) return;
+
+  const sorted = feeders.sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
+  const team1Id = sorted[0].winnerId!;
+  const team2Id = sorted[1].winnerId!;
+
+  const existing = await tx.match.findFirst({
+    where: {
+      leagueId: match.leagueId,
+      round: nextSlot.round,
+      bracketPosition: nextSlot.bracketPosition,
+    },
+  });
+
+  if (existing) {
+    await tx.match.update({
+      where: { id: existing.id },
+      data: { team1Id, team2Id, status: 'SCHEDULED', winnerId: null },
+    });
+  } else {
+    await tx.match.create({
+      data: {
+        leagueId: match.leagueId,
+        team1Id,
+        team2Id,
+        round: nextSlot.round,
+        bracketPosition: nextSlot.bracketPosition,
+        status: 'SCHEDULED',
+      },
+    });
+  }
+}
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
@@ -12,7 +79,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         team1: { select: { id: true, name: true, tag: true } },
         team2: { select: { id: true, name: true, tag: true } },
         winner: { select: { id: true, name: true, tag: true } },
-        league: { select: { id: true, name: true, ownerId: true } },
+        league: { select: { id: true, name: true, ownerId: true, maxTeams: true } },
         demos: {
           include: { stats: true },
           orderBy: { createdAt: 'desc' },
@@ -34,13 +101,17 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       winner: match.winner,
       winnerId: match.winnerId,
       status: match.status.toLowerCase(),
+      round: match.round,
+      bracketPosition: match.bracketPosition,
       map: match.map,
       playedAt: match.playedAt,
       demos: match.demos.map((d) => ({
         id: d.id,
         fileName: d.fileName,
         status: d.status.toLowerCase(),
+        errorMessage: d.errorMessage,
         stats: d.stats,
+        createdAt: d.createdAt,
       })),
     });
   } catch (err) {
@@ -62,6 +133,10 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
     }
     if (match.league.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
       res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+    if (match.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Resultado já registrado para esta partida' });
       return;
     }
 
@@ -97,6 +172,12 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         where: { leagueId: match.leagueId, teamId: loserId },
         data: { losses: { increment: 1 } },
       });
+
+      await tryAdvanceBracket(
+        tx,
+        { ...match, winnerId },
+        match.league.maxTeams
+      );
     });
 
     const updated = await prisma.match.findUnique({

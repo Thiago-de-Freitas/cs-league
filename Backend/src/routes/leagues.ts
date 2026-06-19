@@ -93,9 +93,16 @@ async function assertLeagueOwner(leagueId: string, userId: string, role: string)
   return { error: null, status: 200 as const, league };
 }
 
-router.get('/', authMiddleware, async (_req: AuthRequest, res: Response) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.userId;
     const leagues = await prisma.league.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { teams: { some: { team: { members: { some: { userId } } } } } },
+        ],
+      },
       include: {
         teams: { include: { team: true } },
         _count: { select: { matches: true } },
