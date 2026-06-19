@@ -13,7 +13,7 @@
     <section class="dashboard-card gc-card">
       <div class="gc-card-header">
         <h2 class="gc-card-title">Minhas Ligas</h2>
-        <a routerLink="/create-league" class="btn btn-primary btn-small">+ Nova</a>
+        <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
       </div>
       <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
         <li *ngFor="let league of leagues" class="gc-list-item">
@@ -23,14 +23,14 @@
         </li>
       </ul>
       <ng-template #noLeagues>
-        <p class="meta">Nenhuma liga ainda. <a routerLink="/create-league" class="text-link">Criar liga</a></p>
+        <p class="meta">Nenhuma liga ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateLeagueModal()">Criar liga</button></p>
       </ng-template>
     </section>
 
     <section class="dashboard-card gc-card">
       <div class="gc-card-header">
         <h2 class="gc-card-title">Meus Times</h2>
-        <a routerLink="/create-team" class="btn btn-primary btn-small">+ Novo</a>
+        <button type="button" class="btn btn-primary btn-small" (click)="openCreateTeamModal()">+ Novo</button>
       </div>
       <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
         <li *ngFor="let team of teams" class="gc-list-item">
@@ -40,7 +40,7 @@
         </li>
       </ul>
       <ng-template #noTeams>
-        <p class="meta">Nenhum time ainda. <a routerLink="/create-team" class="text-link">Criar time</a></p>
+        <p class="meta">Nenhum time ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateTeamModal()">Criar time</button></p>
       </ng-template>
     </section>
 
@@ -51,3 +51,15 @@
     </section>
   </div>
 </div>
+
+<app-create-league-modal
+  *ngIf="showCreateLeagueModal"
+  (closed)="closeCreateLeagueModal()"
+  (created)="onLeagueCreated($event)">
+</app-create-league-modal>
+
+<app-create-team-modal
+  *ngIf="showCreateTeamModal"
+  (closed)="closeCreateTeamModal()"
+  (created)="onTeamCreated($event)">
+</app-create-team-modal>

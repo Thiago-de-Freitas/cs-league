@@ -1,88 +1,43 @@
-<div class="form-container">
-  <div class="form-wrapper wide create-team-card">
-    <h2 class="form-header">Criar Novo Time</h2>
-    <p class="form-subtitle">Reúna seus amigos e prepare-se para a competição!</p>
-
-    <form class="form-group-spacing" [formGroup]="createTeamForm" (ngSubmit)="onCreateTeam()">
-      <div class="form-group">
-        <label for="team-name" class="form-label">Nome do Time</label>
-        <input id="team-name" name="teamName" type="text" required
-          formControlName="teamName"
-          class="input-field"
-          placeholder="Ex: Os Vingadores do CS">
-        <div *ngIf="createTeamForm.get('teamName')?.invalid && createTeamForm.get('teamName')?.touched" class="error-message">
-          O nome do time é obrigatório.
-        </div>
+<div class="page-container">
+  <div class="page-inner max-width-narrow">
+    <div class="gc-card-header list-page-header">
+      <div>
+        <h1 class="page-title">Times</h1>
+        <p class="page-subtitle list-page-subtitle">Seus times e elencos de Counter-Strike 2</p>
       </div>
+      <button class="btn btn-primary" (click)="openCreateModal()">+ Novo Time</button>
+    </div>
 
-      <div class="form-group">
-        <label for="team-tag" class="form-label">Tag do Time (máx. 5 caracteres)</label>
-        <input id="team-tag" name="teamTag" type="text" required
-          formControlName="teamTag"
-          class="input-field"
-          placeholder="Ex: VNG"
-          maxlength="5">
-        <div *ngIf="createTeamForm.get('teamTag')?.invalid && createTeamForm.get('teamTag')?.touched" class="error-message">
-          <div *ngIf="createTeamForm.get('teamTag')?.errors?.['required']">A tag do time é obrigatória.</div>
-          <div *ngIf="createTeamForm.get('teamTag')?.errors?.['maxlength']">A tag deve ter no máximo 5 caracteres.</div>
-        </div>
-      </div>
-
-      <div class="invite-section">
-        <h3 class="section-subtitle-small">Convidar Membros</h3>
-        <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"
-          class="input-field"
-          placeholder="Buscar usuário por nome...">
-
-        <ul *ngIf="searchResults.length > 0" class="search-results-list">
-          <li *ngFor="let user of searchResults" class="search-result-item">
-            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
-            <button (click)="inviteUser(user)" type="button" class="btn btn-primary btn-small">
-              Convidar
-            </button>
-          </li>
-        </ul>
-
-        <div *ngIf="invitedMembers.length > 0" class="invited-section">
-          <h4 class="form-label">Membros Convidados</h4>
-          <ul class="invited-members-list">
-            <li *ngFor="let member of invitedMembers" class="invited-member-item">
-              <span>{{ member.displayName }}</span>
-              <button (click)="removeInvitedUser(member)" type="button" class="btn-remove">
-                Remover
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <button type="submit" class="btn btn-primary w-full" [disabled]="loading">
-        {{ loading ? 'Criando...' : 'Criar Time' }}
-      </button>
-
-      <div *ngIf="errorMessage" class="error-message text-center">{{ errorMessage }}</div>
-    </form>
-
-    <div *ngIf="successMessage" class="success-message">
+    <div *ngIf="successMessage" class="success-message mb-4">
       <span>{{ successMessage }}</span>
-      <button class="btn btn-secondary mt-2" (click)="goToTeamDetails()" *ngIf="createdTeamId">
+      <button class="btn btn-secondary btn-small mt-2" (click)="goToTeamDetails()" *ngIf="createdTeamId">
         Ver detalhes do time
       </button>
     </div>
 
-    <div class="teams-list-section">
-      <h3 class="section-title">Times Existentes</h3>
+    <div *ngIf="loading" class="loading">Carregando...</div>
+
+    <div class="gc-card" *ngIf="!loading">
+      <h2 class="section-title">Times Existentes</h2>
       <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
-        <li *ngFor="let team of teams" class="gc-list-item">
-          <span class="team-name">{{ team.name }}</span>
-          <span class="badge badge-orange">{{ team.tag }}</span>
-          <span class="meta">{{ team.players.length || 0 }} membros</span>
+        <li *ngFor="let team of teams" class="gc-list-item team-list-item">
+          <div class="team-info">
+            <span class="team-name">{{ team.name }}</span>
+            <span class="badge badge-orange">{{ team.tag }}</span>
+            <span class="meta">{{ team.players.length || 0 }} membros</span>
+          </div>
           <button class="btn btn-secondary btn-small" (click)="goToTeamDetailsById(team.id)">Ver</button>
         </li>
       </ul>
       <ng-template #noTeams>
-        <p class="meta">Nenhum time cadastrado.</p>
+        <p class="meta">Nenhum time cadastrado. Clique em <strong>+ Novo Time</strong> para começar.</p>
       </ng-template>
     </div>
   </div>
 </div>
+
+<app-create-team-modal
+  *ngIf="showCreateModal"
+  (closed)="closeCreateModal()"
+  (created)="onTeamCreated($event)">
+</app-create-team-modal>

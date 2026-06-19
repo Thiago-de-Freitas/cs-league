@@ -1,0 +1,47 @@
+<div class="gc-modal-backdrop" (click)="onBackdropClick($event)" role="dialog" aria-modal="true" aria-labelledby="upload-demo-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="upload-demo-title" class="gc-modal-title">Enviar Demo</h2>
+        <p class="gc-modal-subtitle">Envie arquivos .dem para análise automática de performance</p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="close()" [disabled]="uploading" aria-label="Fechar">&times;</button>
+    </div>
+
+    <div class="gc-modal-body">
+      <div class="form-group">
+        <label class="form-label">Arquivo .dem</label>
+        <div class="file-input-wrapper">
+          <input type="file" accept=".dem" (change)="onFileSelected($event)" class="file-input" id="demo-file-modal">
+          <label for="demo-file-modal" class="file-input-label">
+            <span class="file-icon">📁</span>
+            {{ selectedFile ? selectedFile.name : 'Selecionar arquivo .dem' }}
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Associar a partida (opcional)</label>
+        <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="input-field">
+          <option value="">Selecione uma liga</option>
+          <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
+        </select>
+        <select *ngIf="matches.length > 0" [(ngModel)]="selectedMatchId" class="input-field mt-2">
+          <option value="">Selecione uma partida</option>
+          <option *ngFor="let m of matches" [value]="m.id">
+            {{ m.team1.name }} vs {{ m.team2.name }}
+          </option>
+        </select>
+      </div>
+
+      <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
+
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="close()" [disabled]="uploading">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="upload()" [disabled]="uploading || !selectedFile">
+          {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -5,25 +5,30 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DemoService } from '../../Services/demo.service';
 import { LeagueService } from '../../Services/league.service';
 import { Demo, League, Match } from '../../Models/interfaces';
+import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 
 @Component({
   selector: 'app-demo-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, DemoUploadModalComponent],
   templateUrl: './demo-upload.component.html',
   styleUrls: ['./demo-upload.component.css']
 })
 export class DemoUploadComponent implements OnInit {
-  selectedFile: File | null = null;
-  uploading = false;
-  errorMsg = '';
   demos: Demo[] = [];
   leagues: League[] = [];
-  selectedMatchId = '';
-  matches: Match[] = [];
-  selectedLeagueId = '';
+  loading = true;
+  showUploadModal = false;
+  uploadPrefillLeagueId = '';
+  uploadPrefillMatchId = '';
   processingDemo: Demo | null = null;
   pollStatus = '';
+  associatingDemoId: string | null = null;
+  associateLeagueId = '';
+  associateMatchId = '';
+  associateMatches: Match[] = [];
+  associating = false;
+  errorMsg = '';
 
   constructor(
     private demoService: DemoService,
@@ -34,71 +39,51 @@ export class DemoUploadComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadDemos();
-    const params = this.route.snapshot.queryParams;
     this.leagueService.getLeagues().subscribe({
-      next: (leagues) => {
-        this.leagues = leagues;
-        if (params['leagueId']) {
-          this.selectedLeagueId = params['leagueId'];
-          this.onLeagueChange(params['matchId']);
-        }
-      }
+      next: (leagues) => (this.leagues = leagues)
     });
+
+    const params = this.route.snapshot.queryParams;
+    if (params['leagueId']) {
+      this.uploadPrefillLeagueId = params['leagueId'];
+      this.uploadPrefillMatchId = params['matchId'] || '';
+      this.showUploadModal = true;
+    }
   }
 
   loadDemos(): void {
+    this.loading = true;
     this.demoService.listDemos().subscribe({
-      next: (demos) => (this.demos = demos)
-    });
-  }
-
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files?.length) {
-      this.selectedFile = input.files[0];
-      this.errorMsg = '';
-    }
-  }
-
-  onLeagueChange(preselectMatchId?: string): void {
-    if (!this.selectedLeagueId) {
-      this.matches = [];
-      return;
-    }
-    this.leagueService.getLeagueById(this.selectedLeagueId).subscribe({
-      next: (league) => {
-        this.matches = league.matches || [];
-        if (preselectMatchId) {
-          this.selectedMatchId = preselectMatchId;
-        }
-      }
-    });
-  }
-
-  upload(): void {
-    if (!this.selectedFile) {
-      this.errorMsg = 'Selecione um arquivo .dem';
-      return;
-    }
-
-    this.uploading = true;
-    this.errorMsg = '';
-    const matchId = this.selectedMatchId || undefined;
-
-    this.demoService.uploadDemo(this.selectedFile, matchId).subscribe({
-      next: (demo) => {
-        this.uploading = false;
-        this.selectedFile = null;
-        this.processingDemo = demo;
-        this.pollStatus = demo.status;
-        this.startPolling(demo.id);
-        this.loadDemos();
+      next: (demos) => {
+        this.demos = demos;
+        this.loading = false;
       },
-      error: (err) => {
-        this.uploading = false;
-        this.errorMsg = err.error?.error || 'Erro no upload.';
+      error: () => {
+        this.loading = false;
       }
     });
+  }
+
+  openUploadModal(): void {
+    this.uploadPrefillLeagueId = '';
+    this.uploadPrefillMatchId = '';
+    this.showUploadModal = true;
+  }
+
+  closeUploadModal(): void {
+    this.showUploadModal = false;
+    this.uploadPrefillLeagueId = '';
+    this.uploadPrefillMatchId = '';
+  }
+
+  onDemoUploaded(demo: Demo): void {
+    this.showUploadModal = false;
+    this.uploadPrefillLeagueId = '';
+    this.uploadPrefillMatchId = '';
+    this.processingDemo = demo;
+    this.pollStatus = demo.status;
+    this.startPolling(demo.id);
+    this.loadDemos();
   }
 
   startPolling(demoId: string): void {
@@ -115,6 +100,50 @@ export class DemoUploadComponent implements OnInit {
 
   viewDemo(demoId: string): void {
     this.router.navigate(['/demo', demoId]);
+  }
+
+  openAssociate(demo: Demo): void {
+    this.associatingDemoId = demo.id;
+    this.associateLeagueId = '';
+    this.associateMatchId = '';
+    this.associateMatches = [];
+  }
+
+  cancelAssociate(): void {
+    this.associatingDemoId = null;
+    this.associateLeagueId = '';
+    this.associateMatchId = '';
+    this.associateMatches = [];
+  }
+
+  onAssociateLeagueChange(): void {
+    if (!this.associateLeagueId) {
+      this.associateMatches = [];
+      return;
+    }
+    this.leagueService.getLeagueById(this.associateLeagueId).subscribe({
+      next: (league) => (this.associateMatches = league.matches || [])
+    });
+  }
+
+  confirmAssociate(demo: Demo): void {
+    if (!this.associateMatchId) {
+      this.errorMsg = 'Selecione uma partida para associar';
+      return;
+    }
+    this.associating = true;
+    this.demoService.associateMatch(demo.id, this.associateMatchId).subscribe({
+      next: () => {
+        this.associating = false;
+        this.errorMsg = '';
+        this.cancelAssociate();
+        this.loadDemos();
+      },
+      error: (err) => {
+        this.associating = false;
+        this.errorMsg = err.error?.error || 'Erro ao associar demo';
+      }
+    });
   }
 
   getStatusLabel(status: string): string {

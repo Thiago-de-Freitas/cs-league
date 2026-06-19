@@ -7,6 +7,7 @@ import {
   isValidBracketSize,
   rankTeamsForSeeding,
 } from '../lib/bracket';
+import { advanceBracketFromRound } from '../lib/bracketAdvance';
 
 const router = Router();
 
@@ -242,6 +243,44 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
   }
 });
 
+router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    const { teamIds } = req.body as { teamIds: string[] };
+    if (!teamIds?.length) {
+      res.status(400).json({ error: 'Lista de teamIds é obrigatória' });
+      return;
+    }
+
+    const uniqueIds = [...new Set(teamIds)];
+    let count = await prisma.leagueTeam.count({ where: { leagueId: req.params.id } });
+    const maxTeams = check.league.maxTeams;
+
+    for (const teamId of uniqueIds) {
+      if (count >= maxTeams) break;
+      const exists = await prisma.leagueTeam.findUnique({
+        where: { leagueId_teamId: { leagueId: req.params.id, teamId } },
+      });
+      if (exists) continue;
+      await prisma.leagueTeam.create({
+        data: { leagueId: req.params.id, teamId, seed: count + 1 },
+      });
+      count++;
+    }
+
+    const full = await getLeagueWithDetails(req.params.id);
+    res.status(201).json(formatLeague(full!));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao adicionar times à liga' });
+  }
+});
+
 router.post('/:id/teams', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
@@ -355,19 +394,23 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
     ranked.forEach((lt, i) => seedToTeam.set(i + 1, lt));
 
     const matchCreates: Parameters<typeof prisma.match.create>[0][] = [];
+    const walkoverWinners = new Map<number, string>();
     let walkovers = 0;
 
     pairings.forEach(([seedA, seedB], position) => {
+      const pos = position + 1;
       const teamA = seedToTeam.get(seedA);
       const teamB = seedToTeam.get(seedB);
 
       if (!teamA && !teamB) return;
 
       if (teamA && !teamB) {
+        walkoverWinners.set(pos, teamA.teamId);
         walkovers++;
         return;
       }
       if (!teamA && teamB) {
+        walkoverWinners.set(pos, teamB.teamId);
         walkovers++;
         return;
       }
@@ -379,16 +422,32 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
             team1Id: teamA.teamId,
             team2Id: teamB.teamId,
             round: 1,
-            bracketPosition: position + 1,
+            bracketPosition: pos,
             status: 'SCHEDULED',
           },
         });
       }
     });
 
-    if (matchCreates.length > 0) {
-      await prisma.$transaction(matchCreates.map((data) => prisma.match.create(data)));
-    }
+    let advancedMatches = 0;
+    await prisma.$transaction(async (tx) => {
+      if (matchCreates.length > 0) {
+        for (const data of matchCreates) {
+          await tx.match.create(data);
+        }
+      }
+      advancedMatches = await advanceBracketFromRound(
+        tx,
+        req.params.id,
+        1,
+        bracketSize,
+        walkoverWinners
+      );
+      await tx.league.update({
+        where: { id: req.params.id },
+        data: { status: 'ONGOING' },
+      });
+    });
 
     const full = await getLeagueWithDetails(req.params.id);
     res.json({
@@ -397,6 +456,7 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
         bracketSize,
         round1Matches: matchCreates.length,
         walkovers,
+        advancedMatches,
         seedingBy: ranked.some((t) => t.wins + t.losses > 0) ? 'record' : 'manual',
       },
     });

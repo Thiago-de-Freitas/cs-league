@@ -20,14 +20,43 @@
           <span class="badge badge-orange">{{ member.role }}</span>
         </li>
       </ul>
+
+      <div *ngIf="isOwner" class="invite-section mt-4">
+        <h2 class="section-title">Convidar Jogadores</h2>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onSearchUsers()"
+          class="input-field"
+          placeholder="Buscar por nome ou email...">
+        <ul *ngIf="searchResults.length > 0" class="gc-list mt-2">
+          <li *ngFor="let user of searchResults" class="gc-list-item">
+            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
+            <button class="btn btn-primary btn-small" (click)="inviteUser(user)">Convidar</button>
+          </li>
+        </ul>
+        <p *ngIf="inviteMsg" class="success-message mt-2">{{ inviteMsg }}</p>
+        <p *ngIf="inviteError" class="error-message mt-2">{{ inviteError }}</p>
+
+        <div *ngIf="team.invites && team.invites.length > 0" class="mt-4">
+          <h3 class="section-subtitle-small">Convites Pendentes (enviados)</h3>
+          <ul class="gc-list">
+            <li *ngFor="let inv of team.invites" class="gc-list-item">
+              <span>{{ inv.invitedUser.displayName }}</span>
+              <span class="badge badge-gray">Pendente</span>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div *ngIf="pendingInvites.length > 0" class="details-card gc-card mt-4">
-      <h2 class="section-title">Convites Pendentes</h2>
+      <h2 class="section-title">Convites Recebidos</h2>
       <ul class="gc-list">
         <li *ngFor="let invite of pendingInvites" class="gc-list-item">
-          <span>{{ invite.team?.name }}</span>
+          <span>{{ invite.team?.name }} [{{ invite.team?.tag }}]</span>
           <button class="btn btn-primary btn-small" (click)="acceptInvite(invite)">Aceitar</button>
+          <button class="btn btn-ghost btn-small" (click)="rejectInvite(invite)">Recusar</button>
         </li>
       </ul>
     </div>

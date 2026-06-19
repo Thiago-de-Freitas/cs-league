@@ -1,78 +1,47 @@
-<div class="form-container">
-  <div class="form-wrapper max-w-2xl wide">
-    <div>
-      <h2 class="form-header">
-        Criar Nova Liga
-      </h2>
-      <p class="form-subtitle">
-        Organize suas competições de Counter-Strike 2.
-      </p>
+<div class="page-container">
+  <div class="page-inner max-width-narrow">
+    <div class="gc-card-header list-page-header">
+      <div>
+        <h1 class="page-title">Ligas</h1>
+        <p class="page-subtitle list-page-subtitle">Suas competições de Counter-Strike 2</p>
+      </div>
+      <button class="btn btn-primary" (click)="openCreateModal()">+ Nova Liga</button>
     </div>
-    <form class="form-group-spacing" [formGroup]="createLeagueForm" (ngSubmit)="onSubmit()">
-      <div class="form-group">
-        <label for="league-name" class="form-label">Nome da Liga</label>
-        <input id="league-name" name="leagueName" type="text" required
-          formControlName="leagueName"
-          class="input-field"
-          placeholder="Ex: Liga dos Campeões CS2">
-        <div *ngIf="createLeagueForm.get('leagueName')?.invalid && createLeagueForm.get('leagueName')?.touched" class="error-message">
-          <div *ngIf="createLeagueForm.get('leagueName')?.errors?.['required']">O nome da liga é obrigatório.</div>
-        </div>
-      </div>
-      <div class="form-group mt-4">
-        <label for="description" class="form-label">Descrição (Opcional)</label>
-        <textarea id="description" name="description" rows="3"
-          formControlName="description"
-          class="textarea-field"
-          placeholder="Uma breve descrição sobre a liga..."></textarea>
-        <div *ngIf="createLeagueForm.get('description')?.errors?.['maxlength']" class="error-message">
-          A descrição não pode ter mais de 500 caracteres.
-        </div>
-      </div>
-      <div class="form-group mt-4">
-        <label for="max-teams" class="form-label">Quantidade máxima de times</label>
-        <select id="max-teams" formControlName="maxTeams" class="input-field">
-          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
-        </select>
-        <p class="form-hint">O chaveamento será calculado de forma justa (1×{{ createLeagueForm.get('maxTeams')?.value }}, favoritos não se enfrentam cedo).</p>
-      </div>
-      <div class="form-group mt-4 flex items-center">
-        <input id="is-public" name="isPublic" type="checkbox"
-          formControlName="isPublic"
-          class="checkbox-field">
-        <label for="is-public" class="ml-2 text-sm text-gray-900">
-          Tornar esta liga pública (visível para todos)
-        </label>
-      </div>
 
-      <div class="form-group">
-        <button type="submit" class="btn btn-primary">
-          Criar Liga
-        </button>
-      </div>
-    </form>
-    <div *ngIf="successMessage" class="success-message">
+    <div *ngIf="successMessage" class="success-message mb-4">
       <span>{{ successMessage }}</span>
-      <button class="btn btn-secondary mt-2" (click)="goToLeagueDetails()" *ngIf="createdLeagueId">
+      <button class="btn btn-secondary btn-small mt-2" (click)="goToLeagueDetails()" *ngIf="createdLeagueId">
         Ver detalhes da liga
       </button>
     </div>
-    <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
-    <div class="leagues-list-section gc-card">
-      <h3 class="section-title">Ligas Existentes</h3>
-      <div *ngIf="leagues.length > 0; else noLeagues">
-        <ul class="leagues-list">
-          <li *ngFor="let league of leagues" class="gc-list-item league-list-item">
+
+    <div *ngIf="loading" class="loading">Carregando...</div>
+
+    <div class="gc-card" *ngIf="!loading">
+      <h2 class="section-title">Ligas Existentes</h2>
+      <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
+        <li *ngFor="let league of leagues" class="gc-list-item league-list-item">
+          <div class="league-info">
             <span class="league-name">{{ league.name }}</span>
-            <span class="league-status">({{ league.status }})</span>
-            <span class="league-teams-count" *ngIf="league.teamCount !== undefined">{{ league.teamCount }}/{{ league.maxTeams || 8 }} times</span>
-            <button class="btn btn-secondary ml-2" (click)="goToLeagueDetailsById(league.id)">Ver Detalhes</button>
-          </li>
-        </ul>
-      </div>
+            <span class="badge badge-gray">{{ getStatusLabel(league.status) }}</span>
+            <span class="meta" *ngIf="league.teamCount !== undefined">
+              {{ league.teamCount }}/{{ league.maxTeams || 8 }} times
+            </span>
+          </div>
+          <button class="btn btn-secondary btn-small" (click)="goToLeagueDetailsById(league.id)">
+            Ver Detalhes
+          </button>
+        </li>
+      </ul>
       <ng-template #noLeagues>
-        <p class="text-gray-600">Nenhuma liga cadastrada.</p>
+        <p class="meta">Nenhuma liga cadastrada. Clique em <strong>+ Nova Liga</strong> para começar.</p>
       </ng-template>
     </div>
   </div>
 </div>
+
+<app-create-league-modal
+  *ngIf="showCreateModal"
+  (closed)="closeCreateModal()"
+  (created)="onLeagueCreated($event)">
+</app-create-league-modal>

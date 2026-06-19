@@ -1,0 +1,52 @@
+<div class="gc-modal-backdrop" (click)="onBackdropClick($event)" role="dialog" aria-modal="true" aria-labelledby="create-league-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="create-league-title" class="gc-modal-title">Criar Nova Liga</h2>
+        <p class="gc-modal-subtitle">Organize suas competições de Counter-Strike 2.</p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="close()" [disabled]="loading" aria-label="Fechar">&times;</button>
+    </div>
+
+    <form class="gc-modal-body" [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="league-name" class="form-label">Nome da Liga</label>
+        <input id="league-name" type="text" required
+          formControlName="leagueName"
+          class="input-field"
+          placeholder="Ex: Liga dos Campeões CS2">
+        <div *ngIf="form.get('leagueName')?.invalid && form.get('leagueName')?.touched" class="error-message">
+          O nome da liga é obrigatório.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="description" class="form-label">Descrição (Opcional)</label>
+        <textarea id="description" rows="3"
+          formControlName="description"
+          class="textarea-field"
+          placeholder="Uma breve descrição sobre a liga..."></textarea>
+        <div *ngIf="form.get('description')?.errors?.['maxlength']" class="error-message">
+          A descrição não pode ter mais de 500 caracteres.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="max-teams" class="form-label">Quantidade máxima de times</label>
+        <select id="max-teams" formControlName="maxTeams" class="input-field">
+          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
+        </select>
+        <p class="form-hint">O chaveamento será calculado de forma justa (1×{{ form.get('maxTeams')?.value }}, favoritos não se enfrentam cedo).</p>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="close()" [disabled]="loading">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Criando...' : 'Criar Liga' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -36,6 +36,10 @@ export class LeagueService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
+  addTeamsToLeague(leagueId: string, teamIds: string[]): Observable<League> {
+    return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams/bulk`, { teamIds });
+  }
+
   addTeamToLeague(leagueId: string, teamId: string, seed?: number): Observable<League> {
     return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams`, { teamId, seed });
   }

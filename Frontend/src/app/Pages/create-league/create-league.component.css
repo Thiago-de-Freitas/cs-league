@@ -1,1 +1,16 @@
-/* Herda estilos globais de formulário */
+.league-list-item {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.league-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.league-name {
+  font-weight: 600;
+  color: var(--gc-text);
+}

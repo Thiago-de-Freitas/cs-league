@@ -1,0 +1,70 @@
+<div class="gc-modal-backdrop" (click)="onBackdropClick($event)" role="dialog" aria-modal="true" aria-labelledby="create-team-title">
+  <div class="gc-modal gc-modal-wide">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="create-team-title" class="gc-modal-title">Criar Novo Time</h2>
+        <p class="gc-modal-subtitle">Reúna seus amigos e prepare-se para a competição!</p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="close()" [disabled]="loading" aria-label="Fechar">&times;</button>
+    </div>
+
+    <form class="gc-modal-body" [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="team-name" class="form-label">Nome do Time</label>
+        <input id="team-name" type="text" required
+          formControlName="teamName"
+          class="input-field"
+          placeholder="Ex: Os Vingadores do CS">
+        <div *ngIf="form.get('teamName')?.invalid && form.get('teamName')?.touched" class="error-message">
+          O nome do time é obrigatório.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="team-tag" class="form-label">Tag do Time (máx. 5 caracteres)</label>
+        <input id="team-tag" type="text" required
+          formControlName="teamTag"
+          class="input-field"
+          placeholder="Ex: VNG"
+          maxlength="5">
+        <div *ngIf="form.get('teamTag')?.invalid && form.get('teamTag')?.touched" class="error-message">
+          <div *ngIf="form.get('teamTag')?.errors?.['required']">A tag do time é obrigatória.</div>
+          <div *ngIf="form.get('teamTag')?.errors?.['maxlength']">A tag deve ter no máximo 5 caracteres.</div>
+        </div>
+      </div>
+
+      <div class="invite-section">
+        <h3 class="section-subtitle-small">Convidar Membros</h3>
+        <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"
+          class="input-field"
+          placeholder="Buscar usuário por nome...">
+
+        <ul *ngIf="searchResults.length > 0" class="search-results-list">
+          <li *ngFor="let user of searchResults" class="search-result-item">
+            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
+            <button type="button" (click)="inviteUser(user)" class="btn btn-primary btn-small">Convidar</button>
+          </li>
+        </ul>
+
+        <div *ngIf="invitedMembers.length > 0" class="invited-section">
+          <h4 class="form-label">Membros Convidados</h4>
+          <ul class="invited-members-list">
+            <li *ngFor="let member of invitedMembers" class="invited-member-item">
+              <span>{{ member.displayName }}</span>
+              <button type="button" (click)="removeInvitedUser(member)" class="btn-remove">Remover</button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="close()" [disabled]="loading">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Criando...' : 'Criar Time' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

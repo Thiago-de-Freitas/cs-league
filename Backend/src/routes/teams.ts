@@ -227,6 +227,32 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
   }
 });
 
+router.post('/:id/invites/:inviteId/reject', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const invite = await prisma.teamInvite.findUnique({
+      where: { id: req.params.inviteId },
+    });
+    if (!invite || invite.teamId !== req.params.id) {
+      res.status(404).json({ error: 'Convite não encontrado' });
+      return;
+    }
+    if (invite.invitedUserId !== req.user!.userId) {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    await prisma.teamInvite.update({
+      where: { id: invite.id },
+      data: { status: 'REJECTED' },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao rejeitar convite' });
+  }
+});
+
 router.post('/:id/invites/:inviteId/accept', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const invite = await prisma.teamInvite.findUnique({

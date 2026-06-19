@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { getFeederPositions, getNextBracketSlot } from '../lib/bracket';
+import { advanceBracketFromRound } from '../lib/bracketAdvance';
 
 const router = Router();
 
@@ -20,55 +20,7 @@ async function tryAdvanceBracket(
   maxTeams: number
 ): Promise<void> {
   if (!match.bracketPosition || !match.winnerId) return;
-
-  const nextSlot = getNextBracketSlot(match.round, match.bracketPosition);
-  if (!nextSlot) return;
-
-  const totalRounds = Math.log2(maxTeams);
-  if (nextSlot.round > totalRounds) return;
-
-  const [posA, posB] = getFeederPositions(match.bracketPosition);
-  const feeders = await tx.match.findMany({
-    where: {
-      leagueId: match.leagueId,
-      round: match.round,
-      bracketPosition: { in: [posA, posB] },
-    },
-  });
-
-  if (feeders.length < 2) return;
-  const allDone = feeders.every((m) => m.status === 'COMPLETED' && m.winnerId);
-  if (!allDone) return;
-
-  const sorted = feeders.sort((a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0));
-  const team1Id = sorted[0].winnerId!;
-  const team2Id = sorted[1].winnerId!;
-
-  const existing = await tx.match.findFirst({
-    where: {
-      leagueId: match.leagueId,
-      round: nextSlot.round,
-      bracketPosition: nextSlot.bracketPosition,
-    },
-  });
-
-  if (existing) {
-    await tx.match.update({
-      where: { id: existing.id },
-      data: { team1Id, team2Id, status: 'SCHEDULED', winnerId: null },
-    });
-  } else {
-    await tx.match.create({
-      data: {
-        leagueId: match.leagueId,
-        team1Id,
-        team2Id,
-        round: nextSlot.round,
-        bracketPosition: nextSlot.bracketPosition,
-        status: 'SCHEDULED',
-      },
-    });
-  }
+  await advanceBracketFromRound(tx, match.leagueId, match.round, maxTeams);
 }
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {

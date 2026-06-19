@@ -11,7 +11,6 @@ import { TeamService } from '../../Services/team.service';
 import { LeagueTeamsTableComponent } from './league-teams-table.component';
 import { LeagueBracketComponent } from '../../Components/league-bracket/league-bracket.component';
 import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
-import { concatMap, from, last } from 'rxjs';
 
 @Component({
   selector: 'app-league-details',
@@ -146,10 +145,7 @@ export class LeagueDetailsComponent implements OnInit {
     }
 
     this.addingTeams = true;
-    from(toAdd).pipe(
-      concatMap((teamId) => this.leagueService.addTeamToLeague(this.leagueId!, teamId)),
-      last()
-    ).subscribe({
+    this.leagueService.addTeamsToLeague(this.leagueId, toAdd).subscribe({
       next: (league) => {
         this.league = league;
         this.showAddTeam = false;

@@ -382,6 +382,13 @@ h1, h2, h3, .display-title {
 /* ===== Links ===== */
 .text-link { color: var(--gc-orange); font-weight: 500; }
 .text-link:hover { text-decoration: underline; }
+.text-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
 
 /* ===== Utilitários ===== */
 .text-center { text-align: center; }
@@ -402,6 +409,95 @@ h1, h2, h3, .display-title {
 .w-full { width: 100%; }
 .max-w-2xl { max-width: 640px; }
 .max-width-narrow { max-width: 720px; margin: 0 auto; }
+
+/* ===== Modal ===== */
+.gc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+.gc-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  background: var(--gc-bg);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+.gc-modal-wide {
+  max-width: 560px;
+}
+
+.gc-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.gc-modal-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gc-text);
+  margin: 0;
+}
+
+.gc-modal-subtitle {
+  color: var(--gc-text-secondary);
+  font-size: 0.9rem;
+  margin: 0.35rem 0 0;
+}
+
+.gc-modal-close {
+  background: none;
+  border: none;
+  color: var(--gc-text-muted);
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  transition: color 0.2s;
+}
+
+.gc-modal-close:hover:not(:disabled) { color: var(--gc-text); }
+.gc-modal-close:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.gc-modal-body {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.list-page-header {
+  margin-bottom: 1.5rem;
+  align-items: flex-start;
+}
+
+.list-page-subtitle {
+  margin-bottom: 0;
+}
 
 .leagues-list-section,
 .teams-list-section {

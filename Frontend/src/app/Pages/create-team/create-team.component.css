@@ -1,51 +1,16 @@
-/* Layout específico — cores via tokens globais (theme/tokens.css) */
-
-.create-team-card {
-  max-width: 640px;
+.team-list-item {
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.create-team-card h2 {
-  color: var(--gc-text);
+.team-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.create-team-card .subtitle {
-  color: var(--gc-text-secondary);
-}
-
-.create-team-card .form-label {
-  color: var(--gc-text-label);
-}
-
-.create-team-card .form-actions {
-  border-top: 1px solid var(--gc-border);
-  padding-top: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-.create-team-card .form-actions a {
-  color: var(--gc-orange);
-}
-
-.create-team-card .input-field {
-  background: var(--gc-bg-secondary);
-  border: 1px solid var(--gc-border);
-  color: var(--gc-text);
-}
-
-.create-team-card .input-field:focus {
-  border-color: var(--gc-orange);
-  box-shadow: 0 0 0 2px var(--gc-orange-dim);
-}
-
-.create-team-card .error-message {
-  color: var(--gc-red);
-}
-
-.create-team-card .members-list {
-  background: var(--gc-bg-secondary);
-  border: 1px solid var(--gc-border);
-}
-
-.create-team-card .member-item {
+.team-name {
+  font-weight: 600;
   color: var(--gc-text);
 }

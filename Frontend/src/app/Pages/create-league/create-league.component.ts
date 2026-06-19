@@ -1,80 +1,61 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LeagueService } from '../../Services/league.service';
 import { League } from '../../Models/interfaces';
-import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
+import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
 
 @Component({
   selector: 'app-create-league',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, RouterModule, CreateLeagueModalComponent],
   templateUrl: './create-league.component.html',
   styleUrls: ['./create-league.component.css']
 })
 export class CreateLeagueComponent implements OnInit {
-  createLeagueForm: FormGroup;
-  createdLeagueId: string | null = null;
-  createdLeagueName = '';
-  successMessage = '';
-  errorMessage = '';
   leagues: League[] = [];
-  loading = false;
-  bracketSizes = ALLOWED_BRACKET_SIZES;
+  loading = true;
+  showCreateModal = false;
+  successMessage = '';
+  createdLeagueId: string | null = null;
 
   constructor(
-    private fb: FormBuilder,
     private router: Router,
     private leagueService: LeagueService
-  ) {
-    this.createLeagueForm = this.fb.group({
-      leagueName: ['', Validators.required],
-      description: ['', Validators.maxLength(500)],
-      maxTeams: [8, Validators.required],
-      isPublic: [true]
-    });
-  }
+  ) {}
 
   ngOnInit(): void {
     this.loadLeagues();
   }
 
   loadLeagues(): void {
+    this.loading = true;
     this.leagueService.getLeagues().subscribe({
-      next: (leagues) => (this.leagues = leagues),
-      error: () => {}
+      next: (leagues) => {
+        this.leagues = leagues;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      }
     });
   }
 
-  onSubmit(): void {
-    if (!this.createLeagueForm.valid) {
-      this.errorMessage = 'Preencha o nome da liga.';
-      return;
-    }
+  openCreateModal(): void {
+    this.showCreateModal = true;
+    this.successMessage = '';
+    this.createdLeagueId = null;
+  }
 
-    this.loading = true;
-    this.errorMessage = '';
-    const { leagueName, description, maxTeams } = this.createLeagueForm.value;
+  closeCreateModal(): void {
+    this.showCreateModal = false;
+  }
 
-    this.leagueService.createLeague({
-      name: leagueName,
-      description,
-      maxTeams: Number(maxTeams),
-    }).subscribe({
-      next: (league) => {
-        this.loading = false;
-        this.createdLeagueId = league.id;
-        this.createdLeagueName = league.name;
-        this.successMessage = `Liga "${league.name}" criada com sucesso!`;
-        this.createLeagueForm.reset({ isPublic: true, maxTeams: 8 });
-        this.loadLeagues();
-      },
-      error: (err) => {
-        this.loading = false;
-        this.errorMessage = err.error?.error || 'Erro ao criar liga.';
-      }
-    });
+  onLeagueCreated(league: League): void {
+    this.showCreateModal = false;
+    this.createdLeagueId = league.id;
+    this.successMessage = `Liga "${league.name}" criada com sucesso!`;
+    this.loadLeagues();
   }
 
   goToLeagueDetails(): void {
@@ -85,5 +66,14 @@ export class CreateLeagueComponent implements OnInit {
 
   goToLeagueDetailsById(id: string): void {
     this.router.navigate(['/league-details', id]);
+  }
+
+  getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      upcoming: 'Em breve',
+      ongoing: 'Em andamento',
+      completed: 'Finalizada',
+    };
+    return labels[status] || status;
   }
 }

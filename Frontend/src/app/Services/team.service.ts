@@ -33,6 +33,10 @@ export class TeamService {
     return this.http.post(`${this.apiUrl}/${teamId}/invite`, { userId });
   }
 
+  rejectInvite(teamId: string, inviteId: string): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${this.apiUrl}/${teamId}/invites/${inviteId}/reject`, {});
+  }
+
   acceptInvite(teamId: string, inviteId: string): Observable<Team> {
     return this.http.post<Team>(`${this.apiUrl}/${teamId}/invites/${inviteId}/accept`, {});
   }

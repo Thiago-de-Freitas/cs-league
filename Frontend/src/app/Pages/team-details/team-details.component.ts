@@ -1,13 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { TeamService } from '../../Services/team.service';
-import { Team, TeamInvite } from '../../Models/interfaces';
+import { AuthService } from '../../Services/auth.service';
+import { Team, TeamInvite, User } from '../../Models/interfaces';
 
 @Component({
   selector: 'app-team-details',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './team-details.component.html',
   styleUrls: ['./team-details.component.css']
 })
@@ -17,10 +19,16 @@ export class TeamDetailsComponent implements OnInit {
   pendingInvites: TeamInvite[] = [];
   loading = true;
   errorMsg = '';
+  isOwner = false;
+  searchQuery = '';
+  searchResults: User[] = [];
+  inviteMsg = '';
+  inviteError = '';
 
   constructor(
     private route: ActivatedRoute,
-    private teamService: TeamService
+    private teamService: TeamService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -38,11 +46,40 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.getTeamById(id).subscribe({
       next: (team) => {
         this.team = team;
+        this.isOwner = this.authService.isTeamOwner(team.ownerId || '');
         this.loading = false;
       },
       error: () => {
         this.errorMsg = 'Time não encontrado.';
         this.loading = false;
+      }
+    });
+  }
+
+  onSearchUsers(): void {
+    if (this.searchQuery.length < 2) {
+      this.searchResults = [];
+      return;
+    }
+    this.teamService.searchUsers(this.searchQuery).subscribe({
+      next: (users) => {
+        const memberIds = new Set(this.team?.players.map((p) => p.id) || []);
+        this.searchResults = users.filter((u) => !memberIds.has(u.id));
+      }
+    });
+  }
+
+  inviteUser(user: User): void {
+    if (!this.teamId) return;
+    this.inviteError = '';
+    this.teamService.inviteUser(this.teamId, user.id).subscribe({
+      next: () => {
+        this.inviteMsg = `Convite enviado para ${user.displayName}`;
+        this.searchResults = this.searchResults.filter((u) => u.id !== user.id);
+        this.searchQuery = '';
+      },
+      error: (err) => {
+        this.inviteError = err.error?.error || 'Erro ao enviar convite';
       }
     });
   }
@@ -53,6 +90,15 @@ export class TeamDetailsComponent implements OnInit {
       next: () => {
         this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
         if (this.teamId) this.loadTeam(this.teamId);
+      }
+    });
+  }
+
+  rejectInvite(invite: TeamInvite): void {
+    if (!invite.team) return;
+    this.teamService.rejectInvite(invite.team.id, invite.id).subscribe({
+      next: () => {
+        this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
       }
     });
   }

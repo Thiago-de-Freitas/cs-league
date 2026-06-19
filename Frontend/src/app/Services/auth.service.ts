@@ -76,6 +76,11 @@ export class AuthService {
     return user?.role === 'ADMIN' || user?.id === leagueOwnerId;
   }
 
+  isTeamOwner(teamOwnerId: string): boolean {
+    const user = this.currentUserSubject.value;
+    return user?.role === 'ADMIN' || user?.id === teamOwnerId;
+  }
+
   private setSession(res: AuthResponse): void {
     localStorage.setItem(TOKEN_KEY, res.token);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));

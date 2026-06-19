@@ -1,63 +1,74 @@
 <div class="page-container">
-  <div class="page-inner">
-    <h1 class="page-title">Upload de <span class="accent">Demo</span></h1>
-    <p class="page-subtitle">Envie arquivos .dem para análise automática de performance</p>
-
-    <div class="gc-card upload-card">
-      <div class="form-group">
-        <label class="form-label">Arquivo .dem</label>
-        <div class="file-input-wrapper">
-          <input type="file" accept=".dem" (change)="onFileSelected($event)" class="file-input" id="demo-file">
-          <label for="demo-file" class="file-input-label">
-            <span class="file-icon">📁</span>
-            {{ selectedFile ? selectedFile.name : 'Selecionar arquivo .dem' }}
-          </label>
-        </div>
+  <div class="page-inner max-width-narrow">
+    <div class="gc-card-header list-page-header">
+      <div>
+        <h1 class="page-title">Demos</h1>
+        <p class="page-subtitle list-page-subtitle">Envie e acompanhe arquivos .dem com estatísticas automáticas</p>
       </div>
-
-      <div class="form-group">
-        <label class="form-label">Associar a partida (opcional)</label>
-        <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="input-field">
-          <option value="">Selecione uma liga</option>
-          <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
-        </select>
-        <select *ngIf="matches.length > 0" [(ngModel)]="selectedMatchId" class="input-field mt-2">
-          <option value="">Selecione uma partida</option>
-          <option *ngFor="let m of matches" [value]="m.id">
-            {{ m.team1.name }} vs {{ m.team2.name }}
-          </option>
-        </select>
-      </div>
-
-      <button class="btn btn-primary w-full" (click)="upload()" [disabled]="uploading || !selectedFile">
-        {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
-      </button>
-
-      <div *ngIf="errorMsg" class="error-message mt-4">{{ errorMsg }}</div>
-
-      <div *ngIf="processingDemo" class="processing-status mt-4">
-        <div class="processing-bar">
-          <div class="processing-bar-fill" [class.done]="pollStatus === 'completed'" [class.failed]="pollStatus === 'failed'"></div>
-        </div>
-        <p>Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
-        <p *ngIf="processingDemo.errorMessage" class="error-message">{{ processingDemo.errorMessage }}</p>
-      </div>
+      <button class="btn btn-primary" (click)="openUploadModal()">+ Enviar Demo</button>
     </div>
 
-    <div class="gc-card mt-4">
+    <div *ngIf="processingDemo" class="processing-status mb-4">
+      <p class="meta mb-2">Processando: <strong>{{ processingDemo.fileName }}</strong></p>
+      <div class="processing-bar">
+        <div class="processing-bar-fill" [class.done]="pollStatus === 'completed'" [class.failed]="pollStatus === 'failed'"></div>
+      </div>
+      <p>Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
+      <p *ngIf="processingDemo.errorMessage" class="error-message">{{ processingDemo.errorMessage }}</p>
+    </div>
+
+    <div *ngIf="errorMsg" class="error-message mb-4">{{ errorMsg }}</div>
+
+    <div *ngIf="loading" class="loading">Carregando...</div>
+
+    <div class="gc-card" *ngIf="!loading">
       <h2 class="section-title">Suas Demos</h2>
       <ul class="gc-list" *ngIf="demos.length > 0; else noDemos">
-        <li *ngFor="let demo of demos" class="gc-list-item">
-          <span>{{ demo.fileName }}</span>
-          <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
-          <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
-            Ver Stats
-          </button>
+        <li *ngFor="let demo of demos" class="gc-list-item demo-list-item">
+          <div class="demo-row">
+            <span>{{ demo.fileName }}</span>
+            <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+            <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
+              Ver Stats
+            </button>
+            <button
+              *ngIf="!demo.matchId"
+              class="btn btn-ghost btn-small"
+              (click)="openAssociate(demo)">
+              Associar
+            </button>
+          </div>
+          <div *ngIf="associatingDemoId === demo.id" class="associate-panel mt-2">
+            <select [(ngModel)]="associateLeagueId" (ngModelChange)="onAssociateLeagueChange()" class="input-field">
+              <option value="">Selecione uma liga</option>
+              <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
+            </select>
+            <select *ngIf="associateMatches.length > 0" [(ngModel)]="associateMatchId" class="input-field mt-2">
+              <option value="">Selecione uma partida</option>
+              <option *ngFor="let m of associateMatches" [value]="m.id">
+                {{ m.team1.name }} vs {{ m.team2.name }}
+              </option>
+            </select>
+            <div class="associate-actions mt-2">
+              <button class="btn btn-primary btn-small" (click)="confirmAssociate(demo)" [disabled]="associating">
+                {{ associating ? 'Salvando...' : 'Confirmar' }}
+              </button>
+              <button class="btn btn-ghost btn-small" (click)="cancelAssociate()">Cancelar</button>
+            </div>
+          </div>
         </li>
       </ul>
       <ng-template #noDemos>
-        <p class="meta">Nenhuma demo enviada ainda.</p>
+        <p class="meta">Nenhuma demo enviada ainda. Clique em <strong>+ Enviar Demo</strong> para começar.</p>
       </ng-template>
     </div>
   </div>
 </div>
+
+<app-demo-upload-modal
+  *ngIf="showUploadModal"
+  [prefillLeagueId]="uploadPrefillLeagueId"
+  [prefillMatchId]="uploadPrefillMatchId"
+  (closed)="closeUploadModal()"
+  (uploaded)="onDemoUploaded($event)">
+</app-demo-upload-modal>
