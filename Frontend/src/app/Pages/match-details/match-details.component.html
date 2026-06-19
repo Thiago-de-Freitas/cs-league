@@ -26,7 +26,7 @@
             <span class="demo-name">{{ demo.fileName }}</span>
             <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
             <app-demo-status-loader *ngIf="isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
-            <span *ngIf="!isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+            <span *ngIf="!isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getDemoStatusLabel(demo.status) }}</span>
           </div>
           <button
             *ngIf="demo.status === 'completed'"
@@ -41,11 +41,14 @@
       </ul>
     </div>
 
-    <div *ngIf="isDemoView && demo && !loading" class="details-card gc-card">
-      <h1 class="page-title">Demo: {{ demo.fileName }}</h1>
-      <div class="match-meta">
+    <div *ngIf="isDemoView && demo && !loading" class="details-card gc-card demo-view-card">
+      <div class="demo-view-header">
+        <p class="demo-view-label">Demo</p>
+        <h1 class="demo-view-filename" [title]="demo.fileName">{{ demo.fileName }}</h1>
+      </div>
+      <div class="match-meta demo-view-meta">
         <app-demo-status-loader *ngIf="pollingDemo || isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
-        <span *ngIf="!pollingDemo && !isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
+        <span *ngIf="!pollingDemo && !isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getDemoStatusLabel(demo.status) }}</span>
         <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
         <span class="meta" *ngIf="demo.matchId && !demo.isPersonal">
           Partida: <a [routerLink]="['/match', demo.matchId]">Ver partida</a>

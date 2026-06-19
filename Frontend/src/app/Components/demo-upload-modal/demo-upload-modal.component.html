@@ -52,7 +52,9 @@
           <input type="file" accept=".dem" (change)="onFileSelected($event)" class="file-input" id="demo-file-modal">
           <label for="demo-file-modal" class="file-input-label">
             <span class="file-icon">📁</span>
-            {{ selectedFile ? selectedFile.name : 'Selecionar arquivo .dem' }}
+            <span class="file-input-name" [title]="selectedFile?.name || ''">
+              {{ selectedFile ? selectedFile.name : 'Selecionar arquivo .dem' }}
+            </span>
           </label>
         </div>
       </div>

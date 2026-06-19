@@ -1,19 +1,27 @@
-.file-input-wrapper { position: relative; }
+.file-input-wrapper { position: relative; min-width: 0; }
 .file-input { position: absolute; opacity: 0; width: 0; height: 0; }
 .file-input-label {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.25rem;
+  padding: 1rem 1.25rem;
   background: var(--gc-bg-secondary);
   border: 2px dashed var(--gc-border-light);
   border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--gc-text-secondary);
   transition: border-color 0.2s, color 0.2s;
+  min-width: 0;
+  overflow: hidden;
 }
 .file-input-label:hover { border-color: var(--gc-orange); color: var(--gc-text); }
-.file-icon { font-size: 1.5rem; }
+.file-icon { font-size: 1.5rem; flex-shrink: 0; }
+.file-input-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mt-2 { margin-top: 0.5rem; }
 
 .upload-mode-options {

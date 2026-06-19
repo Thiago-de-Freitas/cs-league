@@ -189,6 +189,16 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     return demo.status === 'pending' || demo.status === 'processing';
   }
 
+  getDemoStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      pending: 'Aguardando',
+      processing: 'Processando',
+      completed: 'Concluída',
+      failed: 'Falhou',
+    };
+    return labels[status] || status;
+  }
+
   getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       scheduled: 'Agendada',
