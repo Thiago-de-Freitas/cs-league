@@ -1,73 +1,35 @@
 <div class="page-container">
-  <div class="profile-card">
-    <h1 class="page-title text-center">Meu Perfil</h1>
+  <div class="page-inner max-width-narrow">
+    <h1 class="page-title">Meu <span style="color: var(--gc-orange)">Perfil</span></h1>
 
-    <div class="profile-header">
-      <div class="profile-avatar-wrapper">
-        <img [src]="profilePictureUrl" alt="Foto de Perfil" class="profile-avatar">
-      </div>
-      <div class="profile-info">
-        <div class="profile-name">{{ userName }}</div>
-        <div class="profile-email">{{ email }}</div>
-        <div class="profile-steam-section">
-          <p *ngIf="isSteamConnected" class="profile-steam-status">
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            Steam Conectado (ID: {{ steamId }})
-          </p>
-          <button *ngIf="isSteamConnected" (click)="disconnectSteam()" class="btn btn-danger mt-2">
-            Desconectar Steam
-          </button>
-          <button *ngIf="!isSteamConnected" (click)="connectSteam()" class="btn btn-primary mt-2">
-            Conectar Steam
-          </button>
+    <div class="profile-card gc-card">
+      <div class="profile-header">
+        <div class="profile-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+        <div class="profile-info">
+          <div class="profile-name">{{ userName }}</div>
+          <div class="profile-email">{{ email }}</div>
+          <span class="badge badge-orange">{{ role }}</span>
         </div>
       </div>
-    </div>
 
-    <div class="mb-8">
-      <h3 class="section-subtitle">Estatísticas Rápidas</h3>
-      <div class="profile-stats-grid">
-        <div>
-          <p class="text-2xl font-bold text-blue-600">{{ basicStats.kd }}</p>
-          <p class="text-sm">K/D Médio</p>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-green-600">{{ basicStats.adr }}</p>
-          <p class="text-sm">ADR Médio</p>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-purple-600">{{ basicStats.hs }}</p>
-          <p class="text-sm">HS% Médio</p>
-        </div>
-        <div>
-          <p class="text-2xl font-bold text-yellow-600">{{ basicStats.matchesPlayed }}</p>
-          <p class="text-sm">Partidas Jogadas</p>
-        </div>
-      </div>
-    </div>
+      <div *ngIf="successMsg" class="success-message">{{ successMsg }}</div>
+      <div *ngIf="errorMsg" class="error-message mb-4">{{ errorMsg }}</div>
 
-    <div>
-      <h3 class="section-subtitle">Editar Informações do Perfil</h3>
+      <h2 class="section-title">Editar Perfil</h2>
       <form [formGroup]="profileForm" (ngSubmit)="onUpdateProfile()" class="form-group-spacing">
         <div class="form-group">
-          <label for="username" class="form-label">Nome de Usuário</label>
-          <input type="text" id="username" formControlName="username" class="input-field">
-          <div *ngIf="profileForm.get('username')?.invalid && profileForm.get('username')?.touched" class="error-message">
-            Nome de usuário é obrigatório.
-          </div>
+          <label for="displayName" class="form-label">Nome de Exibição</label>
+          <input type="text" id="displayName" formControlName="displayName" class="input-field">
         </div>
         <div class="form-group">
-          <label for="email" class="form-label">Email</label>
-          <input type="email" id="email" formControlName="email" class="input-field">
-          <div *ngIf="profileForm.get('email')?.invalid && profileForm.get('email')?.touched" class="error-message">
-            <div *ngIf="profileForm.get('email')?.errors?.['required']">Email é obrigatório.</div>
-            <div *ngIf="profileForm.get('email')?.errors?.['email']">Email inválido.</div>
-          </div>
+          <label for="steamId" class="form-label">Steam ID</label>
+          <input type="text" id="steamId" formControlName="steamId" class="input-field" placeholder="76561198...">
         </div>
-        <button type="submit" class="btn btn-primary w-full">
-          Salvar Alterações
+        <button type="button" class="btn btn-ghost w-full mb-4" (click)="connectSteam()">
+          Conectar Steam (em breve)
         </button>
+        <button type="submit" class="btn btn-primary w-full">Salvar Alterações</button>
       </form>
     </div>
   </div>
-</div> 
+</div>

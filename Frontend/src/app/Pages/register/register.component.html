@@ -1,10 +1,11 @@
-<div class="form-container">
+<div class="form-container auth-page">
   <div class="form-wrapper">
-    <div>
-      <h2 class="form-header">
-        Crie sua conta
-      </h2>
+    <div class="auth-logo">
+      <span class="auth-logo-icon">CS</span>
+      <span class="auth-logo-text">LEAGUE</span>
     </div>
+    <h2 class="form-header">Cadastrar</h2>
+    <p class="form-subtitle">Crie sua conta e comece a competir</p>
     <form class="form-group-spacing" [formGroup]="registerForm" (ngSubmit)="onSubmit()">
       <div class="form-fields-group">
         <div class="form-group">
@@ -52,10 +53,11 @@
       </div>
 
       <div class="form-group">
-        <button type="submit" class="btn btn-primary">
-          Cadastrar
+        <button type="submit" class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Cadastrando...' : 'Cadastrar' }}
         </button>
       </div>
+      <div *ngIf="errorMsg" class="error-message text-center mt-2">{{ errorMsg }}</div>
     </form>
 
     <div class="text-center text-small mt-4">

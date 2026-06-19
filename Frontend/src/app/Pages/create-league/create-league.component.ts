@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { LeagueService } from '../../Services/league.service';
+import { League } from '../../Models/interfaces';
+import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
 
 @Component({
   selector: 'app-create-league',
@@ -13,38 +15,66 @@ import { RouterModule } from '@angular/router';
 })
 export class CreateLeagueComponent implements OnInit {
   createLeagueForm: FormGroup;
-  createdLeagueId: number | null = null;
-  createdLeagueName: string = '';
-  successMessage: string = '';
-  leagues: { id: number, name: string, status: string }[] = [
-    { id: 1, name: 'Liga dos Campeões', status: 'Ativa' },
-    { id: 2, name: 'Liga Prata', status: 'Finalizada' },
-    { id: 3, name: 'Liga Bronze', status: 'Ativa' }
-  ];
+  createdLeagueId: string | null = null;
+  createdLeagueName = '';
+  successMessage = '';
+  errorMessage = '';
+  leagues: League[] = [];
+  loading = false;
+  bracketSizes = ALLOWED_BRACKET_SIZES;
 
-  constructor(private fb: FormBuilder, private router: Router) {
+  constructor(
+    private fb: FormBuilder,
+    private router: Router,
+    private leagueService: LeagueService
+  ) {
     this.createLeagueForm = this.fb.group({
       leagueName: ['', Validators.required],
       description: ['', Validators.maxLength(500)],
-      rules: [''],
-      isPublic: [true] // Campo para definir se a liga é pública ou privada
+      maxTeams: [8, Validators.required],
+      isPublic: [true]
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.loadLeagues();
+  }
+
+  loadLeagues(): void {
+    this.leagueService.getLeagues().subscribe({
+      next: (leagues) => (this.leagues = leagues),
+      error: () => {}
+    });
+  }
 
   onSubmit(): void {
-    if (this.createLeagueForm.valid) {
-      // Simulação de criação de liga bem-sucedida com ID aleatório
-      this.createdLeagueId = Math.floor(Math.random() * 10000) + 1;
-      this.createdLeagueName = this.createLeagueForm.value.leagueName;
-      this.successMessage = `Liga "${this.createdLeagueName}" criada com sucesso!`;
-      // Limpa o formulário
-      this.createLeagueForm.reset({ isPublic: true });
-    } else {
-      this.successMessage = '';
-      alert('Por favor, preencha o nome da liga e verifique os campos.');
+    if (!this.createLeagueForm.valid) {
+      this.errorMessage = 'Preencha o nome da liga.';
+      return;
     }
+
+    this.loading = true;
+    this.errorMessage = '';
+    const { leagueName, description, maxTeams } = this.createLeagueForm.value;
+
+    this.leagueService.createLeague({
+      name: leagueName,
+      description,
+      maxTeams: Number(maxTeams),
+    }).subscribe({
+      next: (league) => {
+        this.loading = false;
+        this.createdLeagueId = league.id;
+        this.createdLeagueName = league.name;
+        this.successMessage = `Liga "${league.name}" criada com sucesso!`;
+        this.createLeagueForm.reset({ isPublic: true, maxTeams: 8 });
+        this.loadLeagues();
+      },
+      error: (err) => {
+        this.loading = false;
+        this.errorMessage = err.error?.error || 'Erro ao criar liga.';
+      }
+    });
   }
 
   goToLeagueDetails(): void {
@@ -53,7 +83,7 @@ export class CreateLeagueComponent implements OnInit {
     }
   }
 
-  goToLeagueDetailsById(id: number): void {
+  goToLeagueDetailsById(id: string): void {
     this.router.navigate(['/league-details', id]);
   }
 }

@@ -1,6 +1,5 @@
 <div class="form-container">
-
-  <div class="form-wrapper max-w-2xl">
+  <div class="form-wrapper max-w-2xl wide">
     <div>
       <h2 class="form-header">
         Criar Nova Liga
@@ -31,11 +30,11 @@
         </div>
       </div>
       <div class="form-group mt-4">
-        <label for="rules" class="form-label">Regras (Opcional)</label>
-        <textarea id="rules" name="rules" rows="5"
-          formControlName="rules"
-          class="textarea-field"
-          placeholder="Detalhes sobre o formato, pontuação, etc."></textarea>
+        <label for="max-teams" class="form-label">Quantidade máxima de times</label>
+        <select id="max-teams" formControlName="maxTeams" class="input-field">
+          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
+        </select>
+        <p class="form-hint">O chaveamento será calculado de forma justa (1×{{ createLeagueForm.get('maxTeams')?.value }}, favoritos não se enfrentam cedo).</p>
       </div>
       <div class="form-group mt-4 flex items-center">
         <input id="is-public" name="isPublic" type="checkbox"
@@ -58,13 +57,15 @@
         Ver detalhes da liga
       </button>
     </div>
-    <div class="leagues-list-section">
+    <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+    <div class="leagues-list-section gc-card">
       <h3 class="section-title">Ligas Existentes</h3>
       <div *ngIf="leagues.length > 0; else noLeagues">
         <ul class="leagues-list">
-          <li *ngFor="let league of leagues" class="league-list-item">
+          <li *ngFor="let league of leagues" class="gc-list-item league-list-item">
             <span class="league-name">{{ league.name }}</span>
             <span class="league-status">({{ league.status }})</span>
+            <span class="league-teams-count" *ngIf="league.teamCount !== undefined">{{ league.teamCount }}/{{ league.maxTeams || 8 }} times</span>
             <button class="btn btn-secondary ml-2" (click)="goToLeagueDetailsById(league.id)">Ver Detalhes</button>
           </li>
         </ul>

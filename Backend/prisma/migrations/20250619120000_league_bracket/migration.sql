@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "League" ADD COLUMN "maxTeams" INTEGER NOT NULL DEFAULT 8;
+
+-- AlterTable
+ALTER TABLE "Match" ADD COLUMN "round" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "Match" ADD COLUMN "bracketPosition" INTEGER;

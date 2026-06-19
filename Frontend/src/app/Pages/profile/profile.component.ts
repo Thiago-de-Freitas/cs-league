@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-profile',
@@ -13,48 +13,58 @@ import { RouterModule } from '@angular/router';
 })
 export class ProfileComponent implements OnInit {
   profileForm: FormGroup;
-  userName: string = 'Jogador Exemplo';
-  email: string = 'jogador.exemplo@email.com';
-  steamId: string = '76561198123456789'; // Exemplo de Steam ID
-  isSteamConnected: boolean = true;
-  profilePictureUrl: string = 'https://via.placeholder.com/150/007bff/ffffff?text=JP'; // Placeholder
+  userName = '';
+  email = '';
+  steamId = '';
+  role = '';
+  successMsg = '';
+  errorMsg = '';
 
-  constructor(private fb: FormBuilder) {
+  constructor(
+    private fb: FormBuilder,
+    private authService: AuthService
+  ) {
     this.profileForm = this.fb.group({
-      username: [this.userName, Validators.required],
-      email: [this.email, [Validators.required, Validators.email]],
+      displayName: ['', Validators.required],
+      steamId: [''],
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.authService.getMe().subscribe({
+      next: (user) => {
+        this.userName = user.displayName;
+        this.email = user.email;
+        this.steamId = user.steamId || '';
+        this.role = user.role;
+        this.profileForm.patchValue({
+          displayName: user.displayName,
+          steamId: user.steamId || '',
+        });
+      },
+      error: () => {
+        this.errorMsg = 'Erro ao carregar perfil.';
+      }
+    });
+  }
 
   onUpdateProfile(): void {
-    if (this.profileForm.valid) {
-      console.log('Perfil atualizado:', this.profileForm.value);
-      alert('Perfil atualizado com sucesso!');
-    } else {
-      alert('Por favor, corrija os erros no formulário.');
-    }
+    if (!this.profileForm.valid) return;
+
+    this.authService.updateProfile(this.profileForm.value).subscribe({
+      next: (user) => {
+        this.userName = user.displayName;
+        this.steamId = user.steamId || '';
+        this.successMsg = 'Perfil atualizado com sucesso!';
+        this.errorMsg = '';
+      },
+      error: (err) => {
+        this.errorMsg = err.error?.error || 'Erro ao atualizar perfil.';
+      }
+    });
   }
 
   connectSteam(): void {
-    alert('Iniciando conexão com Steam...');
-    this.isSteamConnected = true;
-    this.steamId = '76561198123456789';
+    alert('Login via Steam será implementado em fase futura. Edite o Steam ID manualmente abaixo.');
   }
-
-  disconnectSteam(): void {
-    if (confirm('Tem certeza que deseja desconectar sua conta Steam?')) {
-      alert('Conta Steam desconectada.');
-      this.isSteamConnected = false;
-      this.steamId = '';
-    }
-  }
-
-  basicStats = {
-    kd: '1.25',
-    adr: '88.5',
-    hs: '48%',
-    matchesPlayed: 150
-  };
-} 
+}

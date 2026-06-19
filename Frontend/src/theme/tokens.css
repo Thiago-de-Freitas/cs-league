@@ -1,0 +1,65 @@
+/**
+ * CS League — Design Tokens (fonte única de cores e espaçamento)
+ * Sempre use var(--gc-*) em CSS/HTML. Nunca hardcode hex em componentes.
+ */
+:root {
+  /* Fundos */
+  --gc-bg: #0a0a0a;
+  --gc-bg-secondary: #111111;
+  --gc-surface: #1a1a1a;
+  --gc-surface-hover: #222222;
+  --gc-surface-elevated: #242424;
+  --gc-table-bg: #1f1f1f;
+  --gc-table-header: #2a2a2a;
+
+  /* Bordas */
+  --gc-border: #2d2d2d;
+  --gc-border-light: #3a3a3a;
+  --gc-table-border: #333333;
+
+  /* Marca / ação primária */
+  --gc-orange: #ff5500;
+  --gc-orange-hover: #ff6a1a;
+  --gc-orange-dim: rgba(255, 85, 0, 0.15);
+  --gc-orange-glow: rgba(255, 85, 0, 0.35);
+
+  /* Texto */
+  --gc-text: #f0f0f0;
+  --gc-text-secondary: #a0a0a0;
+  --gc-text-label: #c8c8c8;
+  --gc-text-muted: #666666;
+  --gc-text-on-primary: #ffffff;
+  --gc-text-on-success: #000000;
+
+  /* Semânticas */
+  --gc-green: #00c853;
+  --gc-green-hover: #00a844;
+  --gc-green-dim: rgba(0, 200, 83, 0.15);
+  --gc-red: #ff3d3d;
+  --gc-red-hover: #e03535;
+  --gc-red-dim: rgba(255, 61, 61, 0.15);
+  --gc-yellow: #ffc107;
+  --gc-yellow-hover: #e0a800;
+
+  /* Tipografia */
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Raios e sombras */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px var(--gc-orange-glow);
+
+  /* Aliases legados (preferir --gc-*) */
+  --primary: var(--gc-orange);
+  --primary-dark: var(--gc-orange-hover);
+  --success: var(--gc-green);
+  --danger: var(--gc-red);
+  --gray-100: var(--gc-surface);
+  --gray-200: var(--gc-border);
+  --gray-300: var(--gc-border-light);
+  --gray-600: var(--gc-text-secondary);
+  --gray-800: var(--gc-text);
+}

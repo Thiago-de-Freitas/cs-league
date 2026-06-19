@@ -1,47 +1,53 @@
-<div *ngIf="isAdmin" class="admin-section">
-  <h2>Gerenciamento de Jogos</h2>
-  <button class="btn btn-primary" (click)="openAddGameModal()">Adicionar Novo Jogo</button>
+<div class="dashboard-container">
+  <section class="dashboard-hero">
+    <div class="dashboard-hero-inner">
+      <h1>CS <span>LEAGUE</span></h1>
+      <p *ngIf="userName">Bem-vindo de volta, <strong>{{ userName }}</strong></p>
+      <p *ngIf="!userName">Sua plataforma competitiva de Counter-Strike 2</p>
+    </div>
+  </section>
 
-  <table>
-    <thead>
-      <tr>
-        <th>ID do Jogo</th>
-        <th>Time 1</th>
-        <th>Time 2</th>
-        <th>Data</th>
-        <th>Ações</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let game of games">
-        <td>{{ game.id }}</td>
-        <td>{{ game.team1 }}</td>
-        <td>{{ game.team2 }}</td>
-        <td>{{ game.date | date:'short' }}</td>
-        <td>
-          <button class="btn edit-button" (click)="editGame(game)">Editar</button>
-          <button class="btn delete-button" (click)="deleteGame(game.id)">Excluir</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+  <div *ngIf="loading" class="loading">Carregando...</div>
 
-<div *ngIf="showGameModal" class="modal">
-  <div class="modal-content">
-    <h3>{{ editingGame ? 'Editar Jogo' : 'Adicionar Novo Jogo' }}</h3>
-    <form (ngSubmit)="saveGame()">
-      <label for="team1">Time 1:</label>
-      <input class="input-field" type="text" id="team1" [(ngModel)]="currentGame.team1" name="team1" required>
+  <div class="dashboard-grid" *ngIf="!loading">
+    <section class="dashboard-card gc-card">
+      <div class="gc-card-header">
+        <h2 class="gc-card-title">Minhas Ligas</h2>
+        <a routerLink="/create-league" class="btn btn-primary btn-small">+ Nova</a>
+      </div>
+      <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
+        <li *ngFor="let league of leagues" class="gc-list-item">
+          <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
+          <span class="badge status-{{ league.status }}">{{ league.status }}</span>
+          <span class="meta">{{ league.teamCount || 0 }} times</span>
+        </li>
+      </ul>
+      <ng-template #noLeagues>
+        <p class="meta">Nenhuma liga ainda. <a routerLink="/create-league" class="text-link">Criar liga</a></p>
+      </ng-template>
+    </section>
 
-      <label for="team2">Time 2:</label>
-      <input class="input-field" type="text" id="team2" [(ngModel)]="currentGame.team2" name="team2" required>
+    <section class="dashboard-card gc-card">
+      <div class="gc-card-header">
+        <h2 class="gc-card-title">Meus Times</h2>
+        <a routerLink="/create-team" class="btn btn-primary btn-small">+ Novo</a>
+      </div>
+      <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
+        <li *ngFor="let team of teams" class="gc-list-item">
+          <a [routerLink]="['/team-details', team.id]">{{ team.name }}</a>
+          <span class="badge badge-orange">{{ team.tag }}</span>
+          <span class="meta">{{ team.players.length || 0 }} jogadores</span>
+        </li>
+      </ul>
+      <ng-template #noTeams>
+        <p class="meta">Nenhum time ainda. <a routerLink="/create-team" class="text-link">Criar time</a></p>
+      </ng-template>
+    </section>
 
-      <label for="date">Data:</label>
-      <input class="input-field" type="datetime-local" id="date" [(ngModel)]="currentGame.date" name="date" required>
-
-      <button class="btn btn-primary" type="submit">Salvar</button>
-      <button class="btn btn-secondary" type="button" (click)="closeGameModal()">Cancelar</button>
-    </form>
+    <section class="dashboard-card gc-card">
+      <h2 class="gc-card-title">Análise de Demos</h2>
+      <p class="meta mb-4">Envie arquivos .dem e obtenha estatísticas detalhadas: K/D, ADR, HS% e KAST.</p>
+      <a routerLink="/demo-upload" class="btn btn-success w-full">Upload de Demo</a>
+    </section>
   </div>
 </div>

@@ -1,30 +1,99 @@
-// src/app/models/interfaces.ts (ou no league-details.component.ts)
+export interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  steamId?: string | null;
+  role: 'USER' | 'ADMIN';
+  createdAt?: string;
+}
 
 export interface Player {
-    id: number;
-    name: string;
-    IGN: string; // In-Game Name
-    role: string; // e.g., 'Entry Fragger', 'AWPer', 'Support'
-  }
-  
-  export interface Team {
-    id: number;
-    name: string;
-    logoUrl?: string; // URL para o logo da equipe
-    players: Player[];
-    wins: number;
-    losses: number;
-    points: number;
-    seed?: number; // Posição ou seed da equipe no torneio/liga
-  }
-  
-  export interface League {
-    id: number;
-    name: string;
-    description: string;
-    startDate: Date;
-    endDate: Date;
-    teams: Team[]; // Equipes participantes da liga
-    status: 'upcoming' | 'ongoing' | 'completed';
-    // Adicione outras propriedades relevantes para sua liga, como regras, prêmios, etc.
-  }
+  id: string;
+  name: string;
+  IGN: string;
+  role: string;
+  email?: string;
+  steamId?: string | null;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  tag?: string;
+  logoUrl?: string;
+  ownerId?: string;
+  players: Player[];
+  wins: number;
+  losses: number;
+  points: number;
+  seed?: number;
+  invites?: TeamInvite[];
+}
+
+export interface TeamInvite {
+  id: string;
+  invitedUser: { id: string; displayName: string; email: string };
+  status: string;
+  team?: { id: string; name: string; tag: string };
+}
+
+export interface League {
+  id: string;
+  name: string;
+  description: string;
+  maxTeams?: number;
+  startDate?: Date | string | null;
+  endDate?: Date | string | null;
+  teams: Team[];
+  matches?: Match[];
+  status: 'upcoming' | 'ongoing' | 'completed' | string;
+  ownerId?: string;
+  owner?: { id: string; displayName: string };
+  teamCount?: number;
+  matchCount?: number;
+}
+
+export interface Match {
+  id: string;
+  leagueId: string;
+  team1: { id: string; name: string; tag: string };
+  team2: { id: string; name: string; tag: string };
+  winner?: { id: string; name: string; tag: string } | null;
+  winnerId?: string | null;
+  status: string;
+  round?: number;
+  bracketPosition?: number | null;
+  map?: string | null;
+  playedAt?: string | null;
+  league?: { id: string; name: string; ownerId: string };
+  demos?: Demo[];
+}
+
+export interface Demo {
+  id: string;
+  fileName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  errorMessage?: string | null;
+  matchId?: string | null;
+  match?: Match | null;
+  stats?: MatchPlayerStat[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MatchPlayerStat {
+  id: string;
+  demoId: string;
+  steamId?: string | null;
+  playerName: string;
+  kills: number;
+  deaths: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}

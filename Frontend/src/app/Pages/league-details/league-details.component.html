@@ -3,20 +3,16 @@
     <h1>{{ league.name || '' }}</h1>
     <p class="league-description">{{ league.description }}</p>
     <div class="league-meta">
-      <span>Início: {{ league.startDate | date:'mediumDate' }}</span>
-      <span>Fim: {{ league.endDate | date:'mediumDate' }}</span>
+      <span class="teams-capacity">{{ league.teams.length }} / {{ league.maxTeams || 8 }} times</span>
+      <span *ngIf="league.startDate">Início: {{ league.startDate | date:'mediumDate' }}</span>
+      <span *ngIf="league.endDate">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ league.status | uppercase }}</span>
     </div>
   </header>
 
   <section class="league-content">
     <div class="section-card">
-      <h2 class="section-title">Chaveamento do Torneio</h2>
-      <app-league-bracket [teams]="league.teams"></app-league-bracket>
-    </div>
-
-    <div class="section-card league-teams-management" *ngIf="isAdmin">
-      <h2 class="section-title">Gerenciamento de Equipes da Liga</h2>
+      <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
         [teams]="league.teams || []"
         (teamsReordered)="onTeamsReordered($event)"
@@ -24,16 +20,86 @@
         (removeTeam)="onRemoveTeam($event)">
       </app-league-teams-table>
     </div>
+
+    <div class="section-card" *ngIf="isAdmin">
+      <h2 class="section-title">Administração</h2>
+      <div class="admin-meta">
+        <span>Capacidade: <strong>{{ league.teams.length }} / {{ league.maxTeams || 8 }}</strong></span>
+        <button class="btn btn-ghost btn-small" (click)="editMaxTeams = !editMaxTeams">Alterar limite</button>
+      </div>
+      <div *ngIf="editMaxTeams" class="admin-form">
+        <select [(ngModel)]="newMaxTeams" class="input-field">
+          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
+        </select>
+        <button class="btn btn-primary" (click)="updateMaxTeams()">Salvar</button>
+        <button class="btn btn-secondary" (click)="editMaxTeams = false">Cancelar</button>
+      </div>
+      <div class="admin-actions">
+        <button class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity">Adicionar Time</button>
+        <button class="btn btn-secondary" (click)="showCreateMatch = true">Criar Partida</button>
+        <button class="btn btn-success" (click)="generateBracket()" [disabled]="generatingBracket || league.teams.length < 2">
+          {{ generatingBracket ? 'Gerando...' : 'Gerar Chaveamento' }}
+        </button>
+      </div>
+      <p class="admin-hint">O chaveamento usa seeding justo: com jogos disputados, ordena por pontos/vitórias; senão, pela ordem manual dos seeds.</p>
+
+      <div *ngIf="showAddTeam" class="admin-form">
+        <select [(ngModel)]="selectedTeamId" class="input-field">
+          <option value="">Selecione um time</option>
+          <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
+        </select>
+        <button class="btn btn-primary" (click)="addTeamToLeague()">Confirmar</button>
+        <button class="btn btn-secondary" (click)="showAddTeam = false">Cancelar</button>
+      </div>
+
+      <div *ngIf="showCreateMatch" class="admin-form">
+        <select [(ngModel)]="matchTeam1Id" class="input-field">
+          <option value="">Time 1</option>
+          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
+        </select>
+        <select [(ngModel)]="matchTeam2Id" class="input-field">
+          <option value="">Time 2</option>
+          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
+        </select>
+        <input [(ngModel)]="matchMap" class="input-field" placeholder="Mapa (opcional)">
+        <button class="btn btn-primary" (click)="createMatch()">Criar</button>
+        <button class="btn btn-secondary" (click)="showCreateMatch = false">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title">Partidas</h2>
+      <div *ngIf="league.matches && league.matches.length > 0; else noMatches">
+        <div *ngFor="let match of league.matches" class="match-row">
+          <span>{{ match.team1.name }} vs {{ match.team2.name }}</span>
+          <span class="match-status">{{ match.status }}</span>
+          <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
+          <ng-container *ngIf="isAdmin && match.status !== 'completed'">
+            <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
+              Vitória {{ match.team1.tag || match.team1.name }}
+            </button>
+            <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
+              Vitória {{ match.team2.tag || match.team2.name }}
+            </button>
+          </ng-container>
+        </div>
+      </div>
+      <ng-template #noMatches>
+        <p>Nenhuma partida cadastrada.</p>
+      </ng-template>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title">Chaveamento</h2>
+      <app-league-bracket
+        [teams]="league.teams"
+        [maxTeams]="league.maxTeams || 8"
+        [matches]="league.matches || []">
+      </app-league-bracket>
+    </div>
   </section>
 </div>
 
-<div *ngIf="isLoading" class="loading-spinner">
-  Carregando detalhes da liga...
-</div>
-
-<div *ngIf="!league && !isLoading && !errorMsg" class="not-found-message">
-  Liga não encontrada.
-</div>
-<div *ngIf="errorMsg" class="error-message">
-  {{ errorMsg }}
-</div>
+<div *ngIf="isLoading" class="loading-spinner">Carregando detalhes da liga...</div>
+<div *ngIf="!league && !isLoading && !errorMsg" class="not-found-message">Liga não encontrada.</div>
+<div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>

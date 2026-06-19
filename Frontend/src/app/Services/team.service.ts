@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Team } from '../Models/interfaces';
+import { Team, TeamInvite, User } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class TeamService {
-  private apiUrl = '/api/teams'; // Ajuste conforme seu backend
+  private apiUrl = '/api/teams';
 
   constructor(private http: HttpClient) {}
 
@@ -13,19 +13,35 @@ export class TeamService {
     return this.http.get<Team[]>(this.apiUrl);
   }
 
-  getTeamById(id: number): Observable<Team> {
+  getTeamById(id: string): Observable<Team> {
     return this.http.get<Team>(`${this.apiUrl}/${id}`);
   }
 
-  addTeam(team: Team): Observable<Team> {
-    return this.http.post<Team>(this.apiUrl, team);
+  createTeam(name: string, tag: string): Observable<Team> {
+    return this.http.post<Team>(this.apiUrl, { name, tag });
   }
 
-  updateTeam(team: Team): Observable<Team> {
-    return this.http.put<Team>(`${this.apiUrl}/${team.id}`, team);
+  updateTeam(id: string, data: { name?: string; tag?: string }): Observable<Team> {
+    return this.http.put<Team>(`${this.apiUrl}/${id}`, data);
   }
 
-  deleteTeam(id: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`);
+  deleteTeam(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
-} 
+
+  inviteUser(teamId: string, userId: string): Observable<unknown> {
+    return this.http.post(`${this.apiUrl}/${teamId}/invite`, { userId });
+  }
+
+  acceptInvite(teamId: string, inviteId: string): Observable<Team> {
+    return this.http.post<Team>(`${this.apiUrl}/${teamId}/invites/${inviteId}/accept`, {});
+  }
+
+  getPendingInvites(): Observable<TeamInvite[]> {
+    return this.http.get<TeamInvite[]>(`${this.apiUrl}/invites/pending`);
+  }
+
+  searchUsers(query: string): Observable<User[]> {
+    return this.http.get<User[]>(`/api/users/search?q=${encodeURIComponent(query)}`);
+  }
+}

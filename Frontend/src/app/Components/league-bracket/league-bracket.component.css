@@ -94,7 +94,7 @@
 
 .team-table td .edit-button {
     background-color: var(--edit-button-bg);
-    color: #333;
+    color: var(--gc-text-on-success);
 }
 
 .team-table td .edit-button:hover {
@@ -103,7 +103,7 @@
 
 .team-table td .remove-button {
     background-color: var(--remove-button-bg);
-    color: white;
+    color: var(--gc-text-on-primary);
 }
 
 .team-table td .remove-button:hover {
@@ -115,7 +115,7 @@
     flex-direction: column;
     width: 100%;
     max-width: 1200px;
-    background-color: #2a2a4a;
+    background-color: var(--gc-table-bg);
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
@@ -133,7 +133,7 @@
 .bracket-header h1 {
     font-size: 2.5em;
     margin: 0;
-    color: #ffd700;
+    color: var(--gc-yellow);
     /* Dourado */
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -142,16 +142,16 @@
 .bracket-header .teams-count {
     font-size: 1.2em;
     font-weight: bold;
-    color: #ccc;
-    background-color: #000;
+    color: var(--gc-text-secondary);
+    background-color: var(--gc-bg);
     padding: 5px 10px;
     border-radius: 5px;
 }
 
 .bracket-header .pro-badge {
-    background-color: #ff4500;
+    background-color: var(--gc-orange);
     /* Laranja/Vermelho */
-    color: white;
+    color: var(--gc-text-on-primary);
     padding: 5px 10px;
     border-radius: 0 0 5px 0;
     position: absolute;
@@ -164,10 +164,27 @@
     z-index: 10;
 }
 
+.team-placeholder.bye {
+  color: var(--gc-text-muted);
+  font-style: italic;
+}
+
+.team-placeholder.winner {
+  color: var(--gc-orange);
+  font-weight: 700;
+}
+
+.bracket-empty {
+  color: var(--gc-text-secondary);
+  text-align: center;
+  padding: 2rem;
+}
+
 .bracket-body {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow-x: auto;
 }
 
 .bracket-half {
@@ -196,7 +213,7 @@
 }
 
 .bracket-match {
-    background-color: #3b3b6b;
+    background-color: var(--gc-table-header);
     border-radius: 4px;
     margin-bottom: 10px;
     /* Espaço entre as partidas da mesma rodada */
@@ -209,13 +226,13 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    border: 1px solid #4a4a8a;
+    border: 1px solid var(--gc-table-border);
 }
 
 .team-placeholder {
     padding: 3px 5px;
     font-size: 0.85em;
-    color: #eee;
+    color: var(--gc-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -268,9 +285,9 @@
 .bracket-middle .final-match {
     margin-top: 40px;
     /* Para posicionar a final */
-    background-color: #6a0572;
+    background-color: var(--gc-surface-elevated);
     /* Cor diferente para a final */
-    border-color: #9d00a1;
+    border-color: var(--gc-orange);
 }
 
 /* Placeholder visual para as linhas que seriam desenhadas com CSS */
@@ -280,6 +297,6 @@
     /* Isso é apenas ilustrativo. As linhas reais seriam complexas com pseudo-elementos. */
     /* content: '';
             position: absolute;
-            background-color: #888;
+            background-color: var(--gc-text-muted);
             z-index: 0; */
 }

@@ -23,9 +23,9 @@ import { Team } from '../../Models/interfaces';
       <th>Ações</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody cdkDropList (cdkDropListDropped)="onDrop($event)">
     <tr *ngFor="let team of teams; let i = index" cdkDrag>
-      <td>{{ i + 1 }}</td>
+      <td>{{ team.seed ?? (i + 1) }}</td>
       <td>
         <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do time" width="32" height="32">
       </td>
@@ -47,7 +47,7 @@ export class LeagueTeamsTableComponent {
   @Input() teams: Team[] = [];
   @Output() teamsReordered = new EventEmitter<Team[]>();
   @Output() editTeam = new EventEmitter<Team>();
-  @Output() removeTeam = new EventEmitter<number>();
+  @Output() removeTeam = new EventEmitter<string>();
 
   onDrop(event: CdkDragDrop<Team[]>) {
     moveItemInArray(this.teams, event.previousIndex, event.currentIndex);

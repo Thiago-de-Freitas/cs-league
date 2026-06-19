@@ -1,18 +1,35 @@
 <div class="page-container">
-  <div class="details-card max-width-narrow">
-    <h1 class="details-card-title mb-2">{{ team.name }}</h1>
-    <p class="text-gray-600 mb-2">{{ team.description }}</p>
-    <div class="mb-4 team-stats-row">
-      <span class="stat-badge stat-badge-wins">Vitórias: {{ team.wins }}</span>
-      <span class="stat-badge stat-badge-losses">Derrotas: {{ team.losses }}</span>
+  <div class="page-inner max-width-narrow">
+    <div *ngIf="loading" class="loading">Carregando...</div>
+    <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
+
+    <div class="details-card gc-card" *ngIf="team && !loading">
+      <div class="team-header">
+        <span class="team-tag-badge">{{ team.tag }}</span>
+        <h1 class="page-title">{{ team.name }}</h1>
+      </div>
+      <div class="team-stats-row mb-4">
+        <span class="stat-badge stat-badge-wins">V {{ team.wins }}</span>
+        <span class="stat-badge stat-badge-losses">D {{ team.losses }}</span>
+        <span class="badge badge-gray">PTS {{ team.points }}</span>
+      </div>
+      <h2 class="section-title">Roster</h2>
+      <ul class="gc-list">
+        <li *ngFor="let member of team.players" class="gc-list-item">
+          <span class="member-name">{{ member.name }}</span>
+          <span class="badge badge-orange">{{ member.role }}</span>
+        </li>
+      </ul>
     </div>
-    <div>
-      <h2 class="section-subtitle mb-2">Membros do Time</h2>
-      <ul class="members-list">
-        <li *ngFor="let member of team.members" class="members-list-item">
-          <span class="member-name">{{ member.username }}</span>
+
+    <div *ngIf="pendingInvites.length > 0" class="details-card gc-card mt-4">
+      <h2 class="section-title">Convites Pendentes</h2>
+      <ul class="gc-list">
+        <li *ngFor="let invite of pendingInvites" class="gc-list-item">
+          <span>{{ invite.team?.name }}</span>
+          <button class="btn btn-primary btn-small" (click)="acceptInvite(invite)">Aceitar</button>
         </li>
       </ul>
     </div>
   </div>
-</div> 
+</div>

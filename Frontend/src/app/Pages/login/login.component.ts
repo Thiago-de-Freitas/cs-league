@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -13,35 +14,49 @@ import { RouterModule } from '@angular/router';
 })
 export class LoginComponent implements OnInit {
   loginForm: FormGroup;
-  loginError: string = '';
+  loginError = '';
+  loading = false;
 
-  constructor(private fb: FormBuilder, private router: Router) {
+  constructor(
+    private fb: FormBuilder,
+    private router: Router,
+    private authService: AuthService
+  ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]]
     });
   }
 
-  ngOnInit(): void {}
-
-  onSubmit(): void {
-    if (this.loginForm.valid) {
-      console.log('Dados de Login:', this.loginForm.value);
-      // Lógica de autenticação aqui (chamar API de backend)
-      // Exemplo: this.authService.login(this.loginForm.value).subscribe(...)
-
-      // Simulação de login bem-sucedido
-      this.loginError = '';
-      alert('Login realizado com sucesso!');
+  ngOnInit(): void {
+    if (this.authService.isLoggedIn) {
       this.router.navigate(['/dashboard']);
-    } else {
-      this.loginError = 'Por favor, preencha todos os campos corretamente.';
     }
   }
 
+  onSubmit(): void {
+    if (!this.loginForm.valid) {
+      this.loginError = 'Por favor, preencha todos os campos corretamente.';
+      return;
+    }
+
+    this.loading = true;
+    this.loginError = '';
+    const { email, password } = this.loginForm.value;
+
+    this.authService.login(email, password).subscribe({
+      next: () => {
+        this.loading = false;
+        this.router.navigate(['/dashboard']);
+      },
+      error: (err) => {
+        this.loading = false;
+        this.loginError = err.error?.error || 'Erro ao fazer login.';
+      }
+    });
+  }
+
   loginWithSteam(): void {
-    alert('Redirecionando para login via Steam...');
-    // Lógica para iniciar o fluxo OAuth/OpenID do Steam
-    // Isso geralmente envolve um redirecionamento para a URL de autenticação do Steam.
+    alert('Login via Steam será implementado em uma fase futura. Por enquanto, edite o Steam ID no perfil.');
   }
 }

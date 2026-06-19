@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum TeamMemberRole {
+  CAPTAIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum LeagueStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DemoStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  steamId      String?
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedTeams   Team[]       @relation("TeamOwner")
+  memberships  TeamMember[]
+  invites      TeamInvite[] @relation("InvitedUser")
+  ownedLeagues League[]     @relation("LeagueOwner")
+  demos        Demo[]
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  tag       String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  invites     TeamInvite[]
+  leagueTeams LeagueTeam[]
+  matchesAsTeam1 Match[]   @relation("MatchTeam1")
+  matchesAsTeam2 Match[]   @relation("MatchTeam2")
+  matchesWon     Match[]   @relation("MatchWinner")
+}
+
+model TeamMember {
+  id     String         @id @default(cuid())
+  teamId String
+  userId String
+  role   TeamMemberRole @default(MEMBER)
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model TeamInvite {
+  id            String       @id @default(cuid())
+  teamId        String
+  invitedUserId String
+  status        InviteStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+
+  team        Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser User @relation("InvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, invitedUserId])
+}
+
+model League {
+  id          String       @id @default(cuid())
+  name        String
+  description String       @default("")
+  status      LeagueStatus @default(UPCOMING)
+  maxTeams    Int          @default(8)
+  ownerId     String
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  owner  User         @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  teams  LeagueTeam[]
+  matches Match[]
+}
+
+model LeagueTeam {
+  id       String @id @default(cuid())
+  leagueId String
+  teamId   String
+  wins     Int    @default(0)
+  losses   Int    @default(0)
+  points   Int    @default(0)
+  seed     Int?
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, teamId])
+}
+
+model Match {
+  id              String      @id @default(cuid())
+  leagueId        String
+  team1Id         String
+  team2Id         String
+  winnerId        String?
+  status          MatchStatus @default(SCHEDULED)
+  round           Int         @default(1)
+  bracketPosition Int?
+  map             String?
+  playedAt  DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  league  League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team1   Team   @relation("MatchTeam1", fields: [team1Id], references: [id])
+  team2   Team   @relation("MatchTeam2", fields: [team2Id], references: [id])
+  winner  Team?  @relation("MatchWinner", fields: [winnerId], references: [id])
+  demos   Demo[]
+}
+
+model Demo {
+  id           String     @id @default(cuid())
+  matchId      String?
+  uploadedById String
+  filePath     String
+  fileName     String
+  status       DemoStatus @default(PENDING)
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  match      Match?            @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  uploadedBy User              @relation(fields: [uploadedById], references: [id])
+  stats      MatchPlayerStat[]
+}
+
+model MatchPlayerStat {
+  id         String  @id @default(cuid())
+  demoId     String
+  steamId    String?
+  playerName String
+  kills      Int     @default(0)
+  deaths     Int     @default(0)
+  adr        Float   @default(0)
+  hsPercent  Float   @default(0)
+  kast       Float   @default(0)
+
+  demo Demo @relation(fields: [demoId], references: [id], onDelete: Cascade)
+}

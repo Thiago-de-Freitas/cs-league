@@ -1,13 +1,8 @@
 <div class="form-container">
-  <div class="form-wrapper max-w-2xl">
-    <div>
-      <h2 class="form-header">
-        Criar Novo Time
-      </h2>
-      <p class="form-subtitle">
-        Reúna seus amigos e prepare-se para a competição!
-      </p>
-    </div>
+  <div class="form-wrapper wide create-team-card">
+    <h2 class="form-header">Criar Novo Time</h2>
+    <p class="form-subtitle">Reúna seus amigos e prepare-se para a competição!</p>
+
     <form class="form-group-spacing" [formGroup]="createTeamForm" (ngSubmit)="onCreateTeam()">
       <div class="form-group">
         <label for="team-name" class="form-label">Nome do Time</label>
@@ -19,42 +14,41 @@
           O nome do time é obrigatório.
         </div>
       </div>
-      <div class="form-group mt-4">
-        <label for="team-tag" class="form-label">Tag do Time (Máx. 5 caracteres)</label>
+
+      <div class="form-group">
+        <label for="team-tag" class="form-label">Tag do Time (máx. 5 caracteres)</label>
         <input id="team-tag" name="teamTag" type="text" required
           formControlName="teamTag"
           class="input-field"
-          placeholder="Ex: VNG">
+          placeholder="Ex: VNG"
+          maxlength="5">
         <div *ngIf="createTeamForm.get('teamTag')?.invalid && createTeamForm.get('teamTag')?.touched" class="error-message">
           <div *ngIf="createTeamForm.get('teamTag')?.errors?.['required']">A tag do time é obrigatória.</div>
           <div *ngIf="createTeamForm.get('teamTag')?.errors?.['maxlength']">A tag deve ter no máximo 5 caracteres.</div>
         </div>
       </div>
 
-      <div class="mt-6">
+      <div class="invite-section">
         <h3 class="section-subtitle-small">Convidar Membros</h3>
-        <div class="flex-row-spacing mb-4">
-          <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"
-            class="input-field flex-grow"
-            placeholder="Buscar usuário por nome...">
-        </div>
-        <div *ngIf="searchResults.length > 0" class="search-results-list mb-4">
-          <ul>
-            <li *ngFor="let user of searchResults">
-              <span>{{ user.username }} ({{ user.email }})</span>
-              <button (click)="inviteUser(user)" type="button" class="btn btn-primary btn-small ml-4">
-                Convidar
-              </button>
-            </li>
-          </ul>
-        </div>
+        <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"
+          class="input-field"
+          placeholder="Buscar usuário por nome...">
 
-        <div *ngIf="invitedMembers.length > 0" class="mt-4">
-          <h4 class="text-md font-medium text-gray-800 mb-2">Membros Convidados:</h4>
+        <ul *ngIf="searchResults.length > 0" class="search-results-list">
+          <li *ngFor="let user of searchResults" class="search-result-item">
+            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
+            <button (click)="inviteUser(user)" type="button" class="btn btn-primary btn-small">
+              Convidar
+            </button>
+          </li>
+        </ul>
+
+        <div *ngIf="invitedMembers.length > 0" class="invited-section">
+          <h4 class="form-label">Membros Convidados</h4>
           <ul class="invited-members-list">
-            <li *ngFor="let member of invitedMembers">
-              <span>{{ member.username }}</span>
-              <button (click)="removeInvitedUser(member)" type="button" class="btn-link text-red-500 ml-4">
+            <li *ngFor="let member of invitedMembers" class="invited-member-item">
+              <span>{{ member.displayName }}</span>
+              <button (click)="removeInvitedUser(member)" type="button" class="btn-remove">
                 Remover
               </button>
             </li>
@@ -62,32 +56,33 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <button type="submit" class="btn btn-success">
-          Criar Time
-        </button>
-      </div>
+      <button type="submit" class="btn btn-primary w-full" [disabled]="loading">
+        {{ loading ? 'Criando...' : 'Criar Time' }}
+      </button>
+
+      <div *ngIf="errorMessage" class="error-message text-center">{{ errorMessage }}</div>
     </form>
+
     <div *ngIf="successMessage" class="success-message">
       <span>{{ successMessage }}</span>
       <button class="btn btn-secondary mt-2" (click)="goToTeamDetails()" *ngIf="createdTeamId">
         Ver detalhes do time
       </button>
     </div>
+
     <div class="teams-list-section">
       <h3 class="section-title">Times Existentes</h3>
-      <div *ngIf="teams.length > 0; else noTeams">
-        <ul class="teams-list">
-          <li *ngFor="let team of teams" class="team-list-item">
-            <span class="team-name">{{ team.name }}</span>
-            <span class="team-members">Membros: {{ team.members.join(', ') }}</span>
-            <button class="btn btn-secondary ml-2" (click)="goToTeamDetailsById(team.id)">Ver Detalhes</button>
-          </li>
-        </ul>
-      </div>
+      <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
+        <li *ngFor="let team of teams" class="gc-list-item">
+          <span class="team-name">{{ team.name }}</span>
+          <span class="badge badge-orange">{{ team.tag }}</span>
+          <span class="meta">{{ team.players.length || 0 }} membros</span>
+          <button class="btn btn-secondary btn-small" (click)="goToTeamDetailsById(team.id)">Ver</button>
+        </li>
+      </ul>
       <ng-template #noTeams>
-        <p class="text-gray-600">Nenhum time cadastrado.</p>
+        <p class="meta">Nenhum time cadastrado.</p>
       </ng-template>
     </div>
   </div>
-</div> 
+</div>

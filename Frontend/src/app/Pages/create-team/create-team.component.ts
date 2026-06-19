@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-
+import { forkJoin } from 'rxjs';
+import { TeamService } from '../../Services/team.service';
+import { Team, User } from '../../Models/interfaces';
 
 @Component({
   selector: 'app-create-team',
@@ -14,76 +15,105 @@ import { RouterModule } from '@angular/router';
 })
 export class CreateTeamComponent implements OnInit {
   createTeamForm: FormGroup;
-  searchUserQuery: string = '';
-  searchResults: any[] = [];
-  invitedMembers: any[] = [];
-  successMessage: string = '';
-  createdTeamId: number | null = null;
-  teams: { id: number, name: string, members: string[] }[] = [
-    { id: 1, name: 'Os Vingadores do CS', members: ['Jogador1', 'Jogador2'] },
-    { id: 2, name: 'Time Prata', members: ['Jogador3'] },
-    { id: 3, name: 'Time Bronze', members: ['Jogador4', 'Jogador1'] }
-  ];
+  searchUserQuery = '';
+  searchResults: User[] = [];
+  invitedMembers: User[] = [];
+  successMessage = '';
+  errorMessage = '';
+  createdTeamId: string | null = null;
+  teams: Team[] = [];
+  loading = false;
 
-  // Simulação de usuários disponíveis para convite
-  availableUsers = [
-    { id: 1, username: 'Jogador1', email: 'jogador1@email.com' },
-    { id: 2, username: 'Jogador2', email: 'jogador2@email.com' },
-    { id: 3, username: 'Jogador3', email: 'jogador3@email.com' },
-    { id: 4, username: 'Jogador4', email: 'jogador4@email.com' },
-  ];
-
-  constructor(private fb: FormBuilder, private router: Router) {
+  constructor(
+    private fb: FormBuilder,
+    private router: Router,
+    private teamService: TeamService
+  ) {
     this.createTeamForm = this.fb.group({
       teamName: ['', Validators.required],
       teamTag: ['', [Validators.required, Validators.maxLength(5)]]
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.loadTeams();
+  }
+
+  loadTeams(): void {
+    this.teamService.getTeams().subscribe({
+      next: (teams) => (this.teams = teams),
+      error: () => {}
+    });
+  }
 
   onSearchUsers(): void {
     if (this.searchUserQuery.length > 2) {
-      this.searchResults = this.availableUsers.filter(user =>
-        user.username.toLowerCase().includes(this.searchUserQuery.toLowerCase()) &&
-        !this.invitedMembers.some(member => member.id === user.id)
-      );
+      this.teamService.searchUsers(this.searchUserQuery).subscribe({
+        next: (users) => {
+          this.searchResults = users.filter(
+            (u) => !this.invitedMembers.some((m) => m.id === u.id)
+          );
+        }
+      });
     } else {
       this.searchResults = [];
     }
   }
 
-  inviteUser(user: any): void {
-    if (!this.invitedMembers.some(member => member.id === user.id)) {
+  inviteUser(user: User): void {
+    if (!this.invitedMembers.some((m) => m.id === user.id)) {
       this.invitedMembers.push(user);
-      this.searchResults = this.searchResults.filter(res => res.id !== user.id);
+      this.searchResults = this.searchResults.filter((r) => r.id !== user.id);
       this.searchUserQuery = '';
     }
   }
 
-  removeInvitedUser(user: any): void {
-    this.invitedMembers = this.invitedMembers.filter(member => member.id !== user.id);
+  removeInvitedUser(user: User): void {
+    this.invitedMembers = this.invitedMembers.filter((m) => m.id !== user.id);
   }
 
   onCreateTeam(): void {
-    if (this.createTeamForm.valid) {
-      const newTeamData = {
-        ...this.createTeamForm.value,
-        members: this.invitedMembers.map(member => member.id)
-      };
-      console.log('Dados do Novo Time:', newTeamData);
-      // Simula criação de time e gera um ID aleatório
-      this.createdTeamId = Math.floor(Math.random() * 10000) + 1;
-      this.successMessage = `Time "${newTeamData.teamName}" criado com sucesso! Convites enviados.`;
-      this.createTeamForm.reset();
-      this.invitedMembers = [];
-      this.searchResults = [];
-      this.searchUserQuery = '';
-      // Não redireciona automaticamente
-    } else {
-      this.successMessage = '';
-      alert('Por favor, preencha o nome e a tag do time corretamente.');
+    if (!this.createTeamForm.valid) {
+      this.errorMessage = 'Preencha o nome e a tag do time.';
+      return;
     }
+
+    this.loading = true;
+    this.errorMessage = '';
+    const { teamName, teamTag } = this.createTeamForm.value;
+
+    this.teamService.createTeam(teamName, teamTag).subscribe({
+      next: (team) => {
+        this.createdTeamId = team.id;
+        if (this.invitedMembers.length === 0) {
+          this.loading = false;
+          this.successMessage = `Time "${teamName}" criado com sucesso!`;
+          this.createTeamForm.reset();
+          this.loadTeams();
+          return;
+        }
+        forkJoin(
+          this.invitedMembers.map((m) => this.teamService.inviteUser(team.id, m.id))
+        ).subscribe({
+          next: () => {
+            this.loading = false;
+            this.successMessage = `Time "${teamName}" criado com sucesso! Convites enviados.`;
+            this.createTeamForm.reset();
+            this.invitedMembers = [];
+            this.loadTeams();
+          },
+          error: () => {
+            this.loading = false;
+            this.successMessage = `Time criado, mas alguns convites falharam.`;
+            this.loadTeams();
+          }
+        });
+      },
+      error: (err) => {
+        this.loading = false;
+        this.errorMessage = err.error?.error || 'Erro ao criar time.';
+      }
+    });
   }
 
   goToTeamDetails(): void {
@@ -92,7 +122,7 @@ export class CreateTeamComponent implements OnInit {
     }
   }
 
-  goToTeamDetailsById(id: number): void {
+  goToTeamDetailsById(id: string): void {
     this.router.navigate(['/team-details', id]);
   }
-} 
+}

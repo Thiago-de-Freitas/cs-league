@@ -1,0 +1,54 @@
+<div class="page-container">
+  <div class="page-inner max-width-narrow">
+    <div *ngIf="loading" class="loading">Carregando...</div>
+    <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
+
+    <div *ngIf="match && !loading" class="details-card gc-card">
+      <h1 class="page-title">{{ match.team1.name }} <span class="vs">VS</span> {{ match.team2.name }}</h1>
+      <div class="match-meta">
+        <span class="badge status-{{ match.status }}">{{ match.status }}</span>
+        <span class="meta" *ngIf="match.map">Mapa: {{ match.map }}</span>
+        <span class="meta" *ngIf="match.winner">Vencedor: <strong>{{ match.winner.name }}</strong></span>
+      </div>
+      <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small mt-4">Voltar à Liga</a>
+    </div>
+
+    <div *ngIf="isDemoView && !loading" class="details-card gc-card">
+      <h1 class="page-title">Estatísticas da Demo</h1>
+    </div>
+
+    <div *ngIf="stats.length > 0 && !loading" class="gc-card mt-4">
+      <h2 class="section-title">Performance dos Jogadores</h2>
+      <div class="table-container">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th>Jogador</th>
+              <th>K</th>
+              <th>D</th>
+              <th>K/D</th>
+              <th>ADR</th>
+              <th>HS%</th>
+              <th>KAST</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let stat of stats">
+              <td><strong>{{ stat.playerName }}</strong></td>
+              <td>{{ stat.kills }}</td>
+              <td>{{ stat.deaths }}</td>
+              <td class="stat-highlight">{{ getKd(stat) }}</td>
+              <td>{{ stat.adr }}</td>
+              <td>{{ stat.hsPercent }}%</td>
+              <td>{{ stat.kast }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div *ngIf="!loading && stats.length === 0 && !errorMsg" class="not-found-message">
+      <p>Nenhuma estatística disponível. A demo pode ainda estar em processamento.</p>
+    </div>
+  </div>
+</div>

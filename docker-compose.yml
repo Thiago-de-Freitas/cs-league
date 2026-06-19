@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-csleague}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-csleague}
+      POSTGRES_DB: ${POSTGRES_DB:-csleague}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-csleague}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      DEMO_STORAGE_PATH: /data/demos
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4200}
+      PORT: 3000
+    volumes:
+      - demo_storage:/data/demos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./Worker
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}
+      REDIS_URL: redis://redis:6379
+      DEMO_STORAGE_PATH: /data/demos
+    volumes:
+      - demo_storage:/data/demos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  demo_storage:

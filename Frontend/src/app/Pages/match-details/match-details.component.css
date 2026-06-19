@@ -1,0 +1,4 @@
+.vs { color: var(--gc-orange); font-size: 1.5rem; margin: 0 0.5rem; }
+.match-meta { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-top: 0.75rem; }
+.stat-highlight { color: var(--gc-orange); font-weight: 700; }
+.mt-4 { margin-top: 1rem; }

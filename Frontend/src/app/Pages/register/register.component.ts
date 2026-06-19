@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-register',
@@ -13,35 +14,48 @@ import { RouterModule } from '@angular/router';
 })
 export class RegisterComponent implements OnInit {
   registerForm: FormGroup;
+  errorMsg = '';
+  loading = false;
 
-  constructor(private fb: FormBuilder, private router: Router) {
+  constructor(
+    private fb: FormBuilder,
+    private router: Router,
+    private authService: AuthService
+  ) {
     this.registerForm = this.fb.group({
       username: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required]
-    }, { validator: this.passwordMatchValidator });
+    }, { validators: this.passwordMatchValidator });
   }
 
   ngOnInit(): void {}
 
-  // Validador personalizado para verificar se as senhas coincidem
   passwordMatchValidator(form: FormGroup) {
     return form.get('password')?.value === form.get('confirmPassword')?.value
-     ? null : { 'mismatch': true };
+      ? null : { mismatch: true };
   }
 
   onSubmit(): void {
-    if (this.registerForm.valid) {
-      console.log('Dados de Cadastro:', this.registerForm.value);
-      // Lógica de registro aqui (chamar API de backend)
-      // Exemplo: this.authService.register(this.registerForm.value).subscribe(...)
-
-      // Simulação de registro bem-sucedido
-      alert('Cadastro realizado com sucesso!');
-      this.router.navigate(['/login']); // Redireciona para a tela de login após o cadastro
-    } else {
-      alert('Por favor, preencha todos os campos corretamente e verifique se as senhas coincidem.');
+    if (!this.registerForm.valid) {
+      this.errorMsg = 'Preencha todos os campos corretamente e verifique se as senhas coincidem.';
+      return;
     }
+
+    this.loading = true;
+    this.errorMsg = '';
+    const { email, password, username } = this.registerForm.value;
+
+    this.authService.register(email, password, username).subscribe({
+      next: () => {
+        this.loading = false;
+        this.router.navigate(['/dashboard']);
+      },
+      error: (err) => {
+        this.loading = false;
+        this.errorMsg = err.error?.error || 'Erro ao cadastrar.';
+      }
+    });
   }
 }
