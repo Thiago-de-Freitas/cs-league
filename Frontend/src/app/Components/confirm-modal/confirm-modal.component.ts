@@ -10,7 +10,11 @@ import { CommonModule } from '@angular/common';
 })
 export class ConfirmModalComponent {
   @Input() title = 'Confirmar ação';
+  @Input() subtitle = '';
   @Input() message = 'Deseja continuar?';
+  @Input() highlight = '';
+  @Input() highlightLabel = '';
+  @Input() hint = '';
   @Input() confirmLabel = 'Confirmar';
   @Input() cancelLabel = 'Cancelar';
   @Input() danger = false;

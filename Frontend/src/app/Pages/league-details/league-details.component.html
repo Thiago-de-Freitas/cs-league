@@ -159,7 +159,11 @@
 <app-confirm-modal
   *ngIf="confirmConfig"
   [title]="confirmConfig.title"
+  [subtitle]="confirmConfig.subtitle || ''"
   [message]="confirmConfig.message"
+  [highlight]="confirmConfig.highlight || ''"
+  [highlightLabel]="confirmConfig.highlightLabel || ''"
+  [hint]="confirmConfig.hint || ''"
   [confirmLabel]="confirmConfig.confirmLabel"
   [danger]="confirmConfig.danger ?? false"
   [loading]="confirmLoading"

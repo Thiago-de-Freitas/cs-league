@@ -77,7 +77,10 @@
 <app-confirm-modal
   *ngIf="showDeleteConfirm"
   title="Excluir time"
-  message="Excluir este time permanentemente? Esta ação não pode ser desfeita."
+  message="Esta ação é permanente e não pode ser desfeita."
+  [highlight]="team ? team.name + (team.tag ? ' [' + team.tag + ']' : '') : ''"
+  highlightLabel="Time"
+  hint="Todos os membros, convites e vínculos com ligas serão removidos."
   confirmLabel="Excluir"
   [danger]="true"
   [loading]="deletingTeam"

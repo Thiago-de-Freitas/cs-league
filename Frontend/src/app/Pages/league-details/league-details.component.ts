@@ -14,7 +14,11 @@ import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
 
 interface ConfirmConfig {
   title: string;
+  subtitle?: string;
   message: string;
+  highlight?: string;
+  highlightLabel?: string;
+  hint?: string;
   confirmLabel: string;
   danger?: boolean;
   onConfirm: () => void;
@@ -233,9 +237,16 @@ export class LeagueDetailsComponent implements OnInit {
 
   onRemoveTeam(teamId: string): void {
     if (!this.leagueId) return;
+    const team = this.league?.teams.find((t) => t.id === teamId);
+    const teamLabel = team ? `${team.name}${team.tag ? ' [' + team.tag + ']' : ''}` : '';
+
     this.confirmConfig = {
       title: 'Remover time',
-      message: 'Remover este time da liga?',
+      subtitle: this.league?.name ? `Liga: ${this.league.name}` : '',
+      message: 'Este time será removido da classificação e do chaveamento desta liga.',
+      highlight: teamLabel,
+      highlightLabel: 'Time',
+      hint: 'O time continuará cadastrado no sistema e poderá ser adicionado novamente depois.',
       confirmLabel: 'Remover',
       danger: true,
       onConfirm: () => {
@@ -264,7 +275,10 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.leagueId) return;
     this.confirmConfig = {
       title: 'Excluir liga',
-      message: 'Excluir esta liga permanentemente? Esta ação não pode ser desfeita.',
+      message: 'Esta ação é permanente e não pode ser desfeita.',
+      highlight: this.league?.name,
+      highlightLabel: 'Liga',
+      hint: 'Todos os times, partidas e chaveamentos desta liga serão excluídos.',
       confirmLabel: 'Excluir',
       danger: true,
       onConfirm: () => {
@@ -287,7 +301,10 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.leagueId) return;
     this.confirmConfig = {
       title: 'Arquivar liga',
-      message: 'Arquivar esta liga? Ela deixará de aparecer na página inicial.',
+      message: 'A liga deixará de aparecer na página inicial.',
+      highlight: this.league?.name,
+      highlightLabel: 'Liga',
+      hint: 'Você poderá desarquivá-la depois na listagem de ligas.',
       confirmLabel: 'Arquivar',
       onConfirm: () => {
         this.confirmLoading = true;
@@ -309,7 +326,9 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.leagueId) return;
     this.confirmConfig = {
       title: 'Desarquivar liga',
-      message: 'Desarquivar esta liga? Ela voltará a aparecer na página inicial.',
+      message: 'A liga voltará a aparecer na página inicial.',
+      highlight: this.league?.name,
+      highlightLabel: 'Liga',
       confirmLabel: 'Desarquivar',
       onConfirm: () => {
         this.confirmLoading = true;
