@@ -41,8 +41,16 @@ export class LeagueService {
     return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/archive`, {});
   }
 
+  unarchiveLeague(id: string): Observable<{ id: string; status: string; message: string }> {
+    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/unarchive`, {});
+  }
+
   addTeamsToLeague(leagueId: string, teamIds: string[]): Observable<League> {
     return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams/bulk`, { teamIds });
+  }
+
+  getAvailableTeams(leagueId: string): Observable<{ id: string; name: string; tag: string }[]> {
+    return this.http.get<{ id: string; name: string; tag: string }[]>(`${this.apiUrl}/${leagueId}/available-teams`);
   }
 
   addTeamToLeague(leagueId: string, teamId: string, seed?: number): Observable<League> {

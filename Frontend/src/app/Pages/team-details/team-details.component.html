@@ -73,3 +73,14 @@
     </div>
   </div>
 </div>
+
+<app-confirm-modal
+  *ngIf="showDeleteConfirm"
+  title="Excluir time"
+  message="Excluir este time permanentemente? Esta ação não pode ser desfeita."
+  confirmLabel="Excluir"
+  [danger]="true"
+  [loading]="deletingTeam"
+  (confirmed)="confirmDeleteTeam()"
+  (closed)="cancelDeleteTeam()">
+</app-confirm-modal>

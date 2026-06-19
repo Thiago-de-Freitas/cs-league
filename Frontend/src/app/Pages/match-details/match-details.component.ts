@@ -1,18 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { MatchService } from '../../Services/match.service';
 import { DemoService } from '../../Services/demo.service';
 import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
+import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 
 @Component({
   selector: 'app-match-details',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, DemoUploadModalComponent],
   templateUrl: './match-details.component.html',
   styleUrls: ['./match-details.component.css']
 })
-export class MatchDetailsComponent implements OnInit {
+export class MatchDetailsComponent implements OnInit, OnDestroy {
   matchId: string | null = null;
   match: Match | null = null;
   demo: Demo | null = null;
@@ -20,10 +22,12 @@ export class MatchDetailsComponent implements OnInit {
   loading = true;
   errorMsg = '';
   isDemoView = false;
+  showUploadModal = false;
+  pollingDemo = false;
+  private pollSub?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router,
     private matchService: MatchService,
     private demoService: DemoService
   ) {}
@@ -40,6 +44,10 @@ export class MatchDetailsComponent implements OnInit {
         this.loadMatch(id);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.pollSub?.unsubscribe();
   }
 
   loadDemo(id: string): void {
@@ -64,7 +72,9 @@ export class MatchDetailsComponent implements OnInit {
     this.matchService.getMatch(id).subscribe({
       next: (match) => {
         this.match = match;
+        this.stats = match.aggregatedStats || this.buildAggregatedStats(match.demos || []);
         this.loading = false;
+        this.startPollingPendingDemos();
       },
       error: () => {
         this.errorMsg = 'Partida não encontrada.';
@@ -73,25 +83,68 @@ export class MatchDetailsComponent implements OnInit {
     });
   }
 
-  loadDemoStats(demo: Demo): void {
-    this.stats = demo.stats || [];
-    if (demo.status === 'completed' && demo.stats?.length) return;
-    if (demo.status === 'pending' || demo.status === 'processing') {
-      this.demoService.pollDemoStatus(demo.id).subscribe({
-        next: (updated) => {
-          if (this.match?.demos) {
-            const idx = this.match.demos.findIndex((d) => d.id === updated.id);
-            if (idx >= 0) this.match.demos[idx] = updated;
-          }
-          if (updated.stats?.length) this.stats = updated.stats;
-        }
-      });
+  buildAggregatedStats(demos: Demo[]): MatchPlayerStat[] {
+    const byKey = new Map<string, MatchPlayerStat>();
+    for (const demo of demos) {
+      if (demo.status !== 'completed' || !demo.stats?.length) continue;
+      for (const stat of demo.stats) {
+        const key = (stat.steamId || stat.playerName).toLowerCase();
+        if (!byKey.has(key)) byKey.set(key, stat);
+      }
     }
+    return Array.from(byKey.values()).sort((a, b) => b.kills - a.kills);
+  }
+
+  startPollingPendingDemos(): void {
+    this.pollSub?.unsubscribe();
+    const pending = this.match?.demos?.filter(
+      (d) => d.status === 'pending' || d.status === 'processing'
+    );
+    if (!pending?.length || !this.matchId) return;
+
+    this.pollingDemo = true;
+    const pollId = pending[0].id;
+    this.pollSub = this.demoService.pollDemoStatus(pollId).subscribe({
+      next: (updated) => {
+        if (this.match?.demos) {
+          const idx = this.match.demos.findIndex((d) => d.id === updated.id);
+          if (idx >= 0) this.match.demos[idx] = updated;
+        }
+        if (updated.status === 'completed' || updated.status === 'failed') {
+          this.pollingDemo = false;
+          this.refreshMatch();
+        }
+      }
+    });
+  }
+
+  refreshMatch(): void {
+    if (!this.matchId) return;
+    this.matchService.getMatch(this.matchId).subscribe({
+      next: (match) => {
+        this.match = match;
+        this.stats = match.aggregatedStats || this.buildAggregatedStats(match.demos || []);
+        this.startPollingPendingDemos();
+      }
+    });
   }
 
   viewDemoStats(demo: Demo): void {
     this.stats = demo.stats || [];
     this.demo = demo;
+  }
+
+  openUploadModal(): void {
+    this.showUploadModal = true;
+  }
+
+  closeUploadModal(): void {
+    this.showUploadModal = false;
+  }
+
+  onDemoUploaded(_demo: Demo): void {
+    this.showUploadModal = false;
+    this.refreshMatch();
   }
 
   getKd(stat: MatchPlayerStat): string {
@@ -120,12 +173,5 @@ export class MatchDetailsComponent implements OnInit {
     if (remaining === 2) return 'Semifinal';
     if (remaining === 3) return 'Quartas';
     return `Rodada ${round}`;
-  }
-
-  goToUpload(): void {
-    if (!this.match) return;
-    this.router.navigate(['/demo-upload'], {
-      queryParams: { leagueId: this.match.leagueId, matchId: this.match.id }
-    });
   }
 }

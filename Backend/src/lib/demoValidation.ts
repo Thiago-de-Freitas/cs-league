@@ -2,7 +2,39 @@ import { prisma } from './prisma';
 
 export type PersonalDemoValidation =
   | { valid: true }
-  | { valid: false; error: string; code: 'NO_STEAM_ID' | 'NOT_IN_MATCH' | 'MATCH_HAS_DEMO' | 'MATCH_NOT_FOUND' | 'MATCH_REQUIRED' };
+  | { valid: false; error: string; code: 'NO_STEAM_ID' | 'NOT_IN_MATCH' | 'MATCH_HAS_DEMO' | 'MATCH_NOT_FOUND' | 'MATCH_REQUIRED' | 'USER_HAS_DEMO' | 'DUPLICATE_DEMO' };
+
+const ACTIVE_DEMO_STATUSES = ['PENDING', 'PROCESSING', 'COMPLETED'] as const;
+
+/** Impede reenvio do mesmo arquivo .dem (nome do CS2 identifica a partida). */
+export async function validateDuplicateDemoUpload(
+  userId: string,
+  fileName: string
+): Promise<PersonalDemoValidation> {
+  const normalized = fileName.trim().toLowerCase();
+  if (!normalized) {
+    return { valid: true };
+  }
+
+  const existing = await prisma.demo.findFirst({
+    where: {
+      uploadedById: userId,
+      fileName: { equals: fileName.trim(), mode: 'insensitive' },
+      status: { in: [...ACTIVE_DEMO_STATUSES] },
+    },
+    select: { id: true, status: true },
+  });
+
+  if (existing) {
+    const statusMsg =
+      existing.status === 'COMPLETED'
+        ? 'Este arquivo de demo já foi enviado e processado.'
+        : 'Este arquivo de demo já está na fila de processamento.';
+    return { valid: false, error: statusMsg, code: 'DUPLICATE_DEMO' };
+  }
+
+  return { valid: true };
+}
 
 export async function validatePersonalDemoUpload(
   userId: string,
@@ -49,21 +81,55 @@ export async function validatePersonalDemoUpload(
     };
   }
 
-  const existingDemo = await prisma.demo.findFirst({
+  const ownPersonalDemo = await prisma.demo.findFirst({
     where: {
       matchId,
+      uploadedById: userId,
+      isPersonal: true,
       status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
     },
-    select: { id: true, uploadedById: true },
   });
 
-  if (existingDemo) {
-    const sameUser = existingDemo.uploadedById === userId;
+  if (ownPersonalDemo) {
     return {
       valid: false,
-      error: sameUser
-        ? 'Você já enviou uma demo para esta partida.'
-        : 'Já existe uma demo enviada para esta partida.',
+      error: 'Você já enviou uma demo pessoal para esta partida.',
+      code: 'USER_HAS_DEMO',
+    };
+  }
+
+  const generalDemo = await prisma.demo.findFirst({
+    where: {
+      matchId,
+      isPersonal: false,
+      status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
+    },
+  });
+
+  if (generalDemo) {
+    return {
+      valid: false,
+      error: 'Já existe uma demo geral enviada para esta partida.',
+      code: 'MATCH_HAS_DEMO',
+    };
+  }
+
+  return { valid: true };
+}
+
+export async function validateGeneralDemoUpload(matchId: string): Promise<PersonalDemoValidation> {
+  const existing = await prisma.demo.findFirst({
+    where: {
+      matchId,
+      isPersonal: false,
+      status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
+    },
+  });
+
+  if (existing) {
+    return {
+      valid: false,
+      error: 'Já existe uma demo geral associada a esta partida.',
       code: 'MATCH_HAS_DEMO',
     };
   }

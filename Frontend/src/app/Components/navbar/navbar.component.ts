@@ -10,25 +10,36 @@ import { AuthService } from '../../Services/auth.service';
   template: `
     <nav class="gc-navbar">
       <div class="gc-navbar-inner">
-        <a class="gc-logo" routerLink="/">
+        <a class="gc-logo" routerLink="/" (click)="closeMenu()">
           <span class="gc-logo-icon">CS</span>
           <span class="gc-logo-text">LEAGUE</span>
         </a>
 
-        <ul class="gc-nav-links">
+        <button
+          type="button"
+          class="gc-nav-toggle"
+          (click)="toggleMenu()"
+          [attr.aria-expanded]="menuOpen"
+          aria-label="Abrir menu">
+          <span class="gc-nav-toggle-bar" [class.is-open]="menuOpen"></span>
+          <span class="gc-nav-toggle-bar" [class.is-open]="menuOpen"></span>
+          <span class="gc-nav-toggle-bar" [class.is-open]="menuOpen"></span>
+        </button>
+
+        <ul class="gc-nav-links" [class.is-open]="menuOpen">
           @if (auth.isLoggedIn) {
-            <li><a routerLink="/dashboard" routerLinkActive="active">Início</a></li>
-            <li><a routerLink="/create-league" routerLinkActive="active">Ligas</a></li>
-            <li><a routerLink="/create-team" routerLinkActive="active">Times</a></li>
-            <li><a routerLink="/demo-upload" routerLinkActive="active">Demos</a></li>
-            <li><a routerLink="/profile" routerLinkActive="active">Perfil</a></li>
+            <li><a routerLink="/dashboard" routerLinkActive="active" (click)="closeMenu()">Início</a></li>
+            <li><a routerLink="/create-league" routerLinkActive="active" (click)="closeMenu()">Ligas</a></li>
+            <li><a routerLink="/create-team" routerLinkActive="active" (click)="closeMenu()">Times</a></li>
+            <li><a routerLink="/demo-upload" routerLinkActive="active" (click)="closeMenu()">Demos</a></li>
+            <li><a routerLink="/profile" routerLinkActive="active" (click)="closeMenu()">Perfil</a></li>
             <li>
               <button class="gc-nav-logout" (click)="logout()">Sair</button>
             </li>
           } @else {
-            <li><a routerLink="/login" routerLinkActive="active">Login</a></li>
+            <li><a routerLink="/login" routerLinkActive="active" (click)="closeMenu()">Login</a></li>
             <li>
-              <a routerLink="/register" routerLinkActive="active" class="gc-nav-cta">Cadastrar</a>
+              <a routerLink="/register" routerLinkActive="active" class="gc-nav-cta" (click)="closeMenu()">Cadastrar</a>
             </li>
           }
         </ul>
@@ -37,9 +48,20 @@ import { AuthService } from '../../Services/auth.service';
   `
 })
 export class NavbarComponent {
+  menuOpen = false;
+
   constructor(public auth: AuthService) {}
 
+  toggleMenu(): void {
+    this.menuOpen = !this.menuOpen;
+  }
+
+  closeMenu(): void {
+    this.menuOpen = false;
+  }
+
   logout(): void {
+    this.closeMenu();
     this.auth.logout();
     window.location.href = '/login';
   }

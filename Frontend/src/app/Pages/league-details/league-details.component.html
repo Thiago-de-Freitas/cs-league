@@ -16,6 +16,7 @@
       <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
         [teams]="league.teams || []"
+        [canManageLeague]="isAdmin"
         (teamsReordered)="onTeamsReordered($event)"
         (editTeam)="onEditTeam($event)"
         (removeTeam)="onRemoveTeam($event)">
@@ -42,7 +43,6 @@
           {{ generatingBracket ? 'Gerando...' : 'Gerar Chaveamento' }}
         </button>
       </div>
-      <p class="admin-hint">O chaveamento usa seeding justo: com jogos disputados, ordena por pontos/vitórias; senão, pela ordem manual dos seeds.</p>
 
       <div *ngIf="showAddTeam" class="admin-form">
         <label class="form-label" for="team-multi-select">Times disponíveis</label>
@@ -51,9 +51,13 @@
           multiple
           [(ngModel)]="selectedTeamIds"
           class="input-field multi-select"
+          [disabled]="availableTeams.length === 0"
           [size]="availableTeams.length > 6 ? 6 : (availableTeams.length || 3)">
           <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
         </select>
+        <p *ngIf="availableTeams.length === 0" class="admin-hint">
+          Nenhum time disponível. Crie times na página <a routerLink="/create-team">Times</a>.
+        </p>
         <p class="admin-hint">
           Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
           {{ selectedTeamIds.length }} selecionado(s) · {{ remainingSlots }} vaga(s) restante(s)
@@ -89,6 +93,13 @@
       </p>
       <div class="danger-actions">
         <button
+          *ngIf="isArchived"
+          class="btn btn-secondary"
+          (click)="unarchiveLeague()"
+          [disabled]="unarchivingLeague">
+          {{ unarchivingLeague ? 'Desarquivando...' : 'Desarquivar Liga' }}
+        </button>
+        <button
           *ngIf="canArchive"
           class="btn btn-secondary"
           (click)="archiveLeague()"
@@ -96,6 +107,7 @@
           {{ archivingLeague ? 'Arquivando...' : 'Arquivar Liga' }}
         </button>
         <button
+          *ngIf="!isArchived"
           class="btn btn-danger"
           (click)="deleteLeague()"
           [disabled]="deletingLeague">
@@ -112,7 +124,7 @@
             <span class="match-round" *ngIf="match.round">R{{ match.round }}</span>
             {{ match.team1.name }} vs {{ match.team2.name }}
           </span>
-          <span class="match-status">{{ match.status }}</span>
+          <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
           <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
           <ng-container *ngIf="isAdmin && match.status !== 'completed'">
             <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
@@ -143,3 +155,14 @@
 <div *ngIf="isLoading" class="loading-spinner">Carregando detalhes da liga...</div>
 <div *ngIf="!league && !isLoading && !errorMsg" class="not-found-message">Liga não encontrada.</div>
 <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
+
+<app-confirm-modal
+  *ngIf="confirmConfig"
+  [title]="confirmConfig.title"
+  [message]="confirmConfig.message"
+  [confirmLabel]="confirmConfig.confirmLabel"
+  [danger]="confirmConfig.danger ?? false"
+  [loading]="confirmLoading"
+  (confirmed)="onConfirmAction()"
+  (closed)="closeConfirm()">
+</app-confirm-modal>

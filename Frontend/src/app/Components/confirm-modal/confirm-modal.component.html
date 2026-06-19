@@ -1,0 +1,27 @@
+<div class="gc-modal-backdrop" (click)="onBackdropClick($event)" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 [id]="titleId" class="gc-modal-title">{{ title }}</h2>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="cancel()" [disabled]="loading" aria-label="Fechar">&times;</button>
+    </div>
+
+    <div class="gc-modal-body">
+      <p class="confirm-message">{{ message }}</p>
+    </div>
+
+    <div class="gc-modal-footer">
+      <button type="button" class="btn btn-ghost" (click)="cancel()" [disabled]="loading">{{ cancelLabel }}</button>
+      <button
+        type="button"
+        class="btn"
+        [class.btn-danger]="danger"
+        [class.btn-primary]="!danger"
+        (click)="confirm()"
+        [disabled]="loading">
+        {{ loading ? 'Aguarde...' : confirmLabel }}
+      </button>
+    </div>
+  </div>
+</div>

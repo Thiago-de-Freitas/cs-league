@@ -57,6 +57,7 @@ function formatLeague(league: NonNullable<Awaited<ReturnType<typeof getLeagueWit
       id: lt.team.id,
       name: lt.team.name,
       tag: lt.team.tag,
+      ownerId: lt.team.ownerId,
       wins: lt.wins,
       losses: lt.losses,
       points: lt.points,
@@ -302,6 +303,42 @@ router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Respon
   }
 });
 
+router.post('/:id/unarchive', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.status !== 'ARCHIVED') {
+      res.status(400).json({ error: 'Esta liga não está arquivada' });
+      return;
+    }
+
+    await prisma.$executeRaw`
+      UPDATE "League"
+      SET status = 'COMPLETED'::"LeagueStatus", "updatedAt" = NOW()
+      WHERE id = ${req.params.id}
+    `;
+
+    const league = await prisma.league.findUnique({ where: { id: req.params.id } });
+    if (!league) {
+      res.status(404).json({ error: 'Liga não encontrada' });
+      return;
+    }
+
+    res.json({
+      id: league.id,
+      status: league.status.toLowerCase(),
+      message: 'Liga desarquivada com sucesso',
+    });
+  } catch (err) {
+    console.error('POST /api/leagues/:id/unarchive', err);
+    res.status(500).json({ error: 'Erro ao desarquivar liga' });
+  }
+});
+
 router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
@@ -400,6 +437,33 @@ router.delete('/:id/teams/:teamId', authMiddleware, async (req: AuthRequest, res
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao remover time da liga' });
+  }
+});
+
+router.get('/:id/available-teams', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    const inLeague = await prisma.leagueTeam.findMany({
+      where: { leagueId: req.params.id },
+      select: { teamId: true },
+    });
+    const excludeIds = inLeague.map((lt) => lt.teamId);
+
+    const teams = await prisma.team.findMany({
+      where: excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {},
+      select: { id: true, name: true, tag: true },
+      orderBy: { name: 'asc' },
+    });
+
+    res.json(teams);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar times disponíveis' });
   }
 });
 

@@ -241,15 +241,35 @@
 
 @media (max-width: 768px) {
   .bracket-column {
-    min-width: 180px;
+    min-width: 160px;
   }
 
   .bracket-tree {
-    gap: 2rem;
+    gap: 1.5rem;
   }
 
   .bracket-column:not(.is-last) .bracket-match::after {
-    width: 2rem;
-    right: -2rem;
+    width: 1.5rem;
+    right: -1.5rem;
+  }
+
+  .bracket-scroll {
+    padding: 1rem 0.5rem 1.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .team-row {
+    font-size: 0.8rem;
+    padding: 0.45rem 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bracket-column {
+    min-width: 140px;
+  }
+
+  .round-label {
+    font-size: 0.65rem;
   }
 }

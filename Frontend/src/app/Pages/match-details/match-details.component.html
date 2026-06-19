@@ -13,8 +13,9 @@
       </div>
       <div class="match-actions">
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
-        <button class="btn btn-primary btn-small" (click)="goToUpload()">Enviar Demo</button>
+        <button class="btn btn-primary btn-small" (click)="openUploadModal()">Enviar Demo</button>
       </div>
+      <p *ngIf="pollingDemo" class="meta mt-2">Processando demo...</p>
     </div>
 
     <div *ngIf="match?.demos && match!.demos!.length > 0 && !loading" class="gc-card mt-4">
@@ -23,6 +24,7 @@
         <li *ngFor="let demo of match!.demos" class="gc-list-item demo-list-item">
           <div class="demo-info">
             <span class="demo-name">{{ demo.fileName }}</span>
+            <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
             <span class="badge status-{{ demo.status }}">{{ getStatusLabel(demo.status) }}</span>
           </div>
           <button
@@ -51,6 +53,7 @@
 
     <div *ngIf="stats.length > 0 && !loading" class="gc-card mt-4">
       <h2 class="section-title">Performance dos Jogadores</h2>
+      <p class="meta mb-2" *ngIf="match?.demos && match!.demos!.length > 1">Stats consolidadas de {{ match!.demos!.length }} demos</p>
       <div class="table-container">
         <table class="stats-table">
           <thead>
@@ -81,7 +84,15 @@
 
     <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView" class="not-found-message">
       <p>Nenhuma demo associada. Envie um arquivo .dem para ver as estatísticas.</p>
-      <button class="btn btn-primary mt-4" (click)="goToUpload()">Enviar Demo</button>
+      <button class="btn btn-primary mt-4" (click)="openUploadModal()">Enviar Demo</button>
     </div>
   </div>
 </div>
+
+<app-demo-upload-modal
+  *ngIf="showUploadModal && match"
+  [prefillLeagueId]="match.leagueId"
+  [prefillMatchId]="match.id"
+  (closed)="closeUploadModal()"
+  (uploaded)="onDemoUploaded($event)">
+</app-demo-upload-modal>

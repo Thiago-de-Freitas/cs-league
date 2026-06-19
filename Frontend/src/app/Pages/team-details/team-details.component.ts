@@ -5,11 +5,12 @@ import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { TeamService } from '../../Services/team.service';
 import { AuthService } from '../../Services/auth.service';
 import { Team, TeamInvite, User } from '../../Models/interfaces';
+import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 
 @Component({
   selector: 'app-team-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, ConfirmModalComponent],
   templateUrl: './team-details.component.html',
   styleUrls: ['./team-details.component.css']
 })
@@ -25,6 +26,7 @@ export class TeamDetailsComponent implements OnInit {
   inviteMsg = '';
   inviteError = '';
   deletingTeam = false;
+  showDeleteConfirm = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -51,8 +53,12 @@ export class TeamDetailsComponent implements OnInit {
         this.isOwner = this.authService.isTeamOwner(team.ownerId || '');
         this.loading = false;
       },
-      error: () => {
-        this.errorMsg = 'Time não encontrado.';
+      error: (err) => {
+        if (err.status === 403) {
+          this.errorMsg = 'Você não tem permissão para acessar este time.';
+        } else {
+          this.errorMsg = 'Time não encontrado.';
+        }
         this.loading = false;
       }
     });
@@ -106,14 +112,25 @@ export class TeamDetailsComponent implements OnInit {
   }
 
   deleteTeam(): void {
-    if (!this.teamId || !confirm('Excluir este time permanentemente? Esta ação não pode ser desfeita.')) return;
+    this.showDeleteConfirm = true;
+  }
+
+  confirmDeleteTeam(): void {
+    if (!this.teamId) return;
     this.deletingTeam = true;
     this.teamService.deleteTeam(this.teamId).subscribe({
       next: () => this.router.navigate(['/create-team']),
       error: (err) => {
         this.deletingTeam = false;
+        this.showDeleteConfirm = false;
         alert(err.error?.error || 'Erro ao excluir time');
       }
     });
+  }
+
+  cancelDeleteTeam(): void {
+    if (!this.deletingTeam) {
+      this.showDeleteConfirm = false;
+    }
   }
 }

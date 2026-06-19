@@ -67,6 +67,7 @@ export interface Match {
   playedAt?: string | null;
   league?: { id: string; name: string; ownerId: string; maxTeams?: number };
   demos?: Demo[];
+  aggregatedStats?: MatchPlayerStat[];
 }
 
 export interface Demo {

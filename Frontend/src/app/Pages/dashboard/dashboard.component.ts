@@ -7,11 +7,13 @@ import { AuthService } from '../../Services/auth.service';
 import { League, Team } from '../../Models/interfaces';
 import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
 import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/create-team-modal/create-team-modal.component';
+import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
+import { Demo } from '../../Models/interfaces';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent],
+  imports: [CommonModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent, DemoUploadModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -22,6 +24,8 @@ export class DashboardComponent implements OnInit {
   userName = '';
   showCreateLeagueModal = false;
   showCreateTeamModal = false;
+  showUploadModal = false;
+  showArchivedLeagues = false;
 
   constructor(
     private leagueService: LeagueService,
@@ -39,7 +43,7 @@ export class DashboardComponent implements OnInit {
 
   loadData(): void {
     this.loading = true;
-    this.leagueService.getLeagues().subscribe({
+    this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
       next: (leagues) => {
         this.leagues = leagues;
         this.loading = false;
@@ -49,6 +53,25 @@ export class DashboardComponent implements OnInit {
     this.teamService.getTeams().subscribe({
       next: (teams) => (this.teams = teams)
     });
+  }
+
+  toggleArchivedLeagues(): void {
+    this.showArchivedLeagues = !this.showArchivedLeagues;
+    this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
+      next: (leagues) => (this.leagues = leagues)
+    });
+  }
+
+  openUploadModal(): void {
+    this.showUploadModal = true;
+  }
+
+  closeUploadModal(): void {
+    this.showUploadModal = false;
+  }
+
+  onDemoUploaded(_demo: Demo): void {
+    this.showUploadModal = false;
   }
 
   openCreateLeagueModal(): void {

@@ -107,6 +107,17 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: 'Time não encontrado' });
       return;
     }
+
+    const userId = req.user!.userId;
+    const isMember = team.ownerId === userId
+      || team.members.some((m) => m.userId === userId)
+      || req.user!.role === 'ADMIN';
+
+    if (!isMember) {
+      res.status(403).json({ error: 'Sem permissão para acessar este time' });
+      return;
+    }
+
     res.json(formatTeam(team));
   } catch (err) {
     console.error(err);

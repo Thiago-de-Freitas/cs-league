@@ -1,5 +1,6 @@
 /* Tokens carregados via import para garantir bundle único no dev server */
 @import './theme/tokens.css';
+@import './theme/responsive.css';
 
 /* ===== CS League — Estilos globais (tokens em theme/tokens.css) ===== */
 
@@ -256,6 +257,15 @@ h1, h2, h3, .display-title {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1.25rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 .gc-card-title {
   font-family: var(--font-display);
@@ -641,10 +651,90 @@ h1, h2, h3, .display-title {
   border-color: var(--gc-orange);
   color: var(--gc-orange);
 }
+
+/* Menu mobile */
+.gc-nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.gc-nav-toggle-bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--gc-text);
+  border-radius: 1px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.gc-nav-toggle-bar.is-open:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.gc-nav-toggle-bar.is-open:nth-child(2) {
+  opacity: 0;
+}
+
+.gc-nav-toggle-bar.is-open:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
 @media (max-width: 768px) {
-  .gc-navbar { height: auto; }
-  .gc-navbar-inner { flex-direction: column; padding: 0.75rem 1rem; gap: 0.75rem; }
-  .gc-nav-links { flex-wrap: wrap; justify-content: center; }
+  .gc-navbar {
+    height: auto;
+    position: sticky;
+  }
+
+  .gc-navbar-inner {
+    flex-wrap: wrap;
+    padding: 0.65rem 1rem;
+    gap: 0;
+  }
+
+  .gc-nav-toggle {
+    display: flex;
+    margin-left: auto;
+  }
+
+  .gc-nav-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    gap: 0.25rem;
+    padding: 0.75rem 0 0.25rem;
+    border-top: 1px solid var(--gc-border);
+    margin-top: 0.65rem;
+  }
+
+  .gc-nav-links.is-open {
+    display: flex;
+  }
+
+  .gc-nav-links li {
+    width: 100%;
+  }
+
+  .gc-nav-links a,
+  .gc-nav-logout {
+    display: block;
+    width: 100%;
+    text-align: left;
+    margin-left: 0 !important;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .gc-nav-cta {
+    text-align: center !important;
+  }
 }
 
 /* ===== Scrollbar ===== */

@@ -81,6 +81,14 @@ export class AuthService {
     return user?.role === 'ADMIN' || user?.id === teamOwnerId;
   }
 
+  canManageTeam(team: { ownerId?: string; players?: { id: string }[] }): boolean {
+    const user = this.currentUserSubject.value;
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+    if (team.ownerId && user.id === team.ownerId) return true;
+    return team.players?.some((p) => p.id === user.id) ?? false;
+  }
+
   private setSession(res: AuthResponse): void {
     localStorage.setItem(TOKEN_KEY, res.token);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));

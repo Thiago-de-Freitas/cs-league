@@ -13,7 +13,12 @@
     <section class="dashboard-card gc-card">
       <div class="gc-card-header">
         <h2 class="gc-card-title">Minhas Ligas</h2>
-        <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
+        <div class="header-actions">
+          <button type="button" class="btn btn-ghost btn-small" (click)="toggleArchivedLeagues()">
+            {{ showArchivedLeagues ? 'Ocultar arquivadas' : 'Ver arquivadas' }}
+          </button>
+          <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
+        </div>
       </div>
       <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
         <li *ngFor="let league of leagues" class="gc-list-item">
@@ -47,7 +52,7 @@
     <section class="dashboard-card gc-card">
       <h2 class="gc-card-title">Análise de Demos</h2>
       <p class="meta mb-4">Envie arquivos .dem e obtenha estatísticas detalhadas: K/D, ADR, HS% e KAST.</p>
-      <a routerLink="/demo-upload" class="btn btn-success w-full">Upload de Demo</a>
+      <button type="button" class="btn btn-success w-full" (click)="openUploadModal()">Enviar Demo</button>
     </section>
   </div>
 </div>
@@ -63,3 +68,9 @@
   (closed)="closeCreateTeamModal()"
   (created)="onTeamCreated($event)">
 </app-create-team-modal>
+
+<app-demo-upload-modal
+  *ngIf="showUploadModal"
+  (closed)="closeUploadModal()"
+  (uploaded)="onDemoUploaded($event)">
+</app-demo-upload-modal>

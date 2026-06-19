@@ -34,6 +34,7 @@ export class DemoUploadModalComponent implements OnInit {
   selectedMatchId = '';
   matches: Match[] = [];
   hasSteamId = false;
+  existingDemoNames = new Set<string>();
 
   constructor(
     private demoService: DemoService,
@@ -44,6 +45,16 @@ export class DemoUploadModalComponent implements OnInit {
   ngOnInit(): void {
     this.authService.currentUser$.subscribe((user) => {
       this.hasSteamId = !!user?.steamId?.trim();
+    });
+
+    this.demoService.listDemos().subscribe({
+      next: (demos) => {
+        this.existingDemoNames = new Set(
+          demos
+            .filter((d) => d.status !== 'failed')
+            .map((d) => d.fileName.toLowerCase())
+        );
+      }
     });
 
     this.leagueService.getLeagues().subscribe({
@@ -88,8 +99,14 @@ export class DemoUploadModalComponent implements OnInit {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
-      this.selectedFile = input.files[0];
+      const file = input.files[0];
+      this.selectedFile = file;
       this.errorMsg = '';
+      if (this.existingDemoNames.has(file.name.toLowerCase())) {
+        this.errorMsg = 'Este arquivo de demo já foi enviado.';
+        this.selectedFile = null;
+        input.value = '';
+      }
     }
   }
 
@@ -173,6 +190,7 @@ export class DemoUploadModalComponent implements OnInit {
     }).subscribe({
       next: (demo) => {
         this.uploading = false;
+        this.existingDemoNames.add(demo.fileName.toLowerCase());
         this.uploaded.emit(demo);
       },
       error: (err) => {

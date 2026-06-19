@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { tryCompleteLeague } from '../lib/leagueComplete';
+import { aggregateMatchStats } from '../lib/matchStats';
 
 const router = Router();
 
@@ -62,10 +63,12 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         id: d.id,
         fileName: d.fileName,
         status: d.status.toLowerCase(),
+        isPersonal: d.isPersonal,
         errorMessage: d.errorMessage,
         stats: d.stats,
         createdAt: d.createdAt,
       })),
+      aggregatedStats: aggregateMatchStats(match.demos),
     });
   } catch (err) {
     console.error(err);

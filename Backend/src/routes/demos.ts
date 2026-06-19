@@ -5,7 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
-import { validatePersonalDemoUpload } from '../lib/demoValidation';
+import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload } from '../lib/demoValidation';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -64,9 +64,24 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
 
     const isPersonal = parseIsPersonal(req.body.isPersonal);
     const matchId = req.body.matchId ? String(req.body.matchId) : undefined;
+    const fileName = req.file.originalname;
+
+    const duplicateCheck = await validateDuplicateDemoUpload(req.user!.userId, fileName);
+    if (!duplicateCheck.valid) {
+      fs.unlink(req.file.path, () => {});
+      res.status(400).json({ error: duplicateCheck.error, code: duplicateCheck.code });
+      return;
+    }
 
     if (isPersonal) {
       const validation = await validatePersonalDemoUpload(req.user!.userId, matchId || '');
+      if (!validation.valid) {
+        fs.unlink(req.file.path, () => {});
+        res.status(400).json({ error: validation.error, code: validation.code });
+        return;
+      }
+    } else if (matchId) {
+      const validation = await validateGeneralDemoUpload(matchId);
       if (!validation.valid) {
         fs.unlink(req.file.path, () => {});
         res.status(400).json({ error: validation.error, code: validation.code });

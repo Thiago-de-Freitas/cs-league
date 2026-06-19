@@ -1,0 +1,305 @@
+/* ===== CS League — Responsividade global ===== */
+
+.page-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  width: 100%;
+}
+
+/* ----- Tablet (≤1024px) ----- */
+@media (max-width: 1024px) {
+  .container,
+  .dashboard-hero-inner,
+  .dashboard-grid,
+  .gc-navbar-inner {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .league-detail-container {
+    max-width: 100%;
+    padding: 1rem;
+    margin: 0;
+  }
+}
+
+/* ----- Mobile (≤768px) ----- */
+@media (max-width: 768px) {
+  .page-container {
+    min-height: calc(100vh - 56px);
+    padding: 1rem 0;
+  }
+
+  .page-inner {
+    padding: 0 1rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .page-subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-container {
+    padding: 1rem 0.75rem;
+    align-items: flex-start;
+  }
+
+  .form-wrapper {
+    padding: 1.5rem 1.25rem;
+    border-radius: var(--radius-md);
+  }
+
+  .form-header {
+    font-size: 1.35rem;
+  }
+
+  .gc-card,
+  .dashboard-card,
+  .profile-card,
+  .details-card {
+    padding: 1rem;
+  }
+
+  .gc-card-header,
+  .list-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .header-actions .btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .gc-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+  }
+
+  .gc-list-item:hover {
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .team-list-item,
+  .league-list-item {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .team-info,
+  .league-info {
+    width: 100%;
+  }
+
+  .team-list-item .btn,
+  .league-list-item .btn {
+    width: 100%;
+  }
+
+  .dashboard-hero {
+    padding: 1.5rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .dashboard-hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 0 1rem 1.5rem;
+  }
+
+  .admin-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .admin-actions,
+  .danger-actions,
+  .admin-form,
+  .match-actions,
+  .associate-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .admin-actions .btn,
+  .danger-actions .btn,
+  .admin-form .btn,
+  .match-actions .btn,
+  .associate-actions .btn,
+  .admin-form .input-field,
+  .admin-form select {
+    width: 100%;
+  }
+
+  .gc-modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .gc-modal,
+  .gc-modal-wide {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+  }
+
+  .gc-modal-header {
+    padding: 1rem 1rem 0;
+  }
+
+  .gc-modal-body {
+    padding: 1rem;
+  }
+
+  .gc-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .gc-modal-footer .btn {
+    width: 100%;
+  }
+
+  .upload-mode-options {
+    gap: 0.75rem;
+  }
+
+  .table th,
+  .table td,
+  .stats-table th,
+  .stats-table td,
+  .team-table th,
+  .team-table td {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .match-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.5rem;
+  }
+
+  .match-row .btn {
+    width: 100%;
+  }
+
+  .demo-row {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .demo-row .btn {
+    width: 100%;
+  }
+
+  .team-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .team-stats-row {
+    width: 100%;
+  }
+
+  .bracket-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 1rem;
+  }
+
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 1.5rem;
+  }
+
+  .profile-name {
+    font-size: 1.25rem;
+  }
+
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -0.25rem;
+  }
+
+  .main-content {
+    min-height: calc(100vh - 56px);
+  }
+}
+
+/* ----- Mobile pequeno (≤480px) ----- */
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 1.3rem;
+  }
+
+  .btn {
+    font-size: 0.8rem;
+    padding: 0.55rem 1rem;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .btn-small {
+    font-size: 0.75rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .gc-logo-text {
+    font-size: 1.15rem;
+  }
+
+  .form-wrapper {
+    padding: 1.25rem 1rem;
+  }
+
+  .vs {
+    display: block;
+    margin: 0.25rem 0;
+    font-size: 1rem;
+  }
+
+  .match-meta {
+    gap: 0.5rem;
+  }
+
+  .badge,
+  .status-badge {
+    font-size: 0.65rem;
+  }
+}

@@ -1,7 +1,8 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDragDrop, CdkDrag, CdkDropList, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, CdkDropList, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Team } from '../../Models/interfaces';
+import { AuthService } from '../../Services/auth.service';
 
 @Component({
   selector: 'app-league-teams-table',
@@ -20,11 +21,11 @@ import { Team } from '../../Models/interfaces';
       <th>Vitórias</th>
       <th>Derrotas</th>
       <th>Pontos</th>
-      <th>Ações</th>
+      <th *ngIf="showActionsColumn">Ações</th>
     </tr>
   </thead>
-  <tbody cdkDropList (cdkDropListDropped)="onDrop($event)">
-    <tr *ngFor="let team of teams; let i = index" cdkDrag>
+  <tbody cdkDropList [cdkDropListDisabled]="!canManageLeague" (cdkDropListDropped)="onDrop($event)">
+    <tr *ngFor="let team of teams; let i = index" cdkDrag [cdkDragDisabled]="!canManageLeague">
       <td>{{ team.seed ?? (i + 1) }}</td>
       <td>
         <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do time" width="32" height="32">
@@ -33,9 +34,10 @@ import { Team } from '../../Models/interfaces';
       <td>{{ team.wins }}</td>
       <td>{{ team.losses }}</td>
       <td>{{ team.points }}</td>
-      <td>
-        <button (click)="editTeam.emit(team)">Editar</button>
-        <button (click)="removeTeam.emit(team.id)">Remover</button>
+      <td *ngIf="showActionsColumn">
+        <button *ngIf="canEditTeam(team)" (click)="editTeam.emit(team)">Editar</button>
+        <button *ngIf="canManageLeague" (click)="removeTeam.emit(team.id)">Remover</button>
+        <span *ngIf="!canEditTeam(team) && !canManageLeague" class="meta">—</span>
       </td>
     </tr>
   </tbody>
@@ -45,11 +47,23 @@ import { Team } from '../../Models/interfaces';
 })
 export class LeagueTeamsTableComponent {
   @Input() teams: Team[] = [];
+  @Input() canManageLeague = false;
   @Output() teamsReordered = new EventEmitter<Team[]>();
   @Output() editTeam = new EventEmitter<Team>();
   @Output() removeTeam = new EventEmitter<string>();
 
+  constructor(private authService: AuthService) {}
+
+  get showActionsColumn(): boolean {
+    return this.canManageLeague || this.teams.some((t) => this.canEditTeam(t));
+  }
+
+  canEditTeam(team: Team): boolean {
+    return this.authService.canManageTeam(team);
+  }
+
   onDrop(event: CdkDragDrop<Team[]>) {
+    if (!this.canManageLeague) return;
     moveItemInArray(this.teams, event.previousIndex, event.currentIndex);
     this.teams.forEach((team, idx) => team.seed = idx + 1);
     this.teamsReordered.emit(this.teams);

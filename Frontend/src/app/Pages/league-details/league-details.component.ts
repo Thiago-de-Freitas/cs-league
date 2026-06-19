@@ -7,10 +7,18 @@ import { League, Team, Match } from '../../Models/interfaces';
 import { LeagueService } from '../../Services/league.service';
 import { AuthService } from '../../Services/auth.service';
 import { MatchService } from '../../Services/match.service';
-import { TeamService } from '../../Services/team.service';
 import { LeagueTeamsTableComponent } from './league-teams-table.component';
 import { LeagueBracketComponent } from '../../Components/league-bracket/league-bracket.component';
+import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
+
+interface ConfirmConfig {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onConfirm: () => void;
+}
 
 @Component({
   selector: 'app-league-details',
@@ -23,6 +31,7 @@ import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
     FormsModule,
     LeagueTeamsTableComponent,
     LeagueBracketComponent,
+    ConfirmModalComponent,
   ],
   templateUrl: './league-details.component.html',
   styleUrls: ['./league-details.component.css'],
@@ -40,20 +49,22 @@ export class LeagueDetailsComponent implements OnInit {
   matchTeam1Id = '';
   matchTeam2Id = '';
   matchMap = '';
-  availableTeams: Team[] = [];
+  availableTeams: Pick<Team, 'id' | 'name' | 'tag'>[] = [];
   bracketSizes = ALLOWED_BRACKET_SIZES;
   editMaxTeams = false;
   newMaxTeams = 8;
   generatingBracket = false;
   deletingLeague = false;
   archivingLeague = false;
+  unarchivingLeague = false;
+  confirmConfig: ConfirmConfig | null = null;
+  confirmLoading = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private leagueService: LeagueService,
     private matchService: MatchService,
-    private teamService: TeamService,
     private authService: AuthService
   ) {}
 
@@ -134,16 +145,21 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   openAddTeam(): void {
+    if (!this.leagueId) return;
     if (this.teamsAtCapacity) {
       alert(`Limite de ${this.league?.maxTeams} times atingido.`);
       return;
     }
     this.showAddTeam = true;
     this.selectedTeamIds = [];
-    this.teamService.getTeams().subscribe({
+    this.availableTeams = [];
+    this.leagueService.getAvailableTeams(this.leagueId).subscribe({
       next: (teams) => {
-        const inLeague = new Set(this.league?.teams.map((t) => t.id) || []);
-        this.availableTeams = teams.filter((t) => !inLeague.has(t.id));
+        this.availableTeams = teams;
+      },
+      error: () => {
+        alert('Erro ao carregar times disponíveis.');
+        this.showAddTeam = false;
       }
     });
   }
@@ -211,15 +227,33 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   onEditTeam(team: Team): void {
+    if (!this.authService.canManageTeam(team)) return;
     this.router.navigate(['/team-details', team.id]);
   }
 
   onRemoveTeam(teamId: string): void {
-    if (!this.leagueId || !confirm('Remover este time da liga?')) return;
-    this.leagueService.removeTeamFromLeague(this.leagueId, teamId).subscribe({
-      next: (league) => (this.league = league),
-      error: (err) => alert(err.error?.error || 'Erro ao remover time')
-    });
+    if (!this.leagueId) return;
+    this.confirmConfig = {
+      title: 'Remover time',
+      message: 'Remover este time da liga?',
+      confirmLabel: 'Remover',
+      danger: true,
+      onConfirm: () => {
+        this.confirmLoading = true;
+        this.leagueService.removeTeamFromLeague(this.leagueId!, teamId).subscribe({
+          next: (league) => {
+            this.league = league;
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+          },
+          error: (err) => {
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+            alert(err.error?.error || 'Erro ao remover time');
+          }
+        });
+      }
+    };
   }
 
   goToMatch(matchId: string): void {
@@ -227,27 +261,95 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   deleteLeague(): void {
-    if (!this.leagueId || !confirm('Excluir esta liga permanentemente? Esta ação não pode ser desfeita.')) return;
-    this.deletingLeague = true;
-    this.leagueService.deleteLeague(this.leagueId).subscribe({
-      next: () => this.router.navigate(['/create-league']),
-      error: (err) => {
-        this.deletingLeague = false;
-        alert(err.error?.error || 'Erro ao excluir liga');
+    if (!this.leagueId) return;
+    this.confirmConfig = {
+      title: 'Excluir liga',
+      message: 'Excluir esta liga permanentemente? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir',
+      danger: true,
+      onConfirm: () => {
+        this.confirmLoading = true;
+        this.deletingLeague = true;
+        this.leagueService.deleteLeague(this.leagueId!).subscribe({
+          next: () => this.router.navigate(['/create-league']),
+          error: (err) => {
+            this.deletingLeague = false;
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+            alert(err.error?.error || 'Erro ao excluir liga');
+          }
+        });
       }
-    });
+    };
   }
 
   archiveLeague(): void {
-    if (!this.leagueId || !confirm('Arquivar esta liga? Ela deixará de aparecer na página inicial.')) return;
-    this.archivingLeague = true;
-    this.leagueService.archiveLeague(this.leagueId).subscribe({
-      next: () => this.router.navigate(['/dashboard']),
-      error: (err) => {
-        this.archivingLeague = false;
-        alert(err.error?.error || 'Erro ao arquivar liga');
+    if (!this.leagueId) return;
+    this.confirmConfig = {
+      title: 'Arquivar liga',
+      message: 'Arquivar esta liga? Ela deixará de aparecer na página inicial.',
+      confirmLabel: 'Arquivar',
+      onConfirm: () => {
+        this.confirmLoading = true;
+        this.archivingLeague = true;
+        this.leagueService.archiveLeague(this.leagueId!).subscribe({
+          next: () => this.router.navigate(['/dashboard']),
+          error: (err) => {
+            this.archivingLeague = false;
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+            alert(err.error?.error || 'Erro ao arquivar liga');
+          }
+        });
       }
-    });
+    };
+  }
+
+  unarchiveLeague(): void {
+    if (!this.leagueId) return;
+    this.confirmConfig = {
+      title: 'Desarquivar liga',
+      message: 'Desarquivar esta liga? Ela voltará a aparecer na página inicial.',
+      confirmLabel: 'Desarquivar',
+      onConfirm: () => {
+        this.confirmLoading = true;
+        this.unarchivingLeague = true;
+        this.leagueService.unarchiveLeague(this.leagueId!).subscribe({
+          next: () => {
+            this.fetchLeagueDetails(this.leagueId!);
+            this.unarchivingLeague = false;
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+          },
+          error: (err) => {
+            this.unarchivingLeague = false;
+            this.confirmLoading = false;
+            this.confirmConfig = null;
+            alert(err.error?.error || 'Erro ao desarquivar liga');
+          }
+        });
+      }
+    };
+  }
+
+  onConfirmAction(): void {
+    this.confirmConfig?.onConfirm();
+  }
+
+  closeConfirm(): void {
+    if (!this.confirmLoading) {
+      this.confirmConfig = null;
+    }
+  }
+
+  getMatchStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      scheduled: 'Agendada',
+      in_progress: 'Em andamento',
+      completed: 'Finalizada',
+      cancelled: 'Cancelada',
+    };
+    return labels[status] || status;
   }
 
   getStatusLabel(status: string): string {
