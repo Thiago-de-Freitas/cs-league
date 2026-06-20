@@ -11,7 +11,7 @@ import matchRoutes from './routes/matches';
 import demoRoutes from './routes/demos';
 import rankingsRoutes from './routes/rankings';
 import { prisma } from './lib/prisma';
-import { redis } from './lib/redis';
+import { redis, connectRedis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
 import { validateProductionEnv } from './lib/env';
@@ -126,11 +126,18 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`API rodando em http://${HOST}:${PORT}`);
+  void connectRedis();
 });
 
 function shutdown() {
-  server.close(() => {
-    prisma.$disconnect().finally(() => process.exit(0));
+  server.close(async () => {
+    try {
+      await redis.quit();
+    } catch {
+      redis.disconnect();
+    }
+    await prisma.$disconnect();
+    process.exit(0);
   });
 }
 
