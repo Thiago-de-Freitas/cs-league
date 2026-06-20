@@ -48,7 +48,7 @@ Guia para publicar a plataforma CS League na [Railway](https://railway.app) com 
 | Variável | Obrigatória | Valor / origem |
 |----------|-------------|----------------|
 | `DATABASE_URL` | Sim | Referência `${{Postgres.DATABASE_URL}}` |
-| `REDIS_URL` | Sim | Referência `${{Redis.REDIS_URL}}` |
+| `REDIS_URL` | Sim | `${{Redis.REDIS_URL}}` — referência ao plugin Redis (**não** `redis://redis:6379`) |
 | `JWT_SECRET` | Sim | String longa e aleatória (ex.: `openssl rand -hex 32`) |
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
@@ -65,6 +65,21 @@ Guia para publicar a plataforma CS League na [Railway](https://railway.app) com 
 
 5. Atualize `CORS_ORIGIN` com a URL gerada e redeploy se necessário
 
+#### Configurar `REDIS_URL` corretamente (API e Worker)
+
+O hostname `redis` **só existe** na rede do docker-compose local. Na Railway, use a referência ao plugin:
+
+1. No projeto Railway, confirme que existe um serviço **Redis** (Database → Add Redis, se ainda não tiver).
+2. Abra o serviço **cs-league-api** → aba **Variables**.
+3. Adicione ou edite:
+   - **Name:** `REDIS_URL`
+   - **Value:** `${{Redis.REDIS_URL}}` (digite exatamente; o Railway resolve para algo como `redis://default:senha@redis.railway.internal:6379`)
+4. Repita no serviço **cs-league-worker** com o **mesmo** `REDIS_URL=${{Redis.REDIS_URL}}`.
+5. **Remova** qualquer valor `redis://redis:6379` — isso causa `getaddrinfo ENOTFOUND redis`.
+6. **Redeploy** API e Worker após salvar as variables.
+
+> Dica: ao criar a variable, use **Add Reference** → selecione o serviço Redis → variável `REDIS_URL`.
+
 ### 3. Serviço Worker
 
 1. **New Service** → **GitHub Repo** → mesmo repositório
@@ -75,7 +90,7 @@ Guia para publicar a plataforma CS League na [Railway](https://railway.app) com 
 | Variável | Valor |
 |----------|-------|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
-| `REDIS_URL` | `${{Redis.REDIS_URL}}` |
+| `REDIS_URL` | `${{Redis.REDIS_URL}}` — **não** `redis://redis:6379` (hostname só existe no docker-compose local) |
 | `DEMO_STORAGE_PATH` | `/data/demos` |
 
 5. **Volume**: monte o **mesmo volume** em `/data` (mesmo nome/volume compartilhado entre serviços)
@@ -110,7 +125,7 @@ Para o deploy passar e a aplicação funcionar, configure **todas** estas variá
 | Variável | Obrigatória | Como obter |
 |----------|-------------|------------|
 | `DATABASE_URL` | Sim | `${{Postgres.DATABASE_URL}}` |
-| `REDIS_URL` | Sim | `${{Redis.REDIS_URL}}` |
+| `REDIS_URL` | Sim | `${{Redis.REDIS_URL}}` — **não** `redis://redis:6379` |
 | `JWT_SECRET` | Sim | 32+ chars (`openssl rand -hex 32`) |
 | `CORS_ORIGIN` | Sim | URL pública gerada (ex.: `https://xxx.up.railway.app`) |
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
@@ -128,7 +143,7 @@ Copie de `.env.example`. **Nunca** commite valores reais de `JWT_SECRET` ou senh
 
 ```env
 DATABASE_URL=          # Plugin PostgreSQL
-REDIS_URL=             # Plugin Redis
+REDIS_URL=${{Redis.REDIS_URL}}   # Plugin Redis — NÃO use redis://redis:6379
 JWT_SECRET=            # Obrigatório — gere um valor forte
 DEMO_STORAGE_PATH=/data/demos
 TEAM_LOGO_STORAGE_PATH=/data/team-logos
@@ -187,12 +202,16 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | Build Angular falha (SSL npm) | Node incompatível | Use Node 20 LTS localmente |
 | Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs do **preDeploy** |
 | Connection refused no healthcheck | Processo crashou antes de escutar | Verifique `JWT_SECRET` (32+ chars) e `CORS_ORIGIN` nos logs |
+| `[ioredis] getaddrinfo ENOTFOUND redis` | `REDIS_URL=redis://redis:6379` (valor do docker-compose) | No serviço API e Worker, defina `REDIS_URL=${{Redis.REDIS_URL}}` apontando ao plugin Redis |
+| `[redis] connection failed` nos logs | Plugin Redis ausente ou URL errada | Adicione Redis ao projeto; use `${{Redis.REDIS_URL}}` em ambos os serviços |
 
 ### Logs úteis na Railway
 
 - **`[startup] Variáveis de ambiente ausentes ou inválidas`** — falta `JWT_SECRET`, `CORS_ORIGIN`, `DATABASE_URL` ou `REDIS_URL`
 - **`API rodando em http://0.0.0.0:PORT`** — servidor escutando; healthcheck deve passar
 - **`[health/ready]`** — falha ao conectar Postgres/Redis (não bloqueia o healthcheck principal)
+- **`[startup] REDIS_URL hostname é "redis"`** — variável copiada do docker-compose; troque por `${{Redis.REDIS_URL}}`
+- **`[redis] connection failed: ... check REDIS_URL`** — Redis inacessível; API continua no ar, mas upload de demo falha até corrigir a URL
 
 ## Arquivos relacionados
 
