@@ -35,4 +35,4 @@ COPY --from=frontend-build /app/frontend/dist/cs-league/browser ./public
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["node", "dist/index.js"]

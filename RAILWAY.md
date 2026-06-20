@@ -84,7 +84,7 @@ Guia para publicar a plataforma CS League na [Railway](https://railway.app) com 
 
 ### 4. Migrar banco e seed (opcional)
 
-As migrations rodam automaticamente no start (`prisma migrate deploy`).
+As migrations rodam automaticamente no **preDeploy** (`npx prisma migrate deploy` em `railway.toml`), antes do container subir.
 
 Para dados de teste, use o Railway CLI ou um one-off:
 
@@ -96,9 +96,31 @@ railway run --service cs-league-api npm run db:seed
 
 ### 5. Verificar deploy
 
-1. `GET https://SUA-URL/api/health` → `{ "status": "ok" }`
-2. Abra a URL raiz → frontend Angular
-3. Faça login, envie uma demo → status deve sair de **Aguardando** quando o Worker processar
+1. `GET https://SUA-URL/api/health` → `{ "status": "ok" }` (liveness — processo no ar)
+2. `GET https://SUA-URL/api/health/ready` → `{ "status": "ok" }` (readiness — Postgres + Redis OK)
+3. Abra a URL raiz → frontend Angular
+4. Faça login, envie uma demo → status deve sair de **Aguardando** quando o Worker processar
+
+## Checklist de variáveis (healthcheck)
+
+O healthcheck da Railway usa `GET /api/health`, que responde **200** assim que o Node sobe — **sem** depender de banco ou Redis.
+
+Para o deploy passar e a aplicação funcionar, configure **todas** estas variáveis no serviço API:
+
+| Variável | Obrigatória | Como obter |
+|----------|-------------|------------|
+| `DATABASE_URL` | Sim | `${{Postgres.DATABASE_URL}}` |
+| `REDIS_URL` | Sim | `${{Redis.REDIS_URL}}` |
+| `JWT_SECRET` | Sim | 32+ chars (`openssl rand -hex 32`) |
+| `CORS_ORIGIN` | Sim | URL pública gerada (ex.: `https://xxx.up.railway.app`) |
+| `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
+| `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
+| `NODE_ENV` | Não | `production` (já no Dockerfile) |
+| `PORT` | Não | Injetado automaticamente pela Railway |
+
+Migrations rodam no **preDeploy** (`npx prisma migrate deploy`), antes do container subir. Se a migration falhar, o deploy para e os logs mostram o erro do Prisma — o healthcheck nem chega a rodar.
+
+Use `/api/health/ready` para diagnosticar Postgres/Redis após o deploy.
 
 ## Variáveis de ambiente (resumo)
 
@@ -157,11 +179,20 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 
 | Problema | Causa provável | Ação |
 |----------|----------------|------|
+| Healthcheck falha (replicas unhealthy) | App não sobe (env inválida) ou migration falhou no preDeploy | Veja **Deploy Logs** — erros `[startup]` listam variáveis faltando; erros Prisma indicam `DATABASE_URL` |
+| `/api/health` retorna 503 | Versão antiga checava DB/Redis no health | Redeploy com versão atual: `/api/health` = liveness (200); use `/api/health/ready` para deps |
+| `/api/health/ready` retorna 503 | Postgres ou Redis inacessível | Confira `${{Postgres.DATABASE_URL}}` e `${{Redis.REDIS_URL}}` nas variables |
 | Demo em "Aguardando" | Worker parado ou volume diferente | Verifique logs do Worker e paths `DEMO_STORAGE_PATH` |
-| 503 em `/api/health` | Postgres/Redis inacessível | Confira referências `${{...}}` nas variables |
 | CORS no browser | `CORS_ORIGIN` incorreto | Use a URL pública exata (com `https://`) |
 | Build Angular falha (SSL npm) | Node incompatível | Use Node 20 LTS localmente |
-| Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs no deploy |
+| Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs do **preDeploy** |
+| Connection refused no healthcheck | Processo crashou antes de escutar | Verifique `JWT_SECRET` (32+ chars) e `CORS_ORIGIN` nos logs |
+
+### Logs úteis na Railway
+
+- **`[startup] Variáveis de ambiente ausentes ou inválidas`** — falta `JWT_SECRET`, `CORS_ORIGIN`, `DATABASE_URL` ou `REDIS_URL`
+- **`API rodando em http://0.0.0.0:PORT`** — servidor escutando; healthcheck deve passar
+- **`[health/ready]`** — falha ao conectar Postgres/Redis (não bloqueia o healthcheck principal)
 
 ## Arquivos relacionados
 

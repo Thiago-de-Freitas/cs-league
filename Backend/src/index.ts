@@ -14,14 +14,14 @@ import { prisma } from './lib/prisma';
 import { redis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
+import { validateProductionEnv } from './lib/env';
+
+validateProductionEnv();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
-
-if (isProduction && !corsOriginEnv) {
-  throw new Error('CORS_ORIGIN deve ser definido em produção');
-}
 
 const corsOrigins = (corsOriginEnv || 'http://localhost:4200')
   .split(',')
@@ -32,6 +32,24 @@ const app = express();
 const publicPath = path.join(__dirname, '../public');
 const serveFrontend = process.env.SERVE_FRONTEND === 'true'
   || (isProduction && fs.existsSync(publicPath));
+
+// Liveness — Railway healthcheck; não depende de DB/Redis
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness — dependências externas (Postgres + Redis)
+app.get('/api/health/ready', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    await redis.ping();
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Service unavailable';
+    console.error('[health/ready]', message);
+    res.status(503).json({ status: 'error', message: 'Service unavailable' });
+  }
+});
 
 app.use(securityHeaders);
 
@@ -57,16 +75,6 @@ app.use('/uploads/team-logos', (req, res, next) => {
   }
   next();
 }, express.static(teamLogosPath, { dotfiles: 'deny', index: false }));
-
-app.get('/api/health', async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    await redis.ping();
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  } catch {
-    res.status(503).json({ status: 'error', message: 'Service unavailable' });
-  }
-});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -116,8 +124,8 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`API rodando na porta ${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`API rodando em http://${HOST}:${PORT}`);
 });
 
 function shutdown() {
