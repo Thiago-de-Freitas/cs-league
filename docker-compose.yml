@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-csleague}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-csleague}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-csleague}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-csleague}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,7 +32,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       DEMO_STORAGE_PATH: /data/demos
@@ -51,7 +51,7 @@ services:
       context: ./Worker
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       DEMO_STORAGE_PATH: /data/demos
     volumes:

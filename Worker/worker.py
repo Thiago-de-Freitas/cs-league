@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 import traceback
@@ -21,38 +22,82 @@ POLL_TIMEOUT = 5
 WORKER_DIR = Path(__file__).resolve().parent
 BACKEND_DEMOS = WORKER_DIR.parent / "Backend" / "data" / "demos"
 
+CUID_PATTERN = re.compile(r"^c[a-z0-9]{20,}$", re.IGNORECASE)
+UUID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
-def resolve_demo_path(file_path: str) -> str:
-    normalized = os.path.normpath(file_path)
-    if os.path.isabs(normalized) and os.path.exists(normalized):
-        return normalized
 
-    candidates = []
+def get_demo_storage_dir() -> Path:
     if DEMO_STORAGE_PATH:
         storage = Path(DEMO_STORAGE_PATH)
         if not storage.is_absolute():
             storage = (WORKER_DIR / storage).resolve()
-        candidates.append(str(storage / Path(normalized).name))
-        candidates.append(str(storage / normalized))
+    else:
+        storage = BACKEND_DEMOS.resolve()
+    return storage
 
-    candidates.extend([
-        normalized,
-        os.path.abspath(normalized),
-        str(WORKER_DIR / normalized),
-        str(WORKER_DIR.parent / normalized),
-        str(BACKEND_DEMOS / Path(normalized).name),
-    ])
 
-    if "demos" in normalized.replace("\\", "/"):
-        parts = normalized.replace("\\", "/").split("demos/")
-        if len(parts) > 1:
-            candidates.append(str(BACKEND_DEMOS / parts[-1]))
+def is_valid_demo_id(demo_id: str) -> bool:
+    if not demo_id or len(demo_id) > 64 or "\x00" in demo_id:
+        return False
+    return bool(CUID_PATTERN.match(demo_id) or UUID_PATTERN.match(demo_id))
+
+
+def is_path_inside_base(resolved: Path, base: Path) -> bool:
+    try:
+        resolved.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def resolve_demo_path(file_path: str) -> str | None:
+    if not file_path or "\x00" in file_path:
+        return None
+
+    storage = get_demo_storage_dir()
+    normalized = os.path.normpath(file_path)
+
+    candidates: list[Path] = []
+    if os.path.isabs(normalized):
+        candidates.append(Path(normalized).resolve())
+    else:
+        candidates.append((storage / normalized).resolve())
+
+    candidates.append((storage / Path(normalized).name).resolve())
 
     for candidate in candidates:
-        if candidate and os.path.exists(candidate):
-            return os.path.normpath(candidate)
+        if not is_path_inside_base(candidate, storage):
+            continue
+        if candidate.is_file():
+            return str(candidate)
 
-    return normalized
+    return None
+
+
+def parse_job_payload(payload: str) -> tuple[str, str] | None:
+    try:
+        job = json.loads(payload)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    if not isinstance(job, dict):
+        return None
+
+    demo_id = job.get("demoId")
+    file_path = job.get("filePath")
+    if not isinstance(demo_id, str) or not isinstance(file_path, str):
+        return None
+    if not is_valid_demo_id(demo_id):
+        return None
+
+    resolved = resolve_demo_path(file_path)
+    if not resolved:
+        return None
+
+    return demo_id, resolved
 
 
 def create_redis_client():
@@ -299,7 +344,12 @@ def parse_demo(file_path: str) -> list[dict]:
 
 
 def process_job(demo_id: str, file_path: str):
-    file_path = resolve_demo_path(file_path)
+    resolved = resolve_demo_path(file_path)
+    if not resolved:
+        update_demo_status(demo_id, "FAILED", "Arquivo da demo inválido ou fora do diretório permitido.")
+        return
+
+    file_path = resolved
     print(f"Processando demo {demo_id}: {file_path}")
     update_demo_status(demo_id, "PROCESSING")
 
@@ -346,9 +396,12 @@ def main():
                 continue
 
             _, payload = result
-            job = json.loads(payload)
-            demo_id = job["demoId"]
-            file_path = job["filePath"]
+            parsed = parse_job_payload(payload)
+            if not parsed:
+                print("Job Redis inválido ou rejeitado por segurança — ignorando")
+                continue
+
+            demo_id, file_path = parsed
 
             try:
                 process_job(demo_id, file_path)

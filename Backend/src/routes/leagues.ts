@@ -8,6 +8,7 @@ import {
   rankTeamsForSeeding,
 } from '../lib/bracket';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
+import { canUserAccessLeague } from '../lib/leaguePermissions';
 
 const router = Router();
 
@@ -157,6 +158,12 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const access = await canUserAccessLeague(req.user!.userId, req.user!.role, req.params.id);
+    if (!access.allowed) {
+      res.status(access.error === 'Liga não encontrada.' ? 404 : 403).json({ error: access.error });
+      return;
+    }
+
     const league = await getLeagueWithDetails(req.params.id);
     if (!league) {
       res.status(404).json({ error: 'Liga não encontrada' });
@@ -194,7 +201,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
-        status: status?.toUpperCase() || 'UPCOMING',
+        status: req.user!.role === 'ADMIN' && status?.toUpperCase()
+          ? status.toUpperCase()
+          : 'UPCOMING',
       },
     });
 
@@ -487,6 +496,12 @@ router.get('/:id/available-teams', authMiddleware, async (req: AuthRequest, res:
 
 router.get('/:id/standings', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const access = await canUserAccessLeague(req.user!.userId, req.user!.role, req.params.id);
+    if (!access.allowed) {
+      res.status(access.error === 'Liga não encontrada.' ? 404 : 403).json({ error: access.error });
+      return;
+    }
+
     const standings = await prisma.leagueTeam.findMany({
       where: { leagueId: req.params.id },
       include: { team: { select: { id: true, name: true, tag: true } } },

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
 
@@ -19,7 +20,12 @@ const logoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, logoStoragePath),
     filename: (_req, file, cb) => {
-      cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`);
+      const ext = sanitizeFileExtension(file.originalname, ['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+      if (!ext) {
+        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'));
+        return;
+      }
+      cb(null, `${uuidv4()}${ext}`);
     },
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
@@ -41,7 +47,10 @@ function publicLogoUrl(fileName: string): string {
 function logoFilePathFromUrl(logoUrl: string | null): string | null {
   if (!logoUrl?.startsWith('/uploads/team-logos/')) return null;
   const fileName = path.basename(logoUrl);
-  return path.join(logoStoragePath, fileName);
+  if (fileName.includes('..') || fileName.includes('\0')) return null;
+  const resolved = path.join(logoStoragePath, fileName);
+  if (!isPathInsideBase(resolved, logoStoragePath)) return null;
+  return resolved;
 }
 
 function deleteLogoFile(logoUrl: string | null): void {
@@ -214,9 +223,29 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 
     const { name, tag } = req.body;
+    const data: { name?: string; tag?: string } = {};
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 100) {
+        res.status(400).json({ error: 'Nome inválido' });
+        return;
+      }
+      data.name = name.trim();
+    }
+    if (tag !== undefined) {
+      if (typeof tag !== 'string' || !tag.trim() || tag.length > 10) {
+        res.status(400).json({ error: 'Tag inválida' });
+        return;
+      }
+      data.tag = tag.trim();
+    }
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'Nenhum campo válido para atualizar' });
+      return;
+    }
+
     await prisma.team.update({
       where: { id: req.params.id },
-      data: { ...(name && { name }), ...(tag && { tag }) },
+      data,
     });
 
     const full = await getTeamWithDetails(req.params.id);

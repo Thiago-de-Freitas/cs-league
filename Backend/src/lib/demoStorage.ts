@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { isPathInsideBase } from './pathSafe';
 
 /** Caminho absoluto e estável para armazenamento de demos (independente do cwd). */
 export function getDemoStoragePath(): string {
@@ -17,17 +18,30 @@ export function getDemoStoragePath(): string {
   return base;
 }
 
-/** Garante caminho absoluto para o worker localizar o arquivo. */
+/**
+ * Resolve caminho absoluto da demo garantindo que permaneça dentro do storage.
+ * Lança erro se houver tentativa de path traversal.
+ */
 export function resolveDemoFilePath(filePath: string): string {
-  if (path.isAbsolute(filePath)) {
-    return path.normalize(filePath);
-  }
-
   const storage = getDemoStoragePath();
-  const fromStorage = path.resolve(storage, filePath);
-  if (fs.existsSync(fromStorage)) {
-    return fromStorage;
+  const normalized = path.normalize(filePath);
+
+  const resolved = path.isAbsolute(normalized)
+    ? path.resolve(normalized)
+    : path.resolve(storage, normalized);
+
+  if (!isPathInsideBase(resolved, storage)) {
+    throw new Error('Caminho de demo inválido');
   }
 
-  return path.resolve(process.cwd(), filePath);
+  return resolved;
+}
+
+/** Variante segura que retorna null em vez de lançar (para leitura defensiva). */
+export function tryResolveDemoFilePath(filePath: string): string | null {
+  try {
+    return resolveDemoFilePath(filePath);
+  } catch {
+    return null;
+  }
 }

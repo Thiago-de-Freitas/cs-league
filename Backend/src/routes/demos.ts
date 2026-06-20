@@ -13,7 +13,8 @@ import {
   canUserViewDemo,
 } from '../lib/demoValidation';
 import { buildPersonalStatsOverview } from '../lib/personalStats';
-import { getDemoStoragePath, resolveDemoFilePath } from '../lib/demoStorage';
+import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from '../lib/demoStorage';
+import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -23,8 +24,12 @@ const storagePath = getDemoStoragePath();
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, storagePath),
   filename: (_req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
+    const ext = sanitizeFileExtension(file.originalname, ['.dem']);
+    if (!ext) {
+      cb(new Error('Apenas arquivos .dem são permitidos'));
+      return;
+    }
+    cb(null, `${uuidv4()}${ext}`);
   },
 });
 
@@ -278,12 +283,11 @@ router.post('/:id/reprocess', authMiddleware, async (req: AuthRequest, res: Resp
       return;
     }
 
-    if (!fs.existsSync(resolveDemoFilePath(demo.filePath))) {
+    const absolutePath = tryResolveDemoFilePath(demo.filePath);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
       res.status(400).json({ error: 'Arquivo da demo não encontrado no servidor' });
       return;
     }
-
-    const absolutePath = resolveDemoFilePath(demo.filePath);
 
     await prisma.demo.update({
       where: { id: demo.id },
@@ -329,8 +333,8 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       return;
     }
 
-    const filePath = resolveDemoFilePath(demo.filePath);
-    if (fs.existsSync(filePath)) {
+    const filePath = tryResolveDemoFilePath(demo.filePath);
+    if (filePath && fs.existsSync(filePath)) {
       fs.unlink(filePath, () => {});
     }
 
