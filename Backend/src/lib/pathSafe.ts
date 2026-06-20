@@ -37,7 +37,9 @@ export function isValidResourceId(value: string): boolean {
 /** Rejeita segmentos de path perigosos em URLs de upload estático. */
 export function isSafeStaticRequestPath(requestPath: string): boolean {
   if (!requestPath || requestPath.includes('\0')) return false;
-  const normalized = path.posix.normalize(requestPath.replace(/\\/g, '/'));
+  const raw = requestPath.replace(/\\/g, '/');
+  if (raw.includes('..')) return false;
+  const normalized = path.posix.normalize(raw);
   if (normalized.startsWith('..') || normalized.includes('/..')) return false;
   return true;
 }

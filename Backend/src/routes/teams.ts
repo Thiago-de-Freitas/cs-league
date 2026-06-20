@@ -22,7 +22,7 @@ const logoUpload = multer({
     filename: (_req, file, cb) => {
       const ext = sanitizeFileExtension(file.originalname, ['.png', '.jpg', '.jpeg', '.webp', '.gif']);
       if (!ext) {
-        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'));
+        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'), '');
         return;
       }
       cb(null, `${uuidv4()}${ext}`);

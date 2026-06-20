@@ -354,6 +354,9 @@ def process_job(demo_id: str, file_path: str):
     update_demo_status(demo_id, "PROCESSING")
 
     meta = get_demo_meta(demo_id)
+    if meta is None:
+        print(f"Demo {demo_id} não encontrada no banco — job ignorado")
+        return
     map_name = extract_map_name(file_path)
     stats = parse_demo(file_path)
 

@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
   filename: (_req, file, cb) => {
     const ext = sanitizeFileExtension(file.originalname, ['.dem']);
     if (!ext) {
-      cb(new Error('Apenas arquivos .dem são permitidos'));
+      cb(new Error('Apenas arquivos .dem são permitidos'), '');
       return;
     }
     cb(null, `${uuidv4()}${ext}`);

@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import fs from 'fs';
 import path from 'path';
 import authRoutes from './routes/auth';
@@ -14,6 +13,7 @@ import rankingsRoutes from './routes/rankings';
 import { prisma } from './lib/prisma';
 import { redis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
+import { securityHeaders } from './middleware/securityHeaders';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
@@ -33,10 +33,7 @@ const publicPath = path.join(__dirname, '../public');
 const serveFrontend = process.env.SERVE_FRONTEND === 'true'
   || (isProduction && fs.existsSync(publicPath));
 
-app.use(helmet({
-  contentSecurityPolicy: serveFrontend ? false : undefined,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(securityHeaders);
 
 app.use(cors({
   origin(origin, callback) {
