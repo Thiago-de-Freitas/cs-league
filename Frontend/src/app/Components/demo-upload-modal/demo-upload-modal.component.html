@@ -31,7 +31,7 @@
           </label>
         </div>
         <p class="form-hint" *ngIf="!isPersonalMode">
-          Envio para ligas e partidas. A associação com partida é opcional.
+          Selecione a liga e a partida antes de enviar.
         </p>
         <p class="form-hint" *ngIf="isPersonalMode">
           Fica apenas no seu <a routerLink="/profile" class="text-link" (click)="close()">perfil</a>. Extrai somente suas estatísticas.
@@ -60,13 +60,13 @@
       </div>
 
       <div class="form-group" *ngIf="showMatchAssociation">
-        <label class="form-label">Associar a partida (opcional)</label>
+        <label class="form-label">Partida <span class="required-mark">*</span></label>
         <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="input-field">
           <option value="">Selecione uma liga</option>
           <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
         </select>
         <select
-          *ngIf="matches.length > 0"
+          *ngIf="selectedLeagueId"
           [(ngModel)]="selectedMatchId"
           class="input-field mt-2">
           <option value="">Selecione uma partida</option>
@@ -74,6 +74,9 @@
             {{ m.team1.name }} vs {{ m.team2.name }}
           </option>
         </select>
+        <p *ngIf="selectedLeagueId && matches.length === 0" class="form-hint mt-2">
+          Nenhuma partida nesta liga.
+        </p>
       </div>
 
       <p *ngIf="isPersonalMode && validatingPersonal" class="form-hint mt-2">Validando perfil...</p>
@@ -89,7 +92,7 @@
           type="button"
           class="btn btn-primary"
           (click)="upload()"
-          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !personalValidationOk))">
+          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !personalValidationOk)) || (!isPersonalMode && !selectedMatchId)">
           {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
         </button>
       </div>

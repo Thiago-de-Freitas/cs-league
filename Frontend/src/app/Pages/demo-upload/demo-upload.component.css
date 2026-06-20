@@ -34,8 +34,6 @@
 .demo-name { word-break: break-all; }
 .demo-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .demo-error { margin-top: 0.5rem; font-size: 0.875rem; }
-.associate-panel { padding: 0.75rem; background: var(--gc-bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--gc-border); }
-.associate-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .btn-danger-text { color: var(--gc-red); }
 .mt-2 { margin-top: 0.5rem; }
 .mb-2 { margin-bottom: 0.5rem; }

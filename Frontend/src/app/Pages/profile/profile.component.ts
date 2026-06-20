@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
@@ -42,7 +42,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private demoService: DemoService,
     private notify: NotificationService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.profileForm = this.fb.group({
       displayName: ['', Validators.required],
@@ -51,6 +52,13 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.route.queryParamMap.subscribe((params) => {
+      const tab = params.get('tab');
+      if (tab === 'demos' || tab === 'settings' || tab === 'stats') {
+        this.activeTab = tab;
+      }
+    });
+
     this.authService.getMe().subscribe({
       next: (user) => {
         this.userName = user.displayName;

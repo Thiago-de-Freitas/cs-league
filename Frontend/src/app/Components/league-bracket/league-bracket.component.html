@@ -19,7 +19,13 @@
             class="bracket-match"
             *ngFor="let match of col.matches"
             [class.is-completed]="match.status === 'completed'"
-            [class.is-live]="match.status === 'in_progress'">
+            [class.is-live]="match.status === 'in_progress'"
+            [class.is-clickable]="match.matchId"
+            (click)="onMatchClick(match.matchId, $event)"
+            [attr.role]="match.matchId ? 'link' : null"
+            [attr.tabindex]="match.matchId ? 0 : null"
+            (keydown.enter)="match.matchId && onMatchClick(match.matchId, $event)"
+            (keydown.space)="match.matchId && onMatchClick(match.matchId, $event); $event.preventDefault()">
             <div class="match-status" *ngIf="match.status">{{ statusLabel(match.status) }}</div>
             <div
               class="team-row"

@@ -5,7 +5,13 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { enqueueDemoJob } from '../lib/redis';
-import { validatePersonalDemoUpload, validateGeneralDemoUpload, validateDuplicateDemoUpload, canUserManageMatchDemo } from '../lib/demoValidation';
+import {
+  validatePersonalDemoUpload,
+  validateGeneralDemoUpload,
+  validateDuplicateDemoUpload,
+  canUserManageMatchDemo,
+  canUserViewDemo,
+} from '../lib/demoValidation';
 import { buildPersonalStatsOverview } from '../lib/personalStats';
 import { getDemoStoragePath, resolveDemoFilePath } from '../lib/demoStorage';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
@@ -133,7 +139,12 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
         res.status(400).json({ error: validation.error, code: validation.code });
         return;
       }
-    } else if (matchId) {
+    } else {
+      if (!matchId) {
+        fs.unlink(req.file.path, () => {});
+        res.status(400).json({ error: 'Selecione uma partida para enviar a demo.', code: 'MATCH_REQUIRED' });
+        return;
+      }
       const permission = await canUserManageMatchDemo(req.user!.userId, req.user!.role, matchId);
       if (!permission.allowed) {
         fs.unlink(req.file.path, () => {});
@@ -195,6 +206,12 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+
     res.json({
       id: demo.id,
       fileName: demo.fileName,
@@ -215,6 +232,22 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+
     const stats = await prisma.matchPlayerStat.findMany({
       where: { demoId: req.params.id },
       orderBy: { kills: 'desc' },
@@ -333,6 +366,30 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
     }
 
     const { matchId } = req.body;
+
+    if (matchId === null) {
+      if (!demo.matchId) {
+        res.status(400).json({ error: 'Demo não está associada a uma partida' });
+        return;
+      }
+
+      const updated = await prisma.demo.update({
+        where: { id: req.params.id },
+        data: { matchId: null },
+        include: { stats: true },
+      });
+
+      res.json({
+        id: updated.id,
+        fileName: updated.fileName,
+        status: updated.status.toLowerCase(),
+        matchId: updated.matchId,
+        isPersonal: updated.isPersonal,
+        stats: updated.stats,
+      });
+      return;
+    }
+
     if (!matchId) {
       res.status(400).json({ error: 'matchId é obrigatório' });
       return;

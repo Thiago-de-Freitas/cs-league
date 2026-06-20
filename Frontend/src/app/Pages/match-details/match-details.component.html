@@ -13,7 +13,15 @@
       </div>
       <div class="match-actions">
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
-        <button class="btn btn-primary btn-small" (click)="openUploadModal()">Enviar Demo</button>
+        <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="match.status !== 'completed'">Enviar Demo</button>
+        <ng-container *ngIf="canRegisterResult">
+          <button class="btn btn-primary btn-small" (click)="registerResult(match.team1.id)">
+            Vitória {{ match.team1.tag || match.team1.name }}
+          </button>
+          <button class="btn btn-primary btn-small" (click)="registerResult(match.team2.id)">
+            Vitória {{ match.team2.tag || match.team2.name }}
+          </button>
+        </ng-container>
       </div>
       <app-demo-status-loader *ngIf="pollingDemo" [block]="true" status="processing"></app-demo-status-loader>
     </div>
@@ -125,3 +133,41 @@
   (closed)="closeUploadModal()"
   (uploaded)="onDemoUploaded($event)">
 </app-demo-upload-modal>
+
+<div
+  *ngIf="resultModalMatch"
+  class="gc-modal-backdrop"
+  (click)="$event.target === $event.currentTarget && closeResultModal()"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="match-result-modal-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="match-result-modal-title" class="gc-modal-title">Registrar resultado</h2>
+        <p class="gc-modal-subtitle">
+          {{ resultModalMatch.team1.name }} vs {{ resultModalMatch.team2.name }}
+        </p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="closeResultModal()" [disabled]="resultModalLoading" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="gc-modal-body">
+      <p class="result-winner-line">
+        Vencedor: <strong>{{ resultWinnerLabel }}</strong>
+      </p>
+      <div class="form-group">
+        <label class="form-label" for="match-result-map">Mapa (opcional)</label>
+        <select id="match-result-map" class="input-field" [(ngModel)]="resultModalMap" [disabled]="resultModalLoading">
+          <option value="">Não informado</option>
+          <option *ngFor="let m of cs2Maps" [value]="m.value">{{ m.label }}</option>
+        </select>
+      </div>
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="closeResultModal()" [disabled]="resultModalLoading">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading">
+          {{ resultModalLoading ? 'Salvando...' : 'Confirmar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

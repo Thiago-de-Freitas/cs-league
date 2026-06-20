@@ -45,6 +45,10 @@ export class DemoService {
     return this.http.get<MatchPlayerStat[]>(`${this.apiUrl}/${id}/stats`);
   }
 
+  disassociateMatch(demoId: string): Observable<Demo> {
+    return this.http.patch<Demo>(`${this.apiUrl}/${demoId}/match`, { matchId: null });
+  }
+
   associateMatch(demoId: string, matchId: string): Observable<Demo> {
     return this.http.patch<Demo>(`${this.apiUrl}/${demoId}/match`, { matchId });
   }

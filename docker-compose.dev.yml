@@ -1,4 +1,4 @@
-# Infraestrutura mínima para desenvolvimento local (API e Worker rodam no host)
+# Infraestrutura mínima para desenvolvimento local (API roda no host; worker opcional no Docker)
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,6 +25,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  worker:
+    build:
+      context: ./Worker
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}
+      REDIS_URL: redis://redis:6379
+      DEMO_STORAGE_PATH: /data/demos
+    volumes:
+      - ./Backend/data/demos:/data/demos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - worker
 
 volumes:
   postgres_data:

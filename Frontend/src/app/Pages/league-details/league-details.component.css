@@ -692,6 +692,22 @@
   margin-top: 0.75rem;
 }
 
+.completed-notice {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--gc-green-dim);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
+  color: var(--gc-text-secondary);
+  font-size: 0.95rem;
+}
+
+.match-winner {
+  font-size: 0.85rem;
+  color: var(--gc-green);
+  font-weight: 600;
+}
+
 .archived-notice {
   margin-top: 0.75rem;
   padding: 0.75rem 1rem;
@@ -700,4 +716,14 @@
   border-radius: var(--radius-md);
   color: var(--gc-text-secondary);
   font-size: 0.9rem;
+}
+
+.result-winner-line {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  color: var(--gc-text-secondary);
+}
+
+.result-winner-line strong {
+  color: var(--gc-orange);
 }

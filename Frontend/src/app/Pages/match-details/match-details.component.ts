@@ -1,17 +1,20 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { MatchService } from '../../Services/match.service';
 import { DemoService } from '../../Services/demo.service';
+import { NotificationService } from '../../Services/notification.service';
 import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
+import { CS2_MAPS } from '../../Utils/maps';
 
 @Component({
   selector: 'app-match-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
+  imports: [CommonModule, RouterModule, FormsModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
   templateUrl: './match-details.component.html',
   styleUrls: ['./match-details.component.css']
 })
@@ -25,12 +28,18 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   isDemoView = false;
   showUploadModal = false;
   pollingDemo = false;
+  resultModalMatch: Match | null = null;
+  resultModalWinnerId = '';
+  resultModalMap = '';
+  resultModalLoading = false;
+  cs2Maps = CS2_MAPS;
   private pollSub?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
     private matchService: MatchService,
-    private demoService: DemoService
+    private demoService: DemoService,
+    private notify: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -110,8 +119,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.startPollingPendingDemos();
       },
-      error: () => {
-        this.errorMsg = 'Partida não encontrada.';
+      error: (err) => {
+        this.errorMsg = err.status === 403
+          ? 'Sem permissão para visualizar esta partida.'
+          : 'Partida não encontrada.';
         this.loading = false;
       }
     });
@@ -210,6 +221,52 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       failed: 'Falhou',
     };
     return labels[status] || status;
+  }
+
+  get canRegisterResult(): boolean {
+    return !!this.match?.permissions?.canRegisterResult;
+  }
+
+  registerResult(winnerId: string): void {
+    if (!this.match) return;
+    this.resultModalMatch = this.match;
+    this.resultModalWinnerId = winnerId;
+    this.resultModalMap = this.match.map || '';
+    this.resultModalLoading = false;
+  }
+
+  closeResultModal(): void {
+    if (this.resultModalLoading) return;
+    this.resultModalMatch = null;
+    this.resultModalWinnerId = '';
+    this.resultModalMap = '';
+  }
+
+  confirmResultModal(): void {
+    if (!this.resultModalMatch || !this.resultModalWinnerId) return;
+    this.resultModalLoading = true;
+    const map = this.resultModalMap || undefined;
+    this.matchService.registerResult(this.resultModalMatch.id, this.resultModalWinnerId, map).subscribe({
+      next: () => {
+        this.resultModalLoading = false;
+        this.closeResultModal();
+        this.refreshMatch();
+        this.notify.success('Resultado registrado com sucesso.');
+      },
+      error: (err) => {
+        this.resultModalLoading = false;
+        this.notify.error(err.error?.error || 'Erro ao registrar resultado');
+      },
+    });
+  }
+
+  get resultWinnerLabel(): string {
+    if (!this.resultModalMatch) return '';
+    const winner =
+      this.resultModalMatch.team1.id === this.resultModalWinnerId
+        ? this.resultModalMatch.team1
+        : this.resultModalMatch.team2;
+    return winner.name;
   }
 
   getRoundLabel(round?: number): string {

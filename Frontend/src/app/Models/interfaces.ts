@@ -68,6 +68,10 @@ export interface Match {
   league?: { id: string; name: string; ownerId: string; maxTeams?: number };
   demos?: Demo[];
   aggregatedStats?: MatchPlayerStat[];
+  hasGeneralDemo?: boolean;
+  permissions?: {
+    canRegisterResult?: boolean;
+  };
 }
 
 export interface Demo {
@@ -142,6 +146,20 @@ export interface PlayerRankingEntry {
   playerName: string;
   displayName?: string | null;
   steamId?: string | null;
+  demos: number;
+  kills: number;
+  deaths: number;
+  kd: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+  rating: number;
+}
+
+export interface PlayerProfileStats {
+  steamId: string;
+  playerName: string;
+  displayName?: string | null;
   demos: number;
   kills: number;
   deaths: number;

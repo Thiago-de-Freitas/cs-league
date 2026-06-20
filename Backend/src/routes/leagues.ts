@@ -11,6 +11,18 @@ import { advanceBracketFromRound } from '../lib/bracketAdvance';
 
 const router = Router();
 
+async function getMatchIdsWithGeneralDemo(leagueId: string): Promise<Set<string>> {
+  const demos = await prisma.demo.findMany({
+    where: {
+      isPersonal: false,
+      status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
+      match: { leagueId },
+    },
+    select: { matchId: true },
+  });
+  return new Set(demos.map((d) => d.matchId).filter((id): id is string => !!id));
+}
+
 async function getLeagueWithDetails(leagueId: string) {
   return prisma.league.findUnique({
     where: { id: leagueId },
@@ -42,7 +54,10 @@ async function getLeagueWithDetails(leagueId: string) {
   });
 }
 
-function formatLeague(league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>) {
+function formatLeague(
+  league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>,
+  matchIdsWithDemo: Set<string> = new Set()
+) {
   return {
     id: league.id,
     name: league.name,
@@ -82,6 +97,7 @@ function formatLeague(league: NonNullable<Awaited<ReturnType<typeof getLeagueWit
       bracketPosition: m.bracketPosition,
       map: m.map,
       playedAt: m.playedAt,
+      hasGeneralDemo: matchIdsWithDemo.has(m.id),
     })),
     createdAt: league.createdAt,
   };
@@ -146,7 +162,8 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: 'Liga não encontrada' });
       return;
     }
-    res.json(formatLeague(league));
+    const matchIdsWithDemo = await getMatchIdsWithGeneralDemo(req.params.id);
+    res.json(formatLeague(league, matchIdsWithDemo));
   } catch (err) {
     console.error('GET /api/leagues/:id', err);
     res.status(500).json({ error: 'Erro ao buscar liga' });

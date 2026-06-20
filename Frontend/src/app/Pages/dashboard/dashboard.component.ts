@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
@@ -14,7 +15,7 @@ import { Demo } from '../../Models/interfaces';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent, DemoUploadModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent, DemoUploadModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -31,6 +32,7 @@ export class DashboardComponent implements OnInit {
   playerRankings: PlayerRankingEntry[] = [];
   teamRankings: TeamRankingEntry[] = [];
   rankingsLoading = true;
+  rankingLeagueId = '';
 
   constructor(
     private leagueService: LeagueService,
@@ -67,7 +69,8 @@ export class DashboardComponent implements OnInit {
 
   loadRankings(): void {
     this.rankingsLoading = true;
-    this.rankingsService.getPlayerRankings().subscribe({
+    const leagueId = this.rankingLeagueId || undefined;
+    this.rankingsService.getPlayerRankings(leagueId).subscribe({
       next: (players) => (this.playerRankings = players),
       error: () => (this.playerRankings = [])
     });
@@ -81,6 +84,15 @@ export class DashboardComponent implements OnInit {
         this.rankingsLoading = false;
       }
     });
+  }
+
+  onRankingLeagueChange(): void {
+    this.loadRankings();
+  }
+
+  getPlayerProfileLink(player: PlayerRankingEntry): string[] | null {
+    if (!player.steamId?.trim()) return null;
+    return ['/player', player.steamId];
   }
 
   getPlayerLabel(player: PlayerRankingEntry): string {
@@ -127,8 +139,17 @@ export class DashboardComponent implements OnInit {
     this.showUploadModal = false;
   }
 
-  onDemoUploaded(_demo: Demo): void {
+  onDemoUploaded(demo: Demo): void {
     this.showUploadModal = false;
+    if (demo.isPersonal) {
+      this.router.navigate(['/profile'], { queryParams: { tab: 'demos' } });
+      return;
+    }
+    if (demo.matchId) {
+      this.router.navigate(['/match', demo.matchId]);
+      return;
+    }
+    this.router.navigate(['/demo', demo.id]);
   }
 
   openCreateLeagueModal(): void {

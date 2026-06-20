@@ -27,6 +27,10 @@ export class AuthService {
     return !!this.token;
   }
 
+  get currentUser(): User | null {
+    return this.currentUserSubject.value;
+  }
+
   register(email: string, password: string, displayName: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, { email, password, displayName }).pipe(
       tap((res) => this.setSession(res))

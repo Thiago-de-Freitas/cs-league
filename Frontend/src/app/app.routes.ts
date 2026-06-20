@@ -9,6 +9,7 @@ import { LeagueDetailsComponent } from './Pages/league-details/league-details.co
 import { TeamDetailsComponent } from './Pages/team-details/team-details.component';
 import { DemoUploadComponent } from './Pages/demo-upload/demo-upload.component';
 import { MatchDetailsComponent } from './Pages/match-details/match-details.component';
+import { PlayerProfileComponent } from './Pages/player-profile/player-profile.component';
 import { authGuard } from './Guards/auth.guard';
 
 export const routes: Routes = [
@@ -22,6 +23,7 @@ export const routes: Routes = [
   { path: 'team-details/:id', component: TeamDetailsComponent, canActivate: [authGuard] },
   { path: 'demo-upload', component: DemoUploadComponent, canActivate: [authGuard] },
   { path: 'match/:id', component: MatchDetailsComponent, canActivate: [authGuard] },
+  { path: 'player/:steamId', component: PlayerProfileComponent },
   { path: 'demo/:id', component: MatchDetailsComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: 'dashboard' },

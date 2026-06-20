@@ -163,8 +163,11 @@ export class DemoUploadModalComponent implements OnInit {
     }
     this.leagueService.getLeagueById(this.selectedLeagueId).subscribe({
       next: (league) => {
-        this.matches = league.matches || [];
+        this.matches = (league.matches || []).filter((m) => !m.hasGeneralDemo);
         this.selectedMatchId = preselectMatchId || '';
+        if (this.selectedMatchId && !this.matches.some((m) => m.id === this.selectedMatchId)) {
+          this.selectedMatchId = '';
+        }
       }
     });
   }
@@ -184,11 +187,14 @@ export class DemoUploadModalComponent implements OnInit {
         this.errorMsg = 'Valide seu perfil antes de enviar a demo pessoal.';
         return;
       }
+    } else if (!this.selectedMatchId) {
+      this.errorMsg = 'Selecione uma partida para enviar a demo.';
+      return;
     }
 
     this.uploading = true;
     this.errorMsg = '';
-    const matchId = this.isPersonalMode ? undefined : (this.selectedMatchId || undefined);
+    const matchId = this.isPersonalMode ? undefined : this.selectedMatchId;
 
     this.demoService.uploadDemo(this.selectedFile, {
       matchId,

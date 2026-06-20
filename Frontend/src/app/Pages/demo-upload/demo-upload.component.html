@@ -31,7 +31,7 @@
         </div>
       </div>
       <p *ngIf="processingDemo">Status: <strong class="status-label">{{ getStatusLabel(pollStatus) }}</strong></p>
-      <p *ngIf="processingDemo.errorMessage" class="error-message">{{ processingDemo.errorMessage }}</p>
+      <p *ngIf="processingDemo?.errorMessage" class="error-message">{{ processingDemo?.errorMessage }}</p>
     </div>
 
     <div *ngIf="errorMsg" class="error-message mb-4">{{ errorMsg }}</div>
@@ -75,10 +75,11 @@
                 {{ reprocessingId === demo.id ? 'Enviando...' : 'Reprocessar' }}
               </button>
               <button
-                *ngIf="!demo.matchId"
+                *ngIf="canDisassociate(demo)"
                 class="btn btn-ghost btn-small"
-                (click)="openAssociate(demo)">
-                Associar
+                (click)="disassociateDemo(demo, $event)"
+                [disabled]="disassociatingId === demo.id">
+                {{ disassociatingId === demo.id ? 'Desassociando...' : 'Desassociar' }}
               </button>
               <button
                 *ngIf="canDelete(demo)"
@@ -90,24 +91,6 @@
             </div>
           </div>
           <p *ngIf="demo.errorMessage" class="error-message demo-error">{{ demo.errorMessage }}</p>
-          <div *ngIf="associatingDemoId === demo.id" class="associate-panel mt-2">
-            <select [(ngModel)]="associateLeagueId" (ngModelChange)="onAssociateLeagueChange()" class="input-field">
-              <option value="">Selecione uma liga</option>
-              <option *ngFor="let l of leagues" [value]="l.id">{{ l.name }}</option>
-            </select>
-            <select *ngIf="associateMatches.length > 0" [(ngModel)]="associateMatchId" class="input-field mt-2">
-              <option value="">Selecione uma partida</option>
-              <option *ngFor="let m of associateMatches" [value]="m.id">
-                {{ m.team1.name }} vs {{ m.team2.name }}
-              </option>
-            </select>
-            <div class="associate-actions mt-2">
-              <button class="btn btn-primary btn-small" (click)="confirmAssociate(demo)" [disabled]="associating">
-                {{ associating ? 'Salvando...' : 'Confirmar' }}
-              </button>
-              <button class="btn btn-ghost btn-small" (click)="cancelAssociate()">Cancelar</button>
-            </div>
-          </div>
         </li>
       </ul>
       <ng-template #noDemos>

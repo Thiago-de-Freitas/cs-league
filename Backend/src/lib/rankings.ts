@@ -26,14 +26,21 @@ export type TeamRankingEntry = {
   leagues: number;
 };
 
-function calcRating(kd: number, adr: number, kast: number, hsPercent: number): number {
+export function calcRating(kd: number, adr: number, kast: number, hsPercent: number): number {
   return Math.round(((kd / 1.2) * 0.35 + (adr / 85) * 0.35 + (kast / 75) * 0.2 + (hsPercent / 50) * 0.1) * 100) / 100;
 }
 
-export async function getPlayerRankings(limit = 10): Promise<PlayerRankingEntry[]> {
+export async function getPlayerRankings(limit = 10, leagueId?: string): Promise<PlayerRankingEntry[]> {
   const stats = await prisma.matchPlayerStat.findMany({
     where: {
-      demo: { status: 'COMPLETED' },
+      demo: {
+        status: 'COMPLETED',
+        isPersonal: false,
+        matchId: { not: null },
+        ...(leagueId && {
+          match: { leagueId },
+        }),
+      },
     },
     select: {
       steamId: true,
@@ -124,6 +131,73 @@ export async function getPlayerRankings(limit = 10): Promise<PlayerRankingEntry[
     .map((entry, index) => ({ rank: index + 1, ...entry }));
 
   return ranked;
+}
+
+export type PlayerProfileStats = {
+  steamId: string;
+  playerName: string;
+  displayName: string | null;
+  demos: number;
+  kills: number;
+  deaths: number;
+  kd: number;
+  adr: number;
+  hsPercent: number;
+  kast: number;
+  rating: number;
+};
+
+export async function getPlayerProfileBySteamId(steamId: string): Promise<PlayerProfileStats | null> {
+  const normalized = steamId.trim();
+  if (!normalized) return null;
+
+  const stats = await prisma.matchPlayerStat.findMany({
+    where: {
+      steamId: normalized,
+      demo: {
+        status: 'COMPLETED',
+        isPersonal: false,
+        matchId: { not: null },
+      },
+    },
+    select: {
+      playerName: true,
+      kills: true,
+      deaths: true,
+      adr: true,
+      hsPercent: true,
+      kast: true,
+    },
+  });
+
+  if (stats.length === 0) return null;
+
+  const kills = stats.reduce((sum, s) => sum + s.kills, 0);
+  const deaths = stats.reduce((sum, s) => sum + s.deaths, 0);
+  const kd = deaths > 0 ? kills / deaths : kills;
+  const adr = stats.reduce((sum, s) => sum + s.adr, 0) / stats.length;
+  const hsPercent = stats.reduce((sum, s) => sum + s.hsPercent, 0) / stats.length;
+  const kast = stats.reduce((sum, s) => sum + s.kast, 0) / stats.length;
+  const rating = calcRating(kd, adr, kast, hsPercent);
+
+  const user = await prisma.user.findFirst({
+    where: { steamId: normalized },
+    select: { displayName: true },
+  });
+
+  return {
+    steamId: normalized,
+    playerName: stats[0].playerName,
+    displayName: user?.displayName || null,
+    demos: stats.length,
+    kills,
+    deaths,
+    kd: Math.round(kd * 100) / 100,
+    adr: Math.round(adr * 10) / 10,
+    hsPercent: Math.round(hsPercent * 10) / 10,
+    kast: Math.round(kast * 10) / 10,
+    rating,
+  };
 }
 
 export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {

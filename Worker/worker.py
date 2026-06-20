@@ -66,7 +66,7 @@ def get_demo_meta(demo_id: str) -> dict | None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT d."isPersonal", d."uploadedById", u."steamId"
+                SELECT d."isPersonal", d."uploadedById", d."matchId", u."steamId"
                 FROM "Demo" d
                 JOIN "User" u ON u.id = d."uploadedById"
                 WHERE d.id = %s
@@ -79,8 +79,42 @@ def get_demo_meta(demo_id: str) -> dict | None:
             return {
                 "is_personal": bool(row[0]),
                 "uploaded_by_id": row[1],
-                "uploader_steam_id": row[2],
+                "match_id": row[2],
+                "uploader_steam_id": row[3],
             }
+    finally:
+        conn.close()
+
+
+def extract_map_name(file_path: str) -> str | None:
+    parser = DemoParser(file_path)
+    header = parser.parse_header()
+    if not header:
+        return None
+    map_name = header.get("map_name")
+    if isinstance(map_name, str) and map_name.strip():
+        return map_name.strip().lower()
+    return None
+
+
+def update_match_map_from_demo(demo_id: str, map_name: str | None):
+    if not map_name:
+        return
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE "Match" m
+                SET map = %s
+                FROM "Demo" d
+                WHERE d.id = %s
+                  AND d."matchId" = m.id
+                  AND (m.map IS NULL OR m.map = '')
+                """,
+                (map_name, demo_id),
+            )
+        conn.commit()
     finally:
         conn.close()
 
@@ -261,6 +295,7 @@ def process_job(demo_id: str, file_path: str):
     update_demo_status(demo_id, "PROCESSING")
 
     meta = get_demo_meta(demo_id)
+    map_name = extract_map_name(file_path)
     stats = parse_demo(file_path)
 
     if meta and meta["is_personal"]:
@@ -285,6 +320,8 @@ def process_job(demo_id: str, file_path: str):
         stats = [s for s in stats if str(s.get("steam_id", "")).strip() == uploader_steam]
 
     save_player_stats(demo_id, stats)
+    if meta and meta.get("match_id"):
+        update_match_map_from_demo(demo_id, map_name)
     update_demo_status(demo_id, "COMPLETED")
     print(f"Demo {demo_id} processada com {len(stats)} jogadores")
 

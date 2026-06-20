@@ -75,6 +75,50 @@ export async function validateGeneralDemoUpload(matchId: string): Promise<Person
   return { valid: true };
 }
 
+export async function canUserViewDemo(
+  userId: string,
+  role: string,
+  demo: { uploadedById: string; isPersonal: boolean; matchId: string | null }
+): Promise<{ allowed: boolean; error?: string }> {
+  if (role === 'ADMIN' || demo.uploadedById === userId) {
+    return { allowed: true };
+  }
+
+  if (demo.isPersonal) {
+    return { allowed: false, error: 'Sem permissão para visualizar esta demo.' };
+  }
+
+  if (!demo.matchId) {
+    return { allowed: false, error: 'Sem permissão para visualizar esta demo.' };
+  }
+
+  const match = await prisma.match.findUnique({
+    where: { id: demo.matchId },
+    include: { league: { select: { ownerId: true } } },
+  });
+
+  if (!match) {
+    return { allowed: false, error: 'Partida não encontrada.' };
+  }
+
+  if (match.league.ownerId === userId) {
+    return { allowed: true };
+  }
+
+  const membership = await prisma.teamMember.findFirst({
+    where: {
+      userId,
+      teamId: { in: [match.team1Id, match.team2Id] },
+    },
+  });
+
+  if (membership) {
+    return { allowed: true };
+  }
+
+  return { allowed: false, error: 'Sem permissão para visualizar esta demo.' };
+}
+
 export async function canUserManageMatchDemo(
   userId: string,
   role: string,

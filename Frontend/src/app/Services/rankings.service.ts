@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { PlayerRankingEntry, TeamRankingEntry } from '../Models/interfaces';
+import { PlayerRankingEntry, TeamRankingEntry, PlayerProfileStats } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class RankingsService {
@@ -9,8 +9,13 @@ export class RankingsService {
 
   constructor(private http: HttpClient) {}
 
-  getPlayerRankings(): Observable<PlayerRankingEntry[]> {
-    return this.http.get<PlayerRankingEntry[]>(`${this.apiUrl}/players`);
+  getPlayerRankings(leagueId?: string): Observable<PlayerRankingEntry[]> {
+    const params = leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : '';
+    return this.http.get<PlayerRankingEntry[]>(`${this.apiUrl}/players${params}`);
+  }
+
+  getPlayerProfile(steamId: string): Observable<PlayerProfileStats> {
+    return this.http.get<PlayerProfileStats>(`${this.apiUrl}/players/${encodeURIComponent(steamId)}`);
   }
 
   getTeamRankings(): Observable<TeamRankingEntry[]> {

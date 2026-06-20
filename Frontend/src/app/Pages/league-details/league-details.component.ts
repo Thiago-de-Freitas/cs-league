@@ -12,6 +12,7 @@ import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
+import { CS2_MAPS } from '../../Utils/maps';
 
 interface ConfirmConfig {
   title: string;
@@ -60,6 +61,11 @@ export class LeagueDetailsComponent implements OnInit {
   unarchivingLeague = false;
   confirmConfig: ConfirmConfig | null = null;
   confirmLoading = false;
+  resultModalMatch: Match | null = null;
+  resultModalWinnerId = '';
+  resultModalMap = '';
+  resultModalLoading = false;
+  cs2Maps = CS2_MAPS;
 
   constructor(
     private route: ActivatedRoute,
@@ -275,12 +281,57 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   registerResult(match: Match, winnerId: string): void {
-    this.matchService.registerResult(match.id, winnerId).subscribe({
+    this.resultModalMatch = match;
+    this.resultModalWinnerId = winnerId;
+    this.resultModalMap = match.map || '';
+    this.resultModalLoading = false;
+  }
+
+  canRegisterResultForMatch(match: Match): boolean {
+    if (this.isArchived || match.status === 'completed') return false;
+    if (this.isAdmin) return true;
+    const user = this.authService.currentUser;
+    if (!user) return false;
+    const teams = this.league?.teams || [];
+    const team1 = teams.find((t) => t.id === match.team1.id);
+    const team2 = teams.find((t) => t.id === match.team2.id);
+    const isCaptain = (team?: Team) =>
+      team?.players?.some((p) => p.id === user.id && p.role === 'CAPTAIN') ?? false;
+    return isCaptain(team1) || isCaptain(team2);
+  }
+
+  closeResultModal(): void {
+    if (this.resultModalLoading) return;
+    this.resultModalMatch = null;
+    this.resultModalWinnerId = '';
+    this.resultModalMap = '';
+  }
+
+  confirmResultModal(): void {
+    if (!this.resultModalMatch || !this.resultModalWinnerId) return;
+    this.resultModalLoading = true;
+    const map = this.resultModalMap || undefined;
+    this.matchService.registerResult(this.resultModalMatch.id, this.resultModalWinnerId, map).subscribe({
       next: () => {
+        this.resultModalLoading = false;
+        this.closeResultModal();
         if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
+        this.notify.success('Resultado registrado com sucesso.');
       },
-      error: (err) => this.apiError(err, 'Erro ao registrar resultado')
+      error: (err) => {
+        this.resultModalLoading = false;
+        this.apiError(err, 'Erro ao registrar resultado');
+      }
     });
+  }
+
+  get resultWinnerLabel(): string {
+    if (!this.resultModalMatch) return '';
+    const winner =
+      this.resultModalMatch.team1.id === this.resultModalWinnerId
+        ? this.resultModalMatch.team1
+        : this.resultModalMatch.team2;
+    return winner.tag || winner.name;
   }
 
   onTeamsReordered(teams: Team[]): void {

@@ -35,6 +35,15 @@ API em http://localhost:3000
 
 As demos ficam em **Aguardando** até o worker consumir a fila Redis. Rode em um terminal separado:
 
+**Opção rápida (a partir do Backend):**
+
+```powershell
+cd Backend
+npm run worker:dev
+```
+
+**Ou manualmente:**
+
 ```powershell
 cd Worker
 pip install -r requirements.txt
@@ -44,7 +53,13 @@ $env:REDIS_URL="redis://localhost:6379"
 python worker.py
 ```
 
-O backend grava o caminho absoluto do arquivo `.dem` na fila; o worker precisa rodar na **mesma máquina** que a API.
+**Worker no Docker (dev):** compartilha `./Backend/data/demos` com o host. Defina `DEMO_STORAGE_PATH=./data/demos` (relativo) ou o caminho absoluto equivalente no `Backend/.env` para a API gravar no mesmo volume:
+
+```powershell
+docker compose -f docker-compose.dev.yml --profile worker up -d worker
+```
+
+O backend grava o caminho absoluto do arquivo `.dem` na fila quando `DEMO_STORAGE_PATH` não está definido; para API + worker Docker, use `DEMO_STORAGE_PATH` consistente (ex.: `./data/demos` no Backend e volume montado em `/data/demos` no worker).
 
 ### 4. Frontend
 
@@ -87,6 +102,7 @@ npm run db:seed
 4. Na liga: adicione times, gere o chaveamento, registre resultados (semifinal/final são criadas automaticamente)
 5. Na partida: clique em **Detalhes** → **Enviar Demo**
 6. Veja estatísticas na partida ou em `/demo/:id` (K/D, ADR, HS%, KAST)
+7. No dashboard (logado), clique em um jogador no ranking — ou acesse `/player/:steamId` diretamente (perfil público, sem login)
 
 ## Solução de problemas
 

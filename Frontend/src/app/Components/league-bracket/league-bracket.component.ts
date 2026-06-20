@@ -23,6 +23,7 @@ export class LeagueBracketComponent implements OnChanges {
   @Input() canManage = false;
   @Input() bracketLocked = false;
   @Output() seedAssign = new EventEmitter<BracketSeedAssignEvent>();
+  @Output() matchClick = new EventEmitter<string>();
 
   bracketSize = 8;
   columns: BracketColumnView[] = [];
@@ -57,6 +58,13 @@ export class LeagueBracketComponent implements OnChanges {
 
   onSeedChange(seed: number, teamId: string): void {
     this.seedAssign.emit({ seed, teamId: teamId || null });
+  }
+
+  onMatchClick(matchId: string | undefined, event: Event): void {
+    if (!matchId) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('select')) return;
+    this.matchClick.emit(matchId);
   }
 
   private rebuild(): void {

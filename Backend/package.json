@@ -11,7 +11,9 @@
     "db:push": "prisma db push",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "demos:clean": "tsx scripts/clean-demos.ts"
+    "demos:clean": "tsx scripts/clean-demos.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "worker:dev": "powershell -ExecutionPolicy Bypass -File ../Worker/run-dev.ps1"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

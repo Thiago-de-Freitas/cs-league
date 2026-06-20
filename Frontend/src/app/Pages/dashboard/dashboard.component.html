@@ -73,6 +73,13 @@
         <div class="ranking-card-header">
           <h2 class="gc-card-title">Top Jogadores</h2>
           <p class="meta ranking-subtitle">Melhores estatísticas nas demos analisadas</p>
+          <div class="ranking-filter" *ngIf="leagues.length > 0">
+            <label class="form-label" for="ranking-league">Filtrar por liga</label>
+            <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
+              <option value="">Todas as ligas</option>
+              <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
+            </select>
+          </div>
         </div>
 
         <div *ngIf="rankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
@@ -92,7 +99,10 @@
               <tr *ngFor="let player of playerRankings">
                 <td class="rank-cell" [class.rank-top]="player.rank <= 3">{{ player.rank }}</td>
                 <td>
-                  <strong>{{ getPlayerLabel(player) }}</strong>
+                  <a *ngIf="getPlayerProfileLink(player) as link" [routerLink]="link" class="ranking-player-link">
+                    <strong>{{ getPlayerLabel(player) }}</strong>
+                  </a>
+                  <strong *ngIf="!getPlayerProfileLink(player)">{{ getPlayerLabel(player) }}</strong>
                   <span class="meta ranking-demos">{{ player.demos }} demo(s)</span>
                 </td>
                 <td class="stat-highlight">{{ player.rating }}</td>

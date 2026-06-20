@@ -5,6 +5,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { tryCompleteLeague } from '../lib/leagueComplete';
 import { aggregateMatchStats } from '../lib/matchStats';
+import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
 
 const router = Router();
 
@@ -47,6 +48,14 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const access = await canUserAccessMatch(req.user!.userId, req.user!.role, match.id);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+
+    const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
+
     res.json({
       id: match.id,
       leagueId: match.leagueId,
@@ -70,6 +79,9 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         createdAt: d.createdAt,
       })),
       aggregatedStats: aggregateMatchStats(match.demos),
+      permissions: {
+        canRegisterResult: resultAccess.allowed && match.status !== 'COMPLETED',
+      },
     });
   } catch (err) {
     console.error(err);
@@ -88,8 +100,9 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       res.status(404).json({ error: 'Partida não encontrada' });
       return;
     }
-    if (match.league.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
-      res.status(403).json({ error: 'Sem permissão' });
+    const permission = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
+    if (!permission.allowed) {
+      res.status(403).json({ error: permission.error || 'Sem permissão' });
       return;
     }
     if (match.status === 'COMPLETED') {

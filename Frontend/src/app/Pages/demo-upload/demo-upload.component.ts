@@ -1,36 +1,29 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { DemoService } from '../../Services/demo.service';
-import { LeagueService } from '../../Services/league.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, League, Match } from '../../Models/interfaces';
+import { Demo } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 
 @Component({
   selector: 'app-demo-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
+  imports: [CommonModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
   templateUrl: './demo-upload.component.html',
   styleUrls: ['./demo-upload.component.css']
 })
 export class DemoUploadComponent implements OnInit, OnDestroy {
   demos: Demo[] = [];
-  leagues: League[] = [];
   loading = true;
   showUploadModal = false;
   uploadPrefillLeagueId = '';
   uploadPrefillMatchId = '';
   processingDemo: Demo | null = null;
   pollStatus = '';
-  associatingDemoId: string | null = null;
-  associateLeagueId = '';
-  associateMatchId = '';
-  associateMatches: Match[] = [];
-  associating = false;
+  disassociatingId: string | null = null;
   reprocessingId: string | null = null;
   deletingId: string | null = null;
   errorMsg = '';
@@ -38,7 +31,6 @@ export class DemoUploadComponent implements OnInit, OnDestroy {
 
   constructor(
     private demoService: DemoService,
-    private leagueService: LeagueService,
     private notificationService: NotificationService,
     private router: Router,
     private route: ActivatedRoute
@@ -46,9 +38,6 @@ export class DemoUploadComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadDemos();
-    this.leagueService.getLeagues().subscribe({
-      next: (leagues) => (this.leagues = leagues)
-    });
 
     const params = this.route.snapshot.queryParams;
     if (params['leagueId']) {
@@ -152,6 +141,22 @@ export class DemoUploadComponent implements OnInit, OnDestroy {
     });
   }
 
+  disassociateDemo(demo: Demo, event?: Event): void {
+    event?.stopPropagation();
+    this.disassociatingId = demo.id;
+    this.demoService.disassociateMatch(demo.id).subscribe({
+      next: () => {
+        this.disassociatingId = null;
+        this.notificationService.success('Demo desassociada da partida.');
+        this.loadDemos();
+      },
+      error: (err) => {
+        this.disassociatingId = null;
+        this.notificationService.error(err.error?.error || 'Erro ao desassociar demo');
+      }
+    });
+  }
+
   deleteDemo(demo: Demo, event?: Event): void {
     event?.stopPropagation();
     this.deletingId = demo.id;
@@ -172,56 +177,16 @@ export class DemoUploadComponent implements OnInit, OnDestroy {
     return demo.status === 'pending' || demo.status === 'failed';
   }
 
+  canDisassociate(demo: Demo): boolean {
+    return !!demo.matchId && demo.status !== 'processing';
+  }
+
   canDelete(demo: Demo): boolean {
     return demo.status !== 'processing' && !(demo.status === 'completed' && demo.matchId);
   }
 
   isDemoProcessing(demo: Demo): boolean {
     return demo.status === 'pending' || demo.status === 'processing';
-  }
-
-  openAssociate(demo: Demo): void {
-    this.associatingDemoId = demo.id;
-    this.associateLeagueId = '';
-    this.associateMatchId = '';
-    this.associateMatches = [];
-  }
-
-  cancelAssociate(): void {
-    this.associatingDemoId = null;
-    this.associateLeagueId = '';
-    this.associateMatchId = '';
-    this.associateMatches = [];
-  }
-
-  onAssociateLeagueChange(): void {
-    if (!this.associateLeagueId) {
-      this.associateMatches = [];
-      return;
-    }
-    this.leagueService.getLeagueById(this.associateLeagueId).subscribe({
-      next: (league) => (this.associateMatches = league.matches || [])
-    });
-  }
-
-  confirmAssociate(demo: Demo): void {
-    if (!this.associateMatchId) {
-      this.errorMsg = 'Selecione uma partida para associar';
-      return;
-    }
-    this.associating = true;
-    this.demoService.associateMatch(demo.id, this.associateMatchId).subscribe({
-      next: () => {
-        this.associating = false;
-        this.errorMsg = '';
-        this.cancelAssociate();
-        this.loadDemos();
-      },
-      error: (err) => {
-        this.associating = false;
-        this.errorMsg = err.error?.error || 'Erro ao associar demo';
-      }
-    });
   }
 
   getStatusLabel(status: string): string {

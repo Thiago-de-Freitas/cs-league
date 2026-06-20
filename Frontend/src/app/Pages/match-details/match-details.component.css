@@ -27,6 +27,8 @@
 .demo-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; flex-wrap: wrap; }
 .demo-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .stat-highlight { color: var(--gc-orange); font-weight: 700; }
+.result-winner-line { margin: 0 0 1rem; color: var(--gc-text-secondary); }
+.result-winner-line strong { color: var(--gc-text); }
 .mt-4 { margin-top: 1rem; }
 
 @media (max-width: 768px) {
