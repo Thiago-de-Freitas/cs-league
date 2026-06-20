@@ -15,6 +15,7 @@ from demoparser2 import DemoParser
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
+DEMO_STORAGE_PATH = os.environ.get("DEMO_STORAGE_PATH")
 DEMO_QUEUE = "demo:queue"
 POLL_TIMEOUT = 5
 WORKER_DIR = Path(__file__).resolve().parent
@@ -26,13 +27,21 @@ def resolve_demo_path(file_path: str) -> str:
     if os.path.isabs(normalized) and os.path.exists(normalized):
         return normalized
 
-    candidates = [
+    candidates = []
+    if DEMO_STORAGE_PATH:
+        storage = Path(DEMO_STORAGE_PATH)
+        if not storage.is_absolute():
+            storage = (WORKER_DIR / storage).resolve()
+        candidates.append(str(storage / Path(normalized).name))
+        candidates.append(str(storage / normalized))
+
+    candidates.extend([
         normalized,
         os.path.abspath(normalized),
         str(WORKER_DIR / normalized),
         str(WORKER_DIR.parent / normalized),
         str(BACKEND_DEMOS / Path(normalized).name),
-    ]
+    ])
 
     if "demos" in normalized.replace("\\", "/"):
         parts = normalized.replace("\\", "/").split("demos/")

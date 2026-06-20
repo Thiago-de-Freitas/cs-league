@@ -81,6 +81,10 @@ docker compose up --build
 
 Em outro terminal: `cd Frontend && npm start`
 
+## Deploy na Railway
+
+Veja **[RAILWAY.md](./RAILWAY.md)** para deploy em produção (API + frontend + worker + Postgres + Redis).
+
 ## Dados de teste (seed)
 
 ```powershell

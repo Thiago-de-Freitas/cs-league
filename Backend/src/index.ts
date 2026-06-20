@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -15,6 +16,9 @@ import { redis } from './lib/redis';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:4200';
+const publicPath = path.join(__dirname, '../public');
+const serveFrontend = process.env.SERVE_FRONTEND === 'true'
+  || (process.env.NODE_ENV === 'production' && fs.existsSync(publicPath));
 
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
@@ -40,6 +44,19 @@ app.use('/api/leagues', leagueRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/rankings', rankingsRoutes);
+
+if (serveFrontend) {
+  app.use(express.static(publicPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+}
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

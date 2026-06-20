@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.angular
+**/data/demos
+**/.env
+**/.env.local
+**/.git
+**/.vscode
+**/*.dem
+Frontend/dist
+Backend/dist
+Worker/__pycache__
