@@ -99,19 +99,6 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Demos exigem Redis configurado
-app.use('/api/demos', (_req, res, next) => {
-  const redisErrors = getRedisEnvErrors();
-  if (redisErrors.length > 0) {
-    res.status(503).json({
-      error: 'Fila de demos indisponível. Configure REDIS_URL na API.',
-      errors: redisErrors,
-    });
-    return;
-  }
-  next();
-});
-
 app.use(securityHeaders);
 
 app.use(express.json({ limit: '1mb' }));

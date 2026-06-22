@@ -72,12 +72,18 @@ export function getRedisEnvErrors(): string[] {
   return errors;
 }
 
-/** Avisos quando Redis não está configurado (demos não processam). */
+/** Avisos quando Redis não está configurado (upload/reprocess indisponíveis). */
 export function getRedisWarnings(): string[] {
   if (process.env.NODE_ENV !== 'production') {
     return [];
   }
-  return getRedisEnvErrors();
+  const redisErrors = getRedisEnvErrors();
+  if (redisErrors.length === 0) {
+    return [];
+  }
+  return [
+    'Upload e reprocessamento de demos indisponíveis — configure REDIS_URL=${{Redis.REDIS_URL}} na API e no Worker.',
+  ];
 }
 
 /** Diagnóstico sem expor secrets (para debug na Railway). */
@@ -97,6 +103,7 @@ export function getEnvConfigStatus() {
     redis: {
       set: redis.length > 0,
       unresolvedRef: redis ? isUnresolvedRailwayRef(redis) : false,
+      queueAvailable: getRedisEnvErrors().length === 0,
     },
     coreErrors: getCoreEnvErrors(),
     redisErrors: getRedisEnvErrors(),

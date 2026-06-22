@@ -16,6 +16,7 @@ import { buildPersonalStatsOverview } from '../lib/personalStats';
 import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from '../lib/demoStorage';
 import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { requireDemoQueue } from '../middleware/demoQueue';
 
 const router = Router();
 
@@ -119,7 +120,7 @@ router.get('/personal', authMiddleware, async (req: AuthRequest, res: Response) 
   }
 });
 
-router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRequest, res: Response) => {
+router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Arquivo .dem é obrigatório' });
@@ -281,7 +282,7 @@ router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response)
   }
 });
 
-router.post('/:id/reprocess', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/reprocess', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
   try {
     const demo = await prisma.demo.findUnique({ where: { id: req.params.id } });
 
