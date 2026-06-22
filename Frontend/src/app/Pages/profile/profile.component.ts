@@ -321,7 +321,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.reprocessingId = null;
-        this.notify.error(err.error?.error || 'Erro ao reprocessar demo');
+        const msg = err.error?.error || 'Erro ao reprocessar demo';
+        if (err.error?.code === 'DEMO_FILE_NOT_FOUND') {
+          this.notify.error(msg, 'Arquivo perdido', {
+            hint: 'Configure o volume /data na Railway (API + worker) e envie a demo de novo.',
+          });
+          this.loadPersonalDemos();
+          return;
+        }
+        this.notify.error(msg);
       }
     });
   }

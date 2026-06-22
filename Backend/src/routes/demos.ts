@@ -22,6 +22,16 @@ const router = Router();
 
 const storagePath = getDemoStoragePath();
 
+const DEMO_FILE_MISSING_ERROR =
+  'Arquivo .dem não encontrado no servidor. Provavelmente o volume /data não estava montado no upload — exclua esta demo e envie novamente após configurar o volume persistente na API e no worker.';
+
+async function markDemoFileMissing(demoId: string): Promise<void> {
+  await prisma.demo.update({
+    where: { id: demoId },
+    data: { status: 'FAILED', errorMessage: DEMO_FILE_MISSING_ERROR },
+  });
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, storagePath),
   filename: (_req, file, cb) => {
@@ -137,10 +147,11 @@ router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async
     for (const demo of demos) {
       const absolutePath = tryResolveDemoFilePath(demo.filePath);
       if (!absolutePath || !fs.existsSync(absolutePath)) {
+        await markDemoFileMissing(demo.id);
         skipped.push({
           id: demo.id,
           fileName: demo.fileName,
-          reason: 'Arquivo da demo não encontrado no servidor',
+          reason: DEMO_FILE_MISSING_ERROR,
         });
         continue;
       }
@@ -351,7 +362,12 @@ router.post('/:id/reprocess', authMiddleware, requireDemoQueue, async (req: Auth
 
     const absolutePath = tryResolveDemoFilePath(demo.filePath);
     if (!absolutePath || !fs.existsSync(absolutePath)) {
-      res.status(400).json({ error: 'Arquivo da demo não encontrado no servidor' });
+      await markDemoFileMissing(demo.id);
+      res.status(400).json({
+        error: DEMO_FILE_MISSING_ERROR,
+        code: 'DEMO_FILE_NOT_FOUND',
+        storagePath,
+      });
       return;
     }
 
