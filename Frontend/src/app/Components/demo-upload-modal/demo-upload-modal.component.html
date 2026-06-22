@@ -84,7 +84,22 @@
         Perfil válido para demo pessoal.
       </p>
 
+      <div *ngIf="queueUnavailable" class="error-message">
+        {{ queueUnavailableMsg }}
+      </div>
+
       <div *ngIf="errorMsg" class="error-message">{{ errorMsg }}</div>
+
+      <div *ngIf="uploading" class="upload-progress">
+        <div class="upload-progress-label">
+          <span>Enviando arquivo...</span>
+          <span>{{ uploadProgress }}%</span>
+        </div>
+        <div class="upload-progress-bar" role="progressbar" [attr.aria-valuenow]="uploadProgress" aria-valuemin="0" aria-valuemax="100">
+          <div class="upload-progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+        <p class="form-hint">Demos grandes podem levar alguns minutos dependendo da sua conexão.</p>
+      </div>
 
       <div class="gc-modal-footer">
         <button type="button" class="btn btn-ghost" (click)="close()" [disabled]="uploading">Cancelar</button>
@@ -92,8 +107,8 @@
           type="button"
           class="btn btn-primary"
           (click)="upload()"
-          [disabled]="uploading || !selectedFile || (isPersonalMode && (!hasSteamId || !personalValidationOk)) || (!isPersonalMode && !selectedMatchId)">
-          {{ uploading ? 'Enviando...' : 'Enviar Demo' }}
+          [disabled]="uploading || queueUnavailable || !selectedFile || (isPersonalMode && (!hasSteamId || !personalValidationOk)) || (!isPersonalMode && !selectedMatchId)">
+          {{ uploading ? ('Enviando ' + uploadProgress + '%') : 'Enviar Demo' }}
         </button>
       </div>
     </div>

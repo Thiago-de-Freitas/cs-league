@@ -26,6 +26,9 @@ export class DemoUploadModalComponent implements OnInit {
   uploadMode: UploadMode = 'general';
   selectedFile: File | null = null;
   uploading = false;
+  uploadProgress = 0;
+  queueUnavailable = false;
+  queueUnavailableMsg = '';
   errorMsg = '';
   leagues: League[] = [];
   selectedLeagueId = '';
@@ -64,6 +67,19 @@ export class DemoUploadModalComponent implements OnInit {
             .map((d) => d.fileName.toLowerCase())
         );
       }
+    });
+
+    this.demoService.getDemoHealthConfig().subscribe({
+      next: (config) => {
+        const available = config.redis?.queueAvailable !== false && !(config.redisErrors?.length);
+        if (!available) {
+          this.queueUnavailable = true;
+          this.queueUnavailableMsg =
+            config.redisErrors?.[0] ||
+            config.warnings?.[0] ||
+            'Envio de demos temporariamente indisponível. Tente novamente mais tarde.';
+        }
+      },
     });
 
     if (!this.isPersonalMode) {
@@ -193,21 +209,34 @@ export class DemoUploadModalComponent implements OnInit {
     }
 
     this.uploading = true;
+    this.uploadProgress = 0;
     this.errorMsg = '';
     const matchId = this.isPersonalMode ? undefined : this.selectedMatchId;
 
-    this.demoService.uploadDemo(this.selectedFile, {
+    this.demoService.uploadDemoWithProgress(this.selectedFile, {
       matchId,
       isPersonal: this.isPersonalMode,
     }).subscribe({
-      next: (demo) => {
-        this.uploading = false;
-        this.existingDemoNames.add(demo.fileName.toLowerCase());
-        this.uploaded.emit(demo);
+      next: (event) => {
+        if (event.phase === 'uploading') {
+          this.uploadProgress = event.progress;
+          return;
+        }
+        if (event.demo) {
+          this.uploading = false;
+          this.uploadProgress = 100;
+          this.existingDemoNames.add(event.demo.fileName.toLowerCase());
+          this.uploaded.emit(event.demo);
+        }
       },
       error: (err) => {
         this.uploading = false;
-        this.errorMsg = err.error?.error || 'Erro no upload.';
+        this.uploadProgress = 0;
+        this.errorMsg =
+          err.error?.error ||
+          (err.status === 503
+            ? 'Serviço de análise indisponível. Verifique a configuração do Redis na Railway.'
+            : 'Erro no upload.');
       }
     });
   }

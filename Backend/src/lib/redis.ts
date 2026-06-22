@@ -18,10 +18,13 @@ function logRedisConnectionError(err: Error): void {
 
 export const redis = new Redis(redisUrl, {
   lazyConnect: true,
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: 1,
+  connectTimeout: 5_000,
+  commandTimeout: 5_000,
   enableOfflineQueue: false,
   retryStrategy(times) {
-    return Math.min(times * 500, 30_000);
+    if (times > 2) return null;
+    return Math.min(times * 500, 2_000);
   },
 });
 
