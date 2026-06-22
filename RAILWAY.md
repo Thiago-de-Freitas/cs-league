@@ -201,7 +201,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | CORS no browser | `CORS_ORIGIN` incorreto | Use a URL pública exata (com `https://`) |
 | Build Angular falha (SSL npm) | Node incompatível | Use Node 20 LTS localmente |
 | Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs do **preDeploy** |
-| Connection refused no healthcheck | Processo crashou antes de escutar | Verifique `JWT_SECRET` (32+ chars) e `CORS_ORIGIN` nos logs |
+| Connection refused no healthcheck | Processo crashou antes de escutar | Confira Deploy Logs: `JWT_SECRET` (32+ chars), `CORS_ORIGIN`, `DATABASE_URL`. Após o fix, `/api/health` sobe mesmo com config incompleta — use `/api/health/ready` para ver o que falta |
+| `REDIS_URL` com `${{Redis.REDIS_URL}}` literal nos logs | Referência não resolvida | No serviço API: Variables → Add Reference → selecione o serviço **Redis** → variável `REDIS_URL` |
 | `[ioredis] getaddrinfo ENOTFOUND redis` | `REDIS_URL=redis://redis:6379` (valor do docker-compose) | No serviço API e Worker, defina `REDIS_URL=${{Redis.REDIS_URL}}` apontando ao plugin Redis |
 | `[redis] connection failed` nos logs | Plugin Redis ausente ou URL errada | Adicione Redis ao projeto; use `${{Redis.REDIS_URL}}` em ambos os serviços |
 

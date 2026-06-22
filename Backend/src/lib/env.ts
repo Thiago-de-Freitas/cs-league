@@ -1,13 +1,20 @@
-/** Valida variáveis obrigatórias em produção; registra erros em stderr para logs da Railway. */
-export function validateProductionEnv(): void {
+function isUnresolvedRailwayRef(value: string): boolean {
+  return value.includes('${{') || value.includes('{{');
+}
+
+/** Retorna lista de erros de configuração em produção (não derruba o processo). */
+export function getProductionEnvErrors(): string[] {
   if (process.env.NODE_ENV !== 'production') {
-    return;
+    return [];
   }
 
   const errors: string[] = [];
 
-  if (!process.env.CORS_ORIGIN?.trim()) {
+  const corsOrigin = process.env.CORS_ORIGIN?.trim();
+  if (!corsOrigin) {
     errors.push('CORS_ORIGIN deve ser definido (URL pública da API, ex.: https://seu-app.up.railway.app)');
+  } else if (isUnresolvedRailwayRef(corsOrigin)) {
+    errors.push('CORS_ORIGIN não foi resolvida — use a URL pública do serviço, não uma referência inválida');
   }
 
   const jwt = process.env.JWT_SECRET;
@@ -15,22 +22,33 @@ export function validateProductionEnv(): void {
     errors.push('JWT_SECRET deve ter pelo menos 32 caracteres aleatórios (ex.: openssl rand -hex 32)');
   }
 
-  if (!process.env.DATABASE_URL?.trim()) {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
     errors.push('DATABASE_URL deve ser definido (referência ${{Postgres.DATABASE_URL}})');
+  } else if (isUnresolvedRailwayRef(databaseUrl)) {
+    errors.push('DATABASE_URL não foi resolvida — vincule o plugin Postgres ao serviço API');
   }
 
-  if (!process.env.REDIS_URL?.trim()) {
+  const redisUrl = process.env.REDIS_URL?.trim();
+  if (!redisUrl) {
     errors.push('REDIS_URL deve ser definido (referência ${{Redis.REDIS_URL}})');
+  } else if (isUnresolvedRailwayRef(redisUrl)) {
+    errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ao serviço API (Add Reference → Redis → REDIS_URL)');
   } else {
-    logRedisUrlWarnings(process.env.REDIS_URL.trim());
+    logRedisUrlWarnings(redisUrl);
   }
 
-  if (errors.length > 0) {
-    console.error('[startup] Variáveis de ambiente ausentes ou inválidas:');
-    for (const message of errors) {
-      console.error(`[startup]   - ${message}`);
-    }
-    throw new Error(`Configuração inválida (${errors.length} erro(s)). Veja logs acima.`);
+  return errors;
+}
+
+/** Registra erros de env em stderr (usado após o servidor subir). */
+export function logProductionEnvErrors(errors: string[]): void {
+  if (errors.length === 0) {
+    return;
+  }
+  console.error('[startup] Variáveis de ambiente ausentes ou inválidas:');
+  for (const message of errors) {
+    console.error(`[startup]   - ${message}`);
   }
 }
 

@@ -14,11 +14,10 @@ import { prisma } from './lib/prisma';
 import { redis, connectRedis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
-import { validateProductionEnv } from './lib/env';
-
-validateProductionEnv();
+import { getProductionEnvErrors, logProductionEnvErrors } from './lib/env';
 
 const isProduction = process.env.NODE_ENV === 'production';
+let configErrors: string[] = isProduction ? getProductionEnvErrors() : [];
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
@@ -38,8 +37,16 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Readiness — dependências externas (Postgres + Redis)
+// Readiness — config + dependências externas (Postgres + Redis)
 app.get('/api/health/ready', async (_req, res) => {
+  if (configErrors.length > 0) {
+    res.status(503).json({
+      status: 'error',
+      message: 'Configuração incompleta',
+      errors: configErrors,
+    });
+    return;
+  }
   try {
     await prisma.$queryRaw`SELECT 1`;
     await redis.ping();
@@ -49,6 +56,21 @@ app.get('/api/health/ready', async (_req, res) => {
     console.error('[health/ready]', message);
     res.status(503).json({ status: 'error', message: 'Service unavailable' });
   }
+});
+
+// Bloqueia API se env de produção estiver inválida (health endpoints ficam liberados)
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health' || req.path === '/health/ready') {
+    next();
+    return;
+  }
+  if (configErrors.length > 0) {
+    res.status(503).json({
+      error: 'Serviço em configuração. Verifique variáveis de ambiente e /api/health/ready.',
+    });
+    return;
+  }
+  next();
 });
 
 app.use(securityHeaders);
@@ -125,7 +147,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`API rodando em http://${HOST}:${PORT}`);
+  console.log(`API rodando em http://${HOST}:${PORT} (PORT=${PORT}, NODE_ENV=${process.env.NODE_ENV || 'development'})`);
+  if (isProduction) {
+    configErrors = getProductionEnvErrors();
+    logProductionEnvErrors(configErrors);
+    if (configErrors.length > 0) {
+      console.error(`[startup] API no ar, mas ${configErrors.length} erro(s) de config — /api/health OK, /api/health/ready retorna 503`);
+    }
+  }
   void connectRedis();
 });
 
