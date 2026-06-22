@@ -4,9 +4,38 @@ Guia para publicar a plataforma CS League na [Railway](https://railway.app) com 
 
 ## Arquitetura recomendada
 
+### Opção A — Um serviço só (mais simples)
+
 | Serviço | Root Directory | Descrição |
 |---------|----------------|-----------|
 | **cs-league-api** | `/` (raiz) | Express + Angular estático (`Dockerfile` na raiz) |
+
+Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS_ORIGIN` = URL da API.
+
+### Opção B — Frontend separado (cs-league-front)
+
+| Serviço | Root Directory | Descrição |
+|---------|----------------|-----------|
+| **cs-league-api** | `/` | Só API (mesmo Dockerfile; front embutido mas você usa a URL da API só para `/api`) |
+| **cs-league-front** | `Frontend` | `Frontend/Dockerfile` + `serve.prod.cjs` (estáticos + proxy `/api`) |
+
+**Variables no serviço front:**
+
+| Variável | Valor |
+|----------|--------|
+| `API_URL` | URL pública da API (ex.: `https://cs-league-api-production.up.railway.app`) |
+| `PORT` | (Railway define) |
+
+**Variables no serviço API** (com front separado):
+
+| Variável | Valor |
+|----------|--------|
+| `CORS_ORIGIN` | URL do **front** (ex.: `https://cs-league-front-production.up.railway.app`) — **sem** barra no final |
+
+### Serviços compartilhados
+
+| Serviço | Root Directory | Descrição |
+|---------|----------------|-----------|
 | **cs-league-worker** | `Worker` | Python + demoparser2 (`Worker/Dockerfile`) |
 | **PostgreSQL** | plugin Railway | Injeta `DATABASE_URL` |
 | **Redis** | plugin Railway | Injeta `REDIS_URL` |

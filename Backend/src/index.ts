@@ -14,10 +14,11 @@ import { prisma } from './lib/prisma';
 import { redis, connectRedis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
-import { getProductionEnvErrors, logProductionEnvErrors } from './lib/env';
+import { getCoreEnvErrors, getRedisEnvErrors, getProductionEnvErrors, logProductionEnvErrors } from './lib/env';
 
 const isProduction = process.env.NODE_ENV === 'production';
-let configErrors: string[] = isProduction ? getProductionEnvErrors() : [];
+let coreConfigErrors: string[] = isProduction ? getCoreEnvErrors() : [];
+let redisConfigErrors: string[] = isProduction ? getRedisEnvErrors() : [];
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
@@ -41,6 +42,7 @@ app.get('/api/health', (_req, res) => {
 
 // Readiness — config + dependências externas (Postgres + Redis)
 app.get('/api/health/ready', async (_req, res) => {
+  const configErrors = getProductionEnvErrors();
   if (configErrors.length > 0) {
     res.status(503).json({
       status: 'error',
@@ -60,15 +62,29 @@ app.get('/api/health/ready', async (_req, res) => {
   }
 });
 
-// Bloqueia API se env de produção estiver inválida (health endpoints ficam liberados)
+// Bloqueia API se env core estiver inválida (login, ligas, etc.)
 app.use('/api', (req, res, next) => {
   if (req.path === '/health' || req.path === '/health/ready') {
     next();
     return;
   }
-  if (configErrors.length > 0) {
+  if (coreConfigErrors.length > 0) {
     res.status(503).json({
-      error: 'Serviço em configuração. Verifique variáveis de ambiente e /api/health/ready.',
+      error: 'Serviço em configuração. Verifique variáveis de ambiente na API.',
+      errors: coreConfigErrors,
+      hint: 'Abra https://SUA-API.up.railway.app/api/health/ready para ver detalhes',
+    });
+    return;
+  }
+  next();
+});
+
+// Demos exigem Redis configurado
+app.use('/api/demos', (req, res, next) => {
+  if (redisConfigErrors.length > 0) {
+    res.status(503).json({
+      error: 'Fila de demos indisponível. Configure REDIS_URL na API.',
+      errors: redisConfigErrors,
     });
     return;
   }
@@ -152,10 +168,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const server = app.listen(PORT, HOST, () => {
   console.log(`API rodando em http://${HOST}:${PORT} (PORT=${PORT}, NODE_ENV=${process.env.NODE_ENV || 'development'})`);
   if (isProduction) {
-    configErrors = getProductionEnvErrors();
-    logProductionEnvErrors(configErrors);
-    if (configErrors.length > 0) {
-      console.error(`[startup] API no ar, mas ${configErrors.length} erro(s) de config — /api/health OK, /api/health/ready retorna 503`);
+    coreConfigErrors = getCoreEnvErrors();
+    redisConfigErrors = getRedisEnvErrors();
+    logProductionEnvErrors(getProductionEnvErrors());
+    if (coreConfigErrors.length > 0) {
+      console.error(`[startup] API no ar, mas ${coreConfigErrors.length} erro(s) core — login/API bloqueados até corrigir env`);
+    }
+    if (redisConfigErrors.length > 0) {
+      console.error(`[startup] ${redisConfigErrors.length} erro(s) Redis — demos bloqueadas até corrigir REDIS_URL`);
     }
   }
   void connectRedis();

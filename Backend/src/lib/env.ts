@@ -2,8 +2,8 @@ function isUnresolvedRailwayRef(value: string): boolean {
   return value.includes('${{') || value.includes('{{');
 }
 
-/** Retorna lista de erros de configuração em produção (não derruba o processo). */
-export function getProductionEnvErrors(): string[] {
+/** Erros que impedem login, ligas, etc. (core da API). */
+export function getCoreEnvErrors(): string[] {
   if (process.env.NODE_ENV !== 'production') {
     return [];
   }
@@ -12,9 +12,9 @@ export function getProductionEnvErrors(): string[] {
 
   const corsOrigin = process.env.CORS_ORIGIN?.trim();
   if (!corsOrigin) {
-    errors.push('CORS_ORIGIN deve ser definido (URL pública da API, ex.: https://seu-app.up.railway.app)');
+    errors.push('CORS_ORIGIN deve ser definido (URL do front ou da API, ex.: https://seu-app.up.railway.app)');
   } else if (isUnresolvedRailwayRef(corsOrigin)) {
-    errors.push('CORS_ORIGIN não foi resolvida — use a URL pública do serviço, não uma referência inválida');
+    errors.push('CORS_ORIGIN não foi resolvida — use a URL pública, não uma referência inválida');
   }
 
   const jwt = process.env.JWT_SECRET;
@@ -29,16 +29,30 @@ export function getProductionEnvErrors(): string[] {
     errors.push('DATABASE_URL não foi resolvida — vincule o plugin Postgres ao serviço API');
   }
 
+  return errors;
+}
+
+/** Erros de Redis — bloqueiam só fila de demos, não login/cadastro. */
+export function getRedisEnvErrors(): string[] {
+  if (process.env.NODE_ENV !== 'production') {
+    return [];
+  }
+
+  const errors: string[] = [];
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) {
     errors.push('REDIS_URL deve ser definido (referência ${{Redis.REDIS_URL}})');
   } else if (isUnresolvedRailwayRef(redisUrl)) {
-    errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ao serviço API (Add Reference → Redis → REDIS_URL)');
+    errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ao serviço API');
   } else {
     logRedisUrlWarnings(redisUrl);
   }
-
   return errors;
+}
+
+/** Todos os erros de config (core + redis). */
+export function getProductionEnvErrors(): string[] {
+  return [...getCoreEnvErrors(), ...getRedisEnvErrors()];
 }
 
 /** Registra erros de env em stderr (usado após o servidor subir). */
