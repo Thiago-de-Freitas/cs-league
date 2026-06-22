@@ -30,6 +30,11 @@ const corsOrigins = (corsOriginEnv || 'http://localhost:4200')
 
 const app = express();
 const publicPath = path.join(__dirname, '../public');
+
+function isApiHealthPath(req: express.Request): boolean {
+  const pathname = req.originalUrl.split('?')[0];
+  return pathname === '/api/health' || pathname.startsWith('/api/health/');
+}
 const serveFrontend = process.env.SERVE_FRONTEND === 'true'
   || (isProduction && fs.existsSync(publicPath));
 
@@ -78,17 +83,16 @@ app.get('/api/health/ready', async (_req, res) => {
 
 // Bloqueia API se env core estiver inválida (login, ligas, etc.)
 app.use('/api', (req, res, next) => {
-  const p = req.path;
-  if (p === '/health' || p === '/health/ready' || p === '/health/config') {
+  if (isApiHealthPath(req)) {
     next();
     return;
   }
   const coreErrors = getCoreEnvErrors();
   if (coreErrors.length > 0) {
     res.status(503).json({
-      error: 'Serviço em configuração. Verifique variáveis de ambiente na API.',
+      error: 'Serviço em configuração. Configure as variáveis no serviço cs-league-back (API), não no front.',
       errors: coreErrors,
-      hint: 'Abra /api/health/config na URL da API para ver o que falta',
+      hint: 'GET /api/health/config na URL da API (ou via proxy do front) lista o que falta',
     });
     return;
   }

@@ -19,18 +19,26 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
 | **cs-league-api** | `/` | Só API (mesmo Dockerfile; front embutido mas você usa a URL da API só para `/api`) |
 | **cs-league-front** | `Frontend` | `Frontend/Dockerfile` + `serve.prod.cjs` (estáticos + proxy `/api`) |
 
-**Variables no serviço front:**
+**Variables no serviço front (cs-league-front):**
 
 | Variável | Valor |
 |----------|--------|
-| `API_URL` | URL pública da API (ex.: `https://cs-league-api-production.up.railway.app`) |
+| `API_URL` | URL pública da API (ex.: `https://cs-league-back-production.up.railway.app`) — **sem** `/api` no final |
 | `PORT` | (Railway define) |
+| `NODE_ENV` | `production` (já no Dockerfile) |
 
-**Variables no serviço API** (com front separado):
+**Variables no serviço API (cs-league-back):**
 
 | Variável | Valor |
 |----------|--------|
 | `CORS_ORIGIN` | URL do **front** (ex.: `https://cs-league-front-production.up.railway.app`) — **sem** barra no final |
+| `JWT_SECRET` | 32+ caracteres (`openssl rand -hex 32`) |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `REDIS_URL` | `${{Redis.REDIS_URL}}` |
+| `DEMO_STORAGE_PATH` | `/data/demos` |
+| `TEAM_LOGO_STORAGE_PATH` | `/data/team-logos` |
+
+> **Não** coloque `JWT_SECRET`, `DATABASE_URL` ou `CORS_ORIGIN` no cs-league-front — o proxy só precisa de `API_URL`.
 
 ### Serviços compartilhados
 
@@ -109,7 +117,17 @@ Se você criou um serviço **cs-league-front** além da API:
 | `PORT` | (Railway define) |
 
 5. **Remova** do front: `DATABASE_URL`, `JWT_SECRET`, `REDIS_URL` — o front não usa banco nem Redis
-6. No serviço **API**, `CORS_ORIGIN` = URL pública do **front** (não da API)
+6. No serviço **API (cs-league-back)**, `CORS_ORIGIN` = URL pública do **front** (não da API)
+
+#### Diagnóstico rápido (front separado)
+
+```text
+GET https://cs-league-front-production.up.railway.app/api/health          → 200 (proxy + API no ar)
+GET https://cs-league-front-production.up.railway.app/api/health/config   → coreErrors: [] (env OK)
+POST https://cs-league-front-production.up.railway.app/api/auth/register  → 201 ou 4xx (nunca 503 se env OK)
+```
+
+Se `/api/health` = 200 mas `/api/auth/register` = **503** com `"Serviço em configuração"`, o proxy está correto — falta configurar variáveis no **cs-league-back**.
 
 > Se o deploy do front falhar com `Environment variable not found: DATABASE_URL` e `prisma/schema.prisma`, o Root Directory **não** está em `Frontend` — o Railway está usando o `railway.toml` da raiz com `npx prisma migrate deploy`.
 
@@ -242,6 +260,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 
 | Problema | Causa provável | Ação |
 |----------|----------------|------|
+| **503 em POST `/api/auth/register`** (via front) | Proxy OK; **API** bloqueia por env incompleta (`CORS_ORIGIN`, `JWT_SECRET`, etc.) | No **cs-league-back**: defina `CORS_ORIGIN` = URL do front e `JWT_SECRET` (32+ chars). Teste `GET .../api/health/config` — deve listar `coreErrors: []` |
+| **502** em `/api/*` (via front) | `API_URL` ausente, localhost ou API fora do ar | No **cs-league-front**: `API_URL=https://SEU-BACK.up.railway.app` (sem `/api`). Redeploy |
 | Healthcheck falha (replicas unhealthy) | App não sobe (env inválida) ou migration falhou no preDeploy | Veja **Deploy Logs** — erros `[startup]` listam variáveis faltando; erros Prisma indicam `DATABASE_URL` |
 | `/api/health` retorna 503 | Versão antiga checava DB/Redis no health | Redeploy com versão atual: `/api/health` = liveness (200); use `/api/health/ready` para deps |
 | `/api/health/ready` retorna 503 | Postgres ou Redis inacessível | Confira `${{Postgres.DATABASE_URL}}` e `${{Redis.REDIS_URL}}` nas variables |
