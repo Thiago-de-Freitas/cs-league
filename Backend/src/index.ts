@@ -22,9 +22,11 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
 
+const normalizeOrigin = (url: string) => url.replace(/\/+$/, '');
+
 const corsOrigins = (corsOriginEnv || 'http://localhost:4200')
   .split(',')
-  .map((o) => o.trim())
+  .map((o) => normalizeOrigin(o.trim()))
   .filter(Boolean);
 
 const app = express();
@@ -75,17 +77,18 @@ app.use('/api', (req, res, next) => {
 
 app.use(securityHeaders);
 
-app.use(cors({
+app.use(express.json({ limit: '1mb' }));
+
+const corsOptions = cors({
   origin(origin, callback) {
-    if (!origin || corsOrigins.includes(origin)) {
+    if (!origin || corsOrigins.includes(normalizeOrigin(origin))) {
       callback(null, true);
       return;
     }
     callback(new Error('Origem não permitida pelo CORS'));
   },
   credentials: true,
-}));
-app.use(express.json({ limit: '1mb' }));
+});
 
 const teamLogosPath = process.env.TEAM_LOGO_STORAGE_PATH
   || path.join(__dirname, '../data/team-logos');
@@ -98,13 +101,13 @@ app.use('/uploads/team-logos', (req, res, next) => {
   next();
 }, express.static(teamLogosPath, { dotfiles: 'deny', index: false }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/teams', teamRoutes);
-app.use('/api/leagues', leagueRoutes);
-app.use('/api/matches', matchRoutes);
-app.use('/api/demos', demoRoutes);
-app.use('/api/rankings', rankingsRoutes);
+app.use('/api/auth', corsOptions, authRoutes);
+app.use('/api/users', corsOptions, userRoutes);
+app.use('/api/teams', corsOptions, teamRoutes);
+app.use('/api/leagues', corsOptions, leagueRoutes);
+app.use('/api/matches', corsOptions, matchRoutes);
+app.use('/api/demos', corsOptions, demoRoutes);
+app.use('/api/rankings', corsOptions, rankingsRoutes);
 
 if (serveFrontend) {
   app.use(express.static(publicPath, { dotfiles: 'deny', index: false }));
