@@ -60,6 +60,42 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
        └──── Volume /data/demos + /data/team-logos (compartilhado com Worker)
 ```
 
+## Variáveis de ambiente (config as code)
+
+A Railway **não** aceita variáveis dentro de `railway.toml` — só build/deploy. As variáveis ficam em arquivos `.env` companion, importados uma vez via CLI ou RAW Editor:
+
+| Serviço | `railway.toml` | Arquivo de variáveis |
+|---------|----------------|----------------------|
+| cs-league-back | `/railway.toml` | `railway.back.env` |
+| cs-league-front | `Frontend/railway.toml` | `Frontend/railway.env` |
+| cs-league-worker | `Worker/railway.toml` | `Worker/railway.env` |
+| Monolito (Opção A) | `/railway.toml` | `railway.back.monolith.env` |
+
+### Aplicar todas de uma vez
+
+```powershell
+# 1. Crie Shared Variable no projeto: JWT_SECRET = (openssl rand -hex 32)
+# 2. railway link
+.\scripts\railway-import-vars.ps1
+```
+
+```bash
+railway link
+./scripts/railway-import-vars.sh all
+```
+
+Ou importe serviço a serviço:
+
+```bash
+railway variable import --file railway.back.env --service cs-league-back --yes
+railway variable import --file Frontend/railway.env --service cs-league-front --yes
+railway variable import --file Worker/railway.env --service cs-league-worker --yes
+```
+
+Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-league-front.RAILWAY_PUBLIC_DOMAIN}}`, etc.). Ajuste os **nomes dos serviços** se forem diferentes no seu projeto.
+
+---
+
 ## Pré-requisitos
 
 - Conta na Railway
@@ -287,7 +323,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 ## Arquivos relacionados
 
 - `Dockerfile` — build produção API + frontend
-- `railway.toml` — config do serviço API
+- `railway.toml` + `railway.*.env` — config deploy + variáveis por serviço
+- `scripts/railway-import-vars.ps1` — importa variáveis via CLI
 - `Worker/Dockerfile` + `Worker/railway.toml` — worker
 - `.env.example` — template de variáveis
 - `docker-compose.yml` — referência stack local completa

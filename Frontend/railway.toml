@@ -1,9 +1,10 @@
-# Serviço frontend separado — cs-league-front
+# Serviço frontend — cs-league-front
 #
-# OBRIGATÓRIO no Railway (Settings → cs-league-front → Root Directory):
-#   Frontend
+# OBRIGATÓRIO: Settings → Root Directory = Frontend
 #
-# Sem isso, o Railway usa o railway.toml da raiz e roda "prisma migrate" (erro DATABASE_URL).
+# Variáveis: Frontend/railway.env (não coloque no railway.toml)
+#   railway variable import --file railway.env --service cs-league-front --yes
+# Ou: ..\scripts\railway-import-vars.ps1 -Target front
 
 [build]
 builder = "DOCKERFILE"
@@ -15,4 +16,3 @@ healthcheckTimeout = 60
 startCommand = "node serve.prod.cjs"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
-# Este serviço NÃO usa Prisma — não definir preDeployCommand aqui

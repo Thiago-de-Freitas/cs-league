@@ -1,5 +1,8 @@
-# Serviço Worker (Python + demoparser2)
-# No dashboard Railway: Root Directory = Worker
+# Serviço Worker — cs-league-worker (Root Directory = Worker)
+#
+# Variáveis: Worker/railway.env
+#   railway variable import --file railway.env --service cs-league-worker --yes
+# Ou: ..\scripts\railway-import-vars.ps1 -Target worker
 
 [build]
 builder = "DOCKERFILE"
