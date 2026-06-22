@@ -32,7 +32,7 @@ export function getCoreEnvErrors(): string[] {
   return errors;
 }
 
-/** Erros de Redis — só relevante para fila de demos (opcional no startup). */
+/** Erros de Redis — bloqueiam fila de demos. */
 export function getRedisEnvErrors(): string[] {
   if (process.env.NODE_ENV !== 'production') {
     return [];
@@ -41,13 +41,34 @@ export function getRedisEnvErrors(): string[] {
   const errors: string[] = [];
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) {
+    errors.push(
+      'REDIS_URL não configurado — adicione o plugin Redis na Railway e defina REDIS_URL=${{Redis.REDIS_URL}} no cs-league-back e no cs-league-worker'
+    );
     return errors;
   }
   if (isUnresolvedRailwayRef(redisUrl)) {
     errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ou cole a URL copiada do serviço Redis');
-  } else {
-    logRedisUrlWarnings(redisUrl);
+    return errors;
   }
+
+  let hostname: string;
+  try {
+    hostname = new URL(redisUrl).hostname;
+  } catch {
+    errors.push('REDIS_URL tem formato inválido — use redis://... ou ${{Redis.REDIS_URL}} do plugin Redis');
+    return errors;
+  }
+
+  if (hostname === 'redis') {
+    errors.push(
+      'REDIS_URL usa hostname "redis" (docker-compose) — na Railway use REDIS_URL=${{Redis.REDIS_URL}} do plugin Redis'
+    );
+  } else if (hostname.includes('worker')) {
+    errors.push(
+      'REDIS_URL aponta para o serviço Worker — use a URL do plugin Redis (${{Redis.REDIS_URL}}), não cs-league-worker.railway.internal'
+    );
+  }
+
   return errors;
 }
 
@@ -56,12 +77,7 @@ export function getRedisWarnings(): string[] {
   if (process.env.NODE_ENV !== 'production') {
     return [];
   }
-  if (process.env.REDIS_URL?.trim()) {
-    return [];
-  }
-  return [
-    'REDIS_URL não configurado — login e ligas funcionam, mas demos ficarão em Aguardando até adicionar Redis + Worker.',
-  ];
+  return getRedisEnvErrors();
 }
 
 /** Diagnóstico sem expor secrets (para debug na Railway). */

@@ -49,6 +49,7 @@ export async function enqueueDemoJob(demoId: string, filePath: string): Promise<
     throw new Error('ID de demo inválido');
   }
   const safePath = resolveDemoFilePath(filePath);
+  await connectRedis();
   try {
     await redis.lpush(DEMO_QUEUE, JSON.stringify({ demoId, filePath: safePath }));
   } catch (err) {

@@ -175,7 +175,13 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
       },
     });
 
-    await enqueueDemoJob(demo.id, demo.filePath);
+    try {
+      await enqueueDemoJob(demo.id, demo.filePath);
+    } catch (enqueueErr) {
+      await prisma.demo.delete({ where: { id: demo.id } }).catch(() => {});
+      fs.unlink(req.file.path, () => {});
+      throw enqueueErr;
+    }
 
     res.status(201).json({
       id: demo.id,
@@ -187,6 +193,17 @@ router.post('/upload', authMiddleware, upload.single('demo'), async (req: AuthRe
     });
   } catch (err) {
     console.error(err);
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('Fila Redis indisponível') || message.includes('Redis')) {
+      res.status(503).json({
+        error: 'Fila de processamento de demos indisponível. Verifique REDIS_URL na API (plugin Redis, não o Worker).',
+        code: 'DEMO_QUEUE_UNAVAILABLE',
+      });
+      return;
+    }
     res.status(500).json({ error: 'Erro ao fazer upload da demo' });
   }
 });
