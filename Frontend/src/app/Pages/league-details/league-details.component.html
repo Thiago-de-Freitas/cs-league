@@ -3,14 +3,15 @@
     <h1>{{ league.name || '' }}</h1>
     <p class="league-description">{{ league.description }}</p>
     <div class="league-meta">
-      <span class="teams-capacity">{{ league.teams.length }} / {{ league.maxTeams || 8 }} times</span>
+      <span class="teams-capacity">{{ teamCapacityLabel }}</span>
       <span *ngIf="league.startDate">Início: {{ league.startDate | date:'mediumDate' }}</span>
       <span *ngIf="league.endDate">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
+      <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Inscrições abertas</span>
     </div>
     <p *ngIf="isArchived" class="archived-notice">Esta liga está arquivada e não aparece na página inicial.</p>
     <p *ngIf="isAdmin && league.status === 'completed' && !isArchived" class="completed-notice">
-      Liga finalizada. Você pode arquivá-la na seção <strong>Zona de Perigo</strong> abaixo.
+      Liga finalizada. Você pode arquivá-la em <strong>Administração</strong> abaixo.
     </p>
   </header>
 
@@ -19,94 +20,188 @@
       <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
         [teams]="league.teams || []"
-        [canManageLeague]="isAdmin && !hasBracketGenerated"
+        [canManageLeague]="isAdmin && !isArchived && !hasBracketGenerated"
+        [canRemoveTeams]="isAdmin && !isArchived"
         (teamsReordered)="onTeamsReordered($event)"
         (editTeam)="onEditTeam($event)"
         (removeTeam)="onRemoveTeam($event)">
       </app-league-teams-table>
     </div>
 
-    <div class="section-card" *ngIf="isAdmin && !isArchived">
-      <h2 class="section-title">Administração</h2>
-      <div class="admin-meta">
-        <span>Capacidade: <strong>{{ league.teams.length }} / {{ league.maxTeams || 8 }}</strong></span>
-        <button class="btn btn-ghost btn-small" (click)="editMaxTeams = !editMaxTeams">Alterar limite</button>
-      </div>
-      <div *ngIf="editMaxTeams" class="admin-form">
-        <select [(ngModel)]="newMaxTeams" class="input-field">
-          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
-        </select>
-        <button class="btn btn-primary" (click)="updateMaxTeams()">Salvar</button>
-        <button class="btn btn-secondary" (click)="editMaxTeams = false">Cancelar</button>
-      </div>
-      <div class="admin-actions">
-        <button class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity">Adicionar Time</button>
-        <button class="btn btn-success" (click)="generateBracket()" [disabled]="generatingBracket || league.teams.length < 2">
-          {{ generatingBracket ? 'Gerando...' : (hasBracketGenerated ? 'Regenerar Chaveamento' : 'Gerar Chaveamento') }}
-        </button>
-      </div>
-      <p *ngIf="!hasBracketGenerated" class="admin-hint">
-        Defina os times na chave abaixo e clique em <strong>Gerar Chaveamento</strong> para criar as partidas.
+    <div class="section-card" *ngIf="canShowPlayerRegistration">
+      <h2 class="section-title">Inscrever meu time</h2>
+      <p class="admin-hint" *ngIf="registerableTeams.length > 0">
+        Escolha um dos seus times para participar desta liga.
+        <span *ngIf="remainingSlots != null"> Restam <strong>{{ remainingSlots }}</strong> vaga(s).</span>
       </p>
-
-      <div *ngIf="showAddTeam" class="admin-form">
-        <label class="form-label" for="team-multi-select">Times disponíveis</label>
-        <select
-          id="team-multi-select"
-          multiple
-          [(ngModel)]="selectedTeamIds"
-          class="input-field multi-select"
-          [disabled]="availableTeams.length === 0"
-          [size]="availableTeams.length > 6 ? 6 : (availableTeams.length || 3)">
-          <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
+      <p class="admin-hint" *ngIf="registerableTeams.length === 0">
+        Você não tem times disponíveis para inscrição.
+        <a routerLink="/dashboard">Crie um time</a> no dashboard ou inscreva um time que ainda não está na liga.
+      </p>
+      <div class="admin-form" *ngIf="registerableTeams.length > 0">
+        <label class="form-label" for="register-team">Seu time</label>
+        <select id="register-team" class="input-field" [(ngModel)]="registerTeamId" [disabled]="registeringTeam">
+          <option value="">Selecione...</option>
+          <option *ngFor="let t of registerableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
         </select>
-        <p *ngIf="availableTeams.length === 0" class="admin-hint">
-          Nenhum time disponível. Crie times na página <a routerLink="/create-team">Times</a>.
-        </p>
-        <p class="admin-hint">
-          Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
-          {{ selectedTeamIds.length }} selecionado(s) · {{ remainingSlots }} vaga(s) restante(s)
-        </p>
-        <p *ngIf="selectionOverLimit" class="error-message">
-          Você selecionou mais times do que as vagas disponíveis. Desmarque {{ selectedTeamIds.length - remainingSlots }} time(s).
-        </p>
         <button
           class="btn btn-primary"
-          (click)="addTeamsToLeague()"
-          [disabled]="addingTeams || !canSubmitTeamSelection">
-          {{ addingTeams ? 'Adicionando...' : (selectedTeamIds.length ? 'Adicionar ' + selectedTeamIds.length + ' time(s)' : 'Adicionar times') }}
+          (click)="registerMyTeam()"
+          [disabled]="registeringTeam || !registerTeamId">
+          {{ registeringTeam ? 'Inscrevendo...' : 'Inscrever time' }}
         </button>
-        <button class="btn btn-secondary" (click)="cancelAddTeams()" [disabled]="addingTeams">Cancelar</button>
       </div>
     </div>
 
-    <div class="section-card danger-zone" *ngIf="isAdmin">
-      <h2 class="section-title">Zona de Perigo</h2>
-      <p *ngIf="canArchive" class="admin-hint">
+    <div class="section-card admin-panel" *ngIf="isAdmin">
+      <h2 class="section-title">Administração</h2>
+
+      <div class="admin-stats">
+        <div class="admin-stat">
+          <span class="admin-stat-label">Times inscritos</span>
+          <span class="admin-stat-value">{{ teamCapacityLabel }}</span>
+          <button type="button" class="admin-stat-link" *ngIf="!isArchived" (click)="editMaxTeams = !editMaxTeams">
+            {{ editMaxTeams ? 'Fechar' : 'Alterar limite' }}
+          </button>
+        </div>
+
+        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived">
+          <span class="admin-stat-label">Chaveamento previsto</span>
+          <span class="admin-stat-value">{{ previewBracketSize }} slots</span>
+          <span class="admin-stat-note">{{ league.teams.length }} time(s) · BYEs para favoritos se necessário</span>
+        </div>
+
+        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived">
+          <span class="admin-stat-label">Inscrições públicas</span>
+          <span class="admin-stat-value" [class.is-open]="league.registrationOpen">
+            {{ league.registrationOpen ? 'Abertas' : 'Fechadas' }}
+          </span>
+        </div>
+      </div>
+
+      <p *ngIf="canArchive" class="admin-hint admin-archive-hint">
         Todos os jogos foram finalizados. Você pode arquivar a liga para removê-la da página inicial.
       </p>
-      <div class="danger-actions">
-        <button
-          *ngIf="isArchived"
-          class="btn btn-secondary"
-          (click)="unarchiveLeague()"
-          [disabled]="unarchivingLeague">
-          {{ unarchivingLeague ? 'Desarquivando...' : 'Desarquivar Liga' }}
-        </button>
-        <button
-          *ngIf="canArchive"
-          class="btn btn-secondary"
-          (click)="archiveLeague()"
-          [disabled]="archivingLeague">
-          {{ archivingLeague ? 'Arquivando...' : 'Arquivar Liga' }}
-        </button>
-        <button
-          *ngIf="!isArchived"
-          class="btn btn-danger"
-          (click)="deleteLeague()"
-          [disabled]="deletingLeague">
-          {{ deletingLeague ? 'Excluindo...' : 'Excluir Liga' }}
-        </button>
+
+      <div *ngIf="editMaxTeams && !isArchived" class="admin-inline-panel">
+        <h3 class="admin-panel-title">Limite de vagas</h3>
+        <p class="admin-panel-desc">Deixe vazio para aceitar times sem limite.</p>
+        <div class="admin-form">
+          <label class="form-label" for="max-teams-cap">Máximo de times</label>
+          <input
+            id="max-teams-cap"
+            type="number"
+            class="input-field admin-input-cap"
+            [(ngModel)]="newMaxTeams"
+            [attr.min]="minTeams"
+            [attr.max]="maxTeamsLimit"
+            placeholder="Ilimitado">
+          <button type="button" class="btn btn-primary" (click)="updateMaxTeams()">Salvar</button>
+          <button type="button" class="btn btn-secondary" (click)="editMaxTeams = false">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="admin-settings" *ngIf="!hasBracketGenerated && !isArchived">
+        <div class="admin-setting-row">
+          <div class="admin-setting-copy">
+            <span class="admin-setting-title">Inscrições abertas para outros jogadores</span>
+            <p class="admin-setting-desc">Jogadores verão esta liga no dashboard e poderão inscrever times dos quais são donos.</p>
+          </div>
+          <label class="gc-toggle" [class.is-loading]="togglingRegistration">
+            <input
+              type="checkbox"
+              class="gc-toggle-input"
+              [checked]="league.registrationOpen"
+              [disabled]="togglingRegistration"
+              (change)="toggleRegistrationOpen($event)">
+            <span class="gc-toggle-track" aria-hidden="true"></span>
+            <span class="sr-only">Inscrições abertas para outros jogadores</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="admin-toolbar">
+        <ng-container *ngIf="!isArchived">
+          <button type="button" class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity">
+            Adicionar time
+          </button>
+          <button
+            type="button"
+            class="btn btn-success"
+            (click)="generateBracket()"
+            [disabled]="generatingBracket || league.teams.length < 2">
+            {{ generatingBracket ? 'Gerando...' : (hasBracketGenerated ? 'Regenerar chaveamento' : 'Gerar chaveamento') }}
+          </button>
+        </ng-container>
+
+        <div class="admin-toolbar-danger">
+          <button
+            *ngIf="isArchived"
+            type="button"
+            class="btn btn-secondary"
+            (click)="unarchiveLeague()"
+            [disabled]="unarchivingLeague">
+            {{ unarchivingLeague ? 'Desarquivando...' : 'Desarquivar liga' }}
+          </button>
+          <button
+            *ngIf="canArchive"
+            type="button"
+            class="btn btn-secondary"
+            (click)="archiveLeague()"
+            [disabled]="archivingLeague">
+            {{ archivingLeague ? 'Arquivando...' : 'Arquivar liga' }}
+          </button>
+          <button
+            *ngIf="!isArchived"
+            type="button"
+            class="btn btn-danger"
+            (click)="deleteLeague()"
+            [disabled]="deletingLeague">
+            {{ deletingLeague ? 'Excluindo...' : 'Excluir liga' }}
+          </button>
+        </div>
+      </div>
+
+      <p *ngIf="!hasBracketGenerated && !isArchived" class="admin-footnote">
+        Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.
+      </p>
+
+      <div *ngIf="showAddTeam && !isArchived" class="admin-inline-panel">
+        <h3 class="admin-panel-title">Adicionar times</h3>
+        <p class="admin-panel-desc">Selecione um ou mais times para incluir na liga.</p>
+        <div class="admin-form admin-form-stacked">
+          <label class="form-label" for="team-multi-select">Times disponíveis</label>
+          <select
+            id="team-multi-select"
+            multiple
+            [(ngModel)]="selectedTeamIds"
+            class="input-field multi-select"
+            [disabled]="availableTeams.length === 0"
+            [size]="availableTeams.length > 6 ? 6 : (availableTeams.length || 3)">
+            <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
+          </select>
+          <p *ngIf="availableTeams.length === 0" class="admin-hint">
+            Nenhum time disponível. Crie times na página <a routerLink="/create-team">Times</a>.
+          </p>
+          <p class="admin-hint">
+            Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
+            {{ selectedTeamIds.length }} selecionado(s)
+            <span *ngIf="remainingSlots != null"> · {{ remainingSlots }} vaga(s) restante(s)</span>
+          </p>
+          <p *ngIf="selectionOverLimit && remainingSlots != null" class="error-message">
+            Você selecionou mais times do que as vagas disponíveis. Desmarque {{ selectedTeamIds.length - remainingSlots! }} time(s).
+          </p>
+          <div class="admin-form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="addTeamsToLeague()"
+              [disabled]="addingTeams || !canSubmitTeamSelection">
+              {{ addingTeams ? 'Adicionando...' : (selectedTeamIds.length ? 'Adicionar ' + selectedTeamIds.length + ' time(s)' : 'Adicionar times') }}
+            </button>
+            <button type="button" class="btn btn-secondary" (click)="cancelAddTeams()" [disabled]="addingTeams">Cancelar</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -142,7 +237,7 @@
       <h2 class="section-title">Chaveamento</h2>
       <app-league-bracket
         [teams]="league.teams"
-        [maxTeams]="league.maxTeams || 8"
+        [bracketSize]="league.bracketSize ?? null"
         [matches]="league.matches || []"
         [canManage]="isAdmin && !isArchived"
         [bracketLocked]="hasBracketGenerated"

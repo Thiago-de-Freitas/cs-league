@@ -1,6 +1,6 @@
 <div class="playoff-bracket" *ngIf="hasTeams; else emptyBracket">
   <div class="bracket-toolbar">
-    <span class="teams-count">{{ teams.length }} / {{ bracketSize }} times</span>
+    <span class="teams-count">{{ teams.length }} times · bracket {{ resolvedBracketSize }}</span>
     <span class="bracket-format">Eliminatória simples</span>
     <span *ngIf="canEditSeeds" class="bracket-hint">Selecione os times na 1ª rodada</span>
     <span *ngIf="bracketLocked" class="bracket-hint bracket-hint-locked">Chaveamento gerado</span>

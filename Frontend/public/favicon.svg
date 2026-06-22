@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="CS League">
+  <rect width="32" height="32" rx="5" fill="#ff5500"/>
+  <text
+    x="16"
+    y="21.5"
+    text-anchor="middle"
+    fill="#ffffff"
+    font-family="Arial Narrow, Arial, sans-serif"
+    font-size="14"
+    font-weight="800"
+    letter-spacing="-0.5">CS</text>
+</svg>

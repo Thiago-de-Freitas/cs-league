@@ -138,8 +138,31 @@
     gap: 0.5rem;
   }
 
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-toolbar-danger {
+    margin-left: 0;
+    flex-direction: column;
+  }
+
+  .admin-toolbar .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
   .admin-actions,
-  .danger-actions,
   .admin-form,
   .match-actions,
   .associate-actions {
@@ -148,7 +171,7 @@
   }
 
   .admin-actions .btn,
-  .danger-actions .btn,
+  .admin-toolbar-danger .btn,
   .admin-form .btn,
   .match-actions .btn,
   .associate-actions .btn,

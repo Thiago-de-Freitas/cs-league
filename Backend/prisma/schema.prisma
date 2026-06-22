@@ -105,16 +105,18 @@ model TeamInvite {
 }
 
 model League {
-  id          String       @id @default(cuid())
-  name        String
-  description String       @default("")
-  status      LeagueStatus @default(UPCOMING)
-  maxTeams    Int          @default(8)
-  ownerId     String
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  name              String
+  description       String       @default("")
+  status            LeagueStatus @default(UPCOMING)
+  maxTeams          Int?
+  bracketSize       Int?
+  registrationOpen  Boolean      @default(false)
+  ownerId           String
+  startDate         DateTime?
+  endDate           DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   owner  User         @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   teams  LeagueTeam[]

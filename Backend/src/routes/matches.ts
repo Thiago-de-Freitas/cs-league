@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
+import { resolveBracketSize } from '../lib/bracket';
 import { tryCompleteLeague } from '../lib/leagueComplete';
 import { aggregateMatchStats } from '../lib/matchStats';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
@@ -34,7 +35,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         team1: { select: { id: true, name: true, tag: true } },
         team2: { select: { id: true, name: true, tag: true } },
         winner: { select: { id: true, name: true, tag: true } },
-        league: { select: { id: true, name: true, ownerId: true, maxTeams: true } },
+        league: { select: { id: true, name: true, ownerId: true, maxTeams: true, bracketSize: true } },
         demos: {
           where: { isPersonal: false },
           include: { stats: true },
@@ -93,7 +94,7 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const match = await prisma.match.findUnique({
       where: { id: req.params.id },
-      include: { league: true },
+      include: { league: { select: { maxTeams: true, bracketSize: true } } },
     });
 
     if (!match) {
@@ -146,7 +147,10 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       await tryAdvanceBracket(
         tx,
         { ...match, winnerId },
-        match.league.maxTeams
+        resolveBracketSize(
+          await tx.leagueTeam.count({ where: { leagueId: match.leagueId } }),
+          match.league.bracketSize
+        )
       );
 
       await tryCompleteLeague(tx, match.leagueId);

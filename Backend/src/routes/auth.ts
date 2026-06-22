@@ -1,11 +1,14 @@
 import { Router, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
+import { promisify } from 'node:util';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
 
 const router = Router();
+const hashPassword = promisify(bcrypt.hash);
+const comparePassword = promisify(bcrypt.compare);
 const BCRYPT_ROUNDS = 12;
 const MAX_DISPLAY_NAME_LENGTH = 100;
 const MAX_EMAIL_LENGTH = 255;
@@ -61,7 +64,7 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const passwordHash = await hashPassword(password, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
       data: {
         email: email.trim().toLowerCase(),
@@ -96,7 +99,7 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
       return;
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await comparePassword(password, user.passwordHash);
     if (!valid) {
       res.status(401).json({ error: 'Credenciais inválidas' });
       return;

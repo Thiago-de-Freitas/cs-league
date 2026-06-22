@@ -25,7 +25,7 @@
             <span class="league-name">{{ league.name }}</span>
             <span class="badge badge-gray">{{ getStatusLabel(league.status) }}</span>
             <span class="meta" *ngIf="league.teamCount !== undefined">
-              {{ league.teamCount }}/{{ league.maxTeams || 8 }} times
+              {{ league.teamCount != null ? (league.maxTeams != null ? league.teamCount + '/' + league.maxTeams : league.teamCount) : '' }} times
             </span>
           </div>
           <button class="btn btn-secondary btn-small" (click)="goToLeagueDetailsById(league.id)">

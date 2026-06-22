@@ -29,6 +29,16 @@
   text-decoration: none;
 }
 
+.open-league-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
 .ranking-player-link:hover {
   color: var(--gc-orange);
 }

@@ -18,20 +18,20 @@ export interface BracketSeedAssignEvent {
 })
 export class LeagueBracketComponent implements OnChanges {
   @Input() teams: Team[] = [];
-  @Input() maxTeams = 8;
+  @Input() bracketSize: number | null = null;
   @Input() matches: Match[] = [];
   @Input() canManage = false;
   @Input() bracketLocked = false;
   @Output() seedAssign = new EventEmitter<BracketSeedAssignEvent>();
   @Output() matchClick = new EventEmitter<string>();
 
-  bracketSize = 8;
+  resolvedBracketSize = 8;
   columns: BracketColumnView[] = [];
   hasTeams = false;
   treeHeight = 0;
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['teams'] || changes['maxTeams'] || changes['matches']) {
+    if (changes['teams'] || changes['bracketSize'] || changes['matches']) {
       this.rebuild();
     }
   }
@@ -71,8 +71,8 @@ export class LeagueBracketComponent implements OnChanges {
     this.hasTeams = this.teams.length >= 2;
     if (!this.hasTeams) return;
 
-    const view = buildBracketView(this.teams, this.maxTeams, this.matches);
-    this.bracketSize = view.bracketSize;
+    const view = buildBracketView(this.teams, this.teams.length, this.bracketSize, this.matches);
+    this.resolvedBracketSize = view.bracketSize;
     this.columns = view.columns;
     const firstRoundMatches = view.columns[0]?.matches.length ?? 1;
     this.treeHeight = firstRoundMatches * 76 + Math.max(0, firstRoundMatches - 1) * 20;

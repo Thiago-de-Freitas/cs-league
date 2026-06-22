@@ -11,7 +11,7 @@ export async function canUserAccessLeague(
 
   const league = await prisma.league.findUnique({
     where: { id: leagueId },
-    select: { ownerId: true },
+    select: { ownerId: true, registrationOpen: true, status: true },
   });
 
   if (!league) {
@@ -19,6 +19,10 @@ export async function canUserAccessLeague(
   }
 
   if (league.ownerId === userId) {
+    return { allowed: true };
+  }
+
+  if (league.registrationOpen && league.status === 'UPCOMING') {
     return { allowed: true };
   }
 

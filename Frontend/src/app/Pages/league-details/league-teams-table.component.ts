@@ -34,10 +34,10 @@ import { AuthService } from '../../Services/auth.service';
       <td>{{ team.wins }}</td>
       <td>{{ team.losses }}</td>
       <td>{{ team.points }}</td>
-      <td *ngIf="showActionsColumn">
-        <button *ngIf="canEditTeam(team)" (click)="editTeam.emit(team)">Editar</button>
-        <button *ngIf="canManageLeague" (click)="removeTeam.emit(team.id)">Remover</button>
-        <span *ngIf="!canEditTeam(team) && !canManageLeague" class="meta">—</span>
+      <td *ngIf="showActionsColumn" class="team-actions-cell">
+        <button *ngIf="canEditTeam(team)" type="button" class="btn btn-secondary btn-small" (click)="editTeam.emit(team)">Editar</button>
+        <button *ngIf="canRemoveTeams" type="button" class="btn btn-danger btn-small" (click)="removeTeam.emit(team.id)">Remover</button>
+        <span *ngIf="!canEditTeam(team) && !canRemoveTeams" class="meta">—</span>
       </td>
     </tr>
   </tbody>
@@ -48,6 +48,7 @@ import { AuthService } from '../../Services/auth.service';
 export class LeagueTeamsTableComponent {
   @Input() teams: Team[] = [];
   @Input() canManageLeague = false;
+  @Input() canRemoveTeams = false;
   @Output() teamsReordered = new EventEmitter<Team[]>();
   @Output() editTeam = new EventEmitter<Team>();
   @Output() removeTeam = new EventEmitter<string>();
@@ -55,7 +56,7 @@ export class LeagueTeamsTableComponent {
   constructor(private authService: AuthService) {}
 
   get showActionsColumn(): boolean {
-    return this.canManageLeague || this.teams.some((t) => this.canEditTeam(t));
+    return this.canRemoveTeams || this.canManageLeague || this.teams.some((t) => this.canEditTeam(t));
   }
 
   canEditTeam(team: Team): boolean {

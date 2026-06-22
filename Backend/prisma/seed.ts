@@ -1,6 +1,9 @@
 import { PrismaClient, LeagueStatus, MatchStatus } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
+import { promisify } from 'node:util';
 import { getFirstRoundPairings } from '../src/lib/bracket';
+
+const hashPassword = promisify(bcrypt.hash);
 
 const prisma = new PrismaClient();
 const PASSWORD = '123456';
@@ -38,7 +41,7 @@ const TEAMS = [
 
 async function main() {
   console.log('🌱 Populando banco de dados...\n');
-  const passwordHash = await bcrypt.hash(PASSWORD, 10);
+  const passwordHash = await hashPassword(PASSWORD, 10);
 
   const userMap = new Map<string, string>();
   for (const u of USERS) {
@@ -172,10 +175,16 @@ async function main() {
         description: 'Torneio rápido 16 times — inscrições abertas',
         status: LeagueStatus.UPCOMING,
         maxTeams: 16,
+        registrationOpen: true,
         ownerId: userMap.get('admin@test.com')!,
         startDate: new Date('2026-07-15'),
       },
     });
+
+  await prisma.league.update({
+    where: { id: cupLeague.id },
+    data: { registrationOpen: true },
+  });
 
   const cupTags = ['FURIA', 'VIT', 'G2', 'FAZE'];
   for (let i = 0; i < cupTags.length; i++) {

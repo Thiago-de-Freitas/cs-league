@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
 import { RankingsService } from '../../Services/rankings.service';
@@ -11,6 +12,7 @@ import { CreateLeagueModalComponent } from '../../Components/create-league-modal
 import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/create-team-modal/create-team-modal.component';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { Demo } from '../../Models/interfaces';
+import { formatTeamCapacity } from '../../Utils/bracket.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -21,6 +23,7 @@ import { Demo } from '../../Models/interfaces';
 })
 export class DashboardComponent implements OnInit {
   leagues: League[] = [];
+  openLeagues: League[] = [];
   teams: Team[] = [];
   loading = true;
   userName = '';
@@ -33,6 +36,7 @@ export class DashboardComponent implements OnInit {
   teamRankings: TeamRankingEntry[] = [];
   rankingsLoading = true;
   rankingLeagueId = '';
+  formatTeamCapacity = formatTeamCapacity;
 
   constructor(
     private leagueService: LeagueService,
@@ -51,18 +55,21 @@ export class DashboardComponent implements OnInit {
 
   loadData(): void {
     this.loading = true;
-    this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
-      next: (leagues) => {
+    forkJoin({
+      leagues: this.leagueService.getLeagues(this.showArchivedLeagues),
+      openLeagues: this.leagueService.getOpenLeagues(),
+      teams: this.teamService.getTeams(),
+      invites: this.teamService.getPendingInvites(),
+    }).subscribe({
+      next: ({ leagues, openLeagues, teams, invites }) => {
         this.leagues = leagues;
+        const myIds = new Set(leagues.map((l) => l.id));
+        this.openLeagues = openLeagues.filter((l) => !myIds.has(l.id));
+        this.teams = teams;
+        this.pendingInvites = invites;
         this.loading = false;
       },
-      error: () => (this.loading = false)
-    });
-    this.teamService.getTeams().subscribe({
-      next: (teams) => (this.teams = teams)
-    });
-    this.teamService.getPendingInvites().subscribe({
-      next: (invites) => (this.pendingInvites = invites)
+      error: () => (this.loading = false),
     });
     this.loadRankings();
   }

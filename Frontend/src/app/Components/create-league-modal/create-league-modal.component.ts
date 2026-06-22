@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LeagueService } from '../../Services/league.service';
 import { League } from '../../Models/interfaces';
-import { ALLOWED_BRACKET_SIZES } from '../../Utils/bracket.util';
+import { MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
 
 @Component({
   selector: 'app-create-league-modal',
@@ -19,7 +19,8 @@ export class CreateLeagueModalComponent {
   form: FormGroup;
   loading = false;
   errorMessage = '';
-  bracketSizes = ALLOWED_BRACKET_SIZES;
+  minTeams = MIN_LEAGUE_TEAMS;
+  maxTeamsLimit = MAX_LEAGUE_TEAMS;
 
   constructor(
     private fb: FormBuilder,
@@ -28,7 +29,8 @@ export class CreateLeagueModalComponent {
     this.form = this.fb.group({
       leagueName: ['', Validators.required],
       description: ['', Validators.maxLength(500)],
-      maxTeams: [8, Validators.required],
+      maxTeams: [''],
+      registrationOpen: [false],
     });
   }
 
@@ -52,12 +54,23 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams } = this.form.value;
+    const { leagueName, description, maxTeams, registrationOpen } = this.form.value;
+    const capRaw = String(maxTeams ?? '').trim();
+    let registrationCap: number | null = null;
+    if (capRaw) {
+      registrationCap = Number(capRaw);
+      if (!Number.isInteger(registrationCap) || registrationCap < MIN_LEAGUE_TEAMS || registrationCap > MAX_LEAGUE_TEAMS) {
+        this.loading = false;
+        this.errorMessage = `Limite de vagas deve ser entre ${MIN_LEAGUE_TEAMS} e ${MAX_LEAGUE_TEAMS}, ou deixe em branco.`;
+        return;
+      }
+    }
 
     this.leagueService.createLeague({
       name: leagueName,
       description,
-      maxTeams: Number(maxTeams),
+      maxTeams: registrationCap,
+      registrationOpen: !!registrationOpen,
     }).subscribe({
       next: (league) => {
         this.loading = false;

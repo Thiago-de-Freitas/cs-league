@@ -14,6 +14,10 @@ export class LeagueService {
     return this.http.get<League[]>(`${this.apiUrl}${params}`);
   }
 
+  getOpenLeagues(): Observable<League[]> {
+    return this.http.get<League[]>(`${this.apiUrl}/open`);
+  }
+
   getLeagueById(id: string): Observable<League> {
     return this.http.get<League>(`${this.apiUrl}/${id}`);
   }
@@ -21,15 +25,16 @@ export class LeagueService {
   createLeague(data: {
     name: string;
     description?: string;
-    maxTeams?: number;
+    maxTeams?: number | null;
     startDate?: string;
     endDate?: string;
     status?: string;
+    registrationOpen?: boolean;
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data);
   }
 
-  updateLeague(id: string, data: Partial<League>): Observable<League> {
+  updateLeague(id: string, data: Partial<League> & { maxTeams?: number | null }): Observable<League> {
     return this.http.put<League>(`${this.apiUrl}/${id}`, data);
   }
 
@@ -55,6 +60,10 @@ export class LeagueService {
 
   addTeamToLeague(leagueId: string, teamId: string, seed?: number): Observable<League> {
     return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams`, { teamId, seed });
+  }
+
+  registerTeamInLeague(leagueId: string, teamId: string): Observable<League> {
+    return this.http.post<League>(`${this.apiUrl}/${leagueId}/register`, { teamId });
   }
 
   removeTeamFromLeague(leagueId: string, teamId: string): Observable<League> {

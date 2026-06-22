@@ -2,13 +2,17 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import {
-  ALLOWED_BRACKET_SIZES,
+  getFairBracketSize,
   getFirstRoundPairings,
-  isValidBracketSize,
+  hasRegistrationSlots,
+  isValidRegistrationCap,
+  parseRegistrationCap,
   rankTeamsForSeeding,
+  resolveBracketSize,
 } from '../lib/bracket';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { canUserAccessLeague } from '../lib/leaguePermissions';
+import { canUserRegisterTeam } from '../lib/leagueRegistration';
 
 const router = Router();
 
@@ -65,6 +69,9 @@ function formatLeague(
     description: league.description,
     status: league.status.toLowerCase(),
     maxTeams: league.maxTeams,
+    bracketSize: league.bracketSize,
+    effectiveBracketSize: resolveBracketSize(league.teams.length, league.bracketSize),
+    registrationOpen: league.registrationOpen,
     ownerId: league.ownerId,
     owner: league.owner,
     startDate: league.startDate,
@@ -143,6 +150,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         description: l.description,
         status: l.status.toLowerCase(),
         maxTeams: l.maxTeams,
+        registrationOpen: l.registrationOpen,
         ownerId: l.ownerId,
         startDate: l.startDate,
         endDate: l.endDate,
@@ -153,6 +161,51 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao listar ligas' });
+  }
+});
+
+router.get('/open', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ownedTeams = await prisma.team.findMany({
+      where: { ownerId: userId },
+      select: { id: true },
+    });
+    const ownedTeamIds = new Set(ownedTeams.map((t) => t.id));
+
+    const leagues = await prisma.league.findMany({
+      where: {
+        registrationOpen: true,
+        status: 'UPCOMING',
+      },
+      include: {
+        owner: { select: { id: true, displayName: true } },
+        teams: { select: { teamId: true } },
+        _count: { select: { matches: true, teams: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(
+      leagues
+        .filter((l) => l._count.matches === 0 && hasRegistrationSlots(l._count.teams, l.maxTeams))
+        .map((l) => ({
+          id: l.id,
+          name: l.name,
+          description: l.description,
+          status: l.status.toLowerCase(),
+          maxTeams: l.maxTeams,
+          registrationOpen: true,
+          ownerId: l.ownerId,
+          owner: l.owner,
+          teamCount: l._count.teams,
+          remainingSlots: l.maxTeams == null ? null : l.maxTeams - l._count.teams,
+          userHasTeamInLeague: l.teams.some((lt) => ownedTeamIds.has(lt.teamId)),
+        }))
+    );
+  } catch (err) {
+    console.error('GET /api/leagues/open', err);
+    res.status(500).json({ error: 'Erro ao listar ligas abertas' });
   }
 });
 
@@ -179,25 +232,27 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, startDate, endDate, status, maxTeams } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen } = req.body;
     if (!name) {
       res.status(400).json({ error: 'Nome é obrigatório' });
       return;
     }
 
-    const bracketSize = maxTeams ?? 8;
-    if (!isValidBracketSize(bracketSize)) {
+    if (!isValidRegistrationCap(maxTeams)) {
       res.status(400).json({
-        error: `Quantidade de times inválida. Use: ${ALLOWED_BRACKET_SIZES.join(', ')}`,
+        error: 'Limite de vagas inválido. Use entre 2 e 64 ou deixe em branco (ilimitado).',
       });
       return;
     }
+
+    const registrationCap = parseRegistrationCap(maxTeams);
 
     const league = await prisma.league.create({
       data: {
         name,
         description: description || '',
-        maxTeams: bracketSize,
+        maxTeams: registrationCap,
+        registrationOpen: registrationOpen === true,
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -223,19 +278,36 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { name, description, startDate, endDate, status, maxTeams } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen } = req.body;
 
-    if (maxTeams !== undefined) {
-      if (!isValidBracketSize(maxTeams)) {
+    if (registrationOpen === true) {
+      const matchCount = await prisma.match.count({ where: { leagueId: req.params.id } });
+      if (matchCount > 0) {
         res.status(400).json({
-          error: `Quantidade de times inválida. Use: ${ALLOWED_BRACKET_SIZES.join(', ')}`,
+          error: 'Não é possível abrir inscrições após o chaveamento ser gerado.',
         });
         return;
       }
-      const teamCount = await prisma.leagueTeam.count({ where: { leagueId: req.params.id } });
-      if (teamCount > maxTeams) {
+      if (check.league.status !== 'UPCOMING') {
         res.status(400).json({
-          error: `Não é possível reduzir para ${maxTeams} times. A liga já tem ${teamCount} times.`,
+          error: 'Inscrições só podem ficar abertas em ligas com status "Em breve".',
+        });
+        return;
+      }
+    }
+
+    if (maxTeams !== undefined) {
+      if (!isValidRegistrationCap(maxTeams)) {
+        res.status(400).json({
+          error: 'Limite de vagas inválido. Use entre 2 e 64 ou null para ilimitado.',
+        });
+        return;
+      }
+      const registrationCap = parseRegistrationCap(maxTeams);
+      const teamCount = await prisma.leagueTeam.count({ where: { leagueId: req.params.id } });
+      if (registrationCap != null && teamCount > registrationCap) {
+        res.status(400).json({
+          error: `Não é possível reduzir para ${registrationCap} vagas. A liga já tem ${teamCount} times.`,
         });
         return;
       }
@@ -249,7 +321,8 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
         ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
         ...(status && { status: status.toUpperCase() }),
-        ...(maxTeams !== undefined && { maxTeams }),
+        ...(maxTeams !== undefined && { maxTeams: parseRegistrationCap(maxTeams) }),
+        ...(registrationOpen !== undefined && { registrationOpen: registrationOpen === true }),
       },
     });
 
@@ -366,6 +439,83 @@ router.post('/:id/unarchive', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
+router.post('/:id/register', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { teamId } = req.body as { teamId?: string };
+    if (!teamId) {
+      res.status(400).json({ error: 'teamId é obrigatório' });
+      return;
+    }
+
+    const league = await prisma.league.findUnique({
+      where: { id: req.params.id },
+      include: {
+        teams: { select: { teamId: true } },
+        _count: { select: { matches: true, teams: true } },
+      },
+    });
+
+    if (!league) {
+      res.status(404).json({ error: 'Liga não encontrada' });
+      return;
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+
+    const leagueForCheck = {
+      registrationOpen: league.registrationOpen,
+      status: league.status,
+      maxTeams: league.maxTeams,
+      teamCount: league._count.teams,
+      matchCount: league._count.matches,
+    };
+
+    const teamAlreadyInLeague = league.teams.some((lt) => lt.teamId === teamId);
+    const access = canUserRegisterTeam(
+      req.user!.userId,
+      req.user!.role,
+      leagueForCheck,
+      team,
+      teamAlreadyInLeague
+    );
+
+    if (!access.allowed) {
+      res.status(400).json({ error: access.error });
+      return;
+    }
+
+    const count = league._count.teams;
+    await prisma.leagueTeam.create({
+      data: {
+        leagueId: req.params.id,
+        teamId,
+        seed: count + 1,
+      },
+    });
+
+    if (!hasRegistrationSlots(count + 1, league.maxTeams)) {
+      await prisma.league.update({
+        where: { id: req.params.id },
+        data: { registrationOpen: false },
+      });
+    }
+
+    const full = await getLeagueWithDetails(req.params.id);
+    res.status(201).json(formatLeague(full!));
+  } catch (err) {
+    console.error('POST /api/leagues/:id/register', err);
+    res.status(500).json({ error: 'Erro ao inscrever time na liga' });
+  }
+});
+
 router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
@@ -382,10 +532,9 @@ router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Res
 
     const uniqueIds = [...new Set(teamIds)];
     let count = await prisma.leagueTeam.count({ where: { leagueId: req.params.id } });
-    const maxTeams = check.league.maxTeams;
 
     for (const teamId of uniqueIds) {
-      if (count >= maxTeams) break;
+      if (!hasRegistrationSlots(count, check.league.maxTeams)) break;
       const exists = await prisma.leagueTeam.findUnique({
         where: { leagueId_teamId: { leagueId: req.params.id, teamId } },
       });
@@ -419,9 +568,11 @@ router.post('/:id/teams', authMiddleware, async (req: AuthRequest, res: Response
     }
 
     const count = await prisma.leagueTeam.count({ where: { leagueId: req.params.id } });
-    if (count >= check.league.maxTeams) {
+    if (!hasRegistrationSlots(count, check.league.maxTeams)) {
       res.status(400).json({
-        error: `Limite de ${check.league.maxTeams} times atingido. Ajuste o limite ou remova um time.`,
+        error: check.league.maxTeams != null
+          ? `Limite de ${check.league.maxTeams} times atingido. Ajuste o limite ou remova um time.`
+          : 'Limite máximo de times da liga atingido.',
       });
       return;
     }
@@ -450,18 +601,46 @@ router.delete('/:id/teams/:teamId', authMiddleware, async (req: AuthRequest, res
       return;
     }
 
-    const deleted = await prisma.leagueTeam.deleteMany({
-      where: { leagueId: req.params.id, teamId: req.params.teamId },
+    const teamInMatch = await prisma.match.count({
+      where: {
+        leagueId: req.params.id,
+        OR: [{ team1Id: req.params.teamId }, { team2Id: req.params.teamId }],
+        status: { in: ['IN_PROGRESS', 'COMPLETED'] },
+      },
     });
 
-    if (deleted.count === 0) {
-      res.status(404).json({ error: 'Time não encontrado na liga' });
+    if (teamInMatch > 0) {
+      res.status(400).json({
+        error: 'Não é possível remover um time com partidas em andamento ou finalizadas.',
+      });
       return;
     }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.match.deleteMany({
+        where: {
+          leagueId: req.params.id,
+          OR: [{ team1Id: req.params.teamId }, { team2Id: req.params.teamId }],
+          status: { in: ['SCHEDULED', 'CANCELLED'] },
+        },
+      });
+
+      const deleted = await tx.leagueTeam.deleteMany({
+        where: { leagueId: req.params.id, teamId: req.params.teamId },
+      });
+
+      if (deleted.count === 0) {
+        throw new Error('TEAM_NOT_IN_LEAGUE');
+      }
+    });
 
     const full = await getLeagueWithDetails(req.params.id);
     res.json(formatLeague(full!));
   } catch (err) {
+    if (err instanceof Error && err.message === 'TEAM_NOT_IN_LEAGUE') {
+      res.status(404).json({ error: 'Time não encontrado na liga' });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: 'Erro ao remover time da liga' });
   }
@@ -544,7 +723,7 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
       prisma.match.deleteMany({ where: { leagueId: req.params.id } }),
     ]);
 
-    const bracketSize = check.league.maxTeams;
+    const bracketSize = getFairBracketSize(ranked.length);
     const pairings = getFirstRoundPairings(bracketSize);
     const seedToTeam = new Map<number, (typeof ranked)[0]>();
     ranked.forEach((lt, i) => seedToTeam.set(i + 1, lt));
@@ -601,7 +780,7 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
       );
       await tx.league.update({
         where: { id: req.params.id },
-        data: { status: 'ONGOING' },
+        data: { status: 'ONGOING', registrationOpen: false, bracketSize },
       });
     });
 

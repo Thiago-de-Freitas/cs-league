@@ -32,11 +32,27 @@
       </div>
 
       <div class="form-group">
-        <label for="max-teams" class="form-label">Quantidade máxima de times</label>
-        <select id="max-teams" formControlName="maxTeams" class="input-field">
-          <option *ngFor="let size of bracketSizes" [value]="size">{{ size }} times</option>
-        </select>
-        <p class="form-hint">O chaveamento será calculado de forma justa (1×{{ form.get('maxTeams')?.value }}, favoritos não se enfrentam cedo).</p>
+        <label for="max-teams" class="form-label">Limite de vagas (opcional)</label>
+        <input
+          id="max-teams"
+          type="number"
+          formControlName="maxTeams"
+          class="input-field"
+          [attr.min]="minTeams"
+          [attr.max]="maxTeamsLimit"
+          placeholder="Ilimitado — chaveamento se adapta aos times inscritos">
+        <p class="form-hint">
+          Deixe em branco para aceitar qualquer quantidade (até {{ maxTeamsLimit }}).
+          O chaveamento usa a próxima potência de 2 (ex.: 5 times → bracket de 8 com BYEs para favoritos).
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label checkbox-label">
+          <input type="checkbox" formControlName="registrationOpen">
+          Permitir que outros jogadores inscrevam seus times
+        </label>
+        <p class="form-hint">Com inscrições abertas, a liga aparece no dashboard de todos os jogadores.</p>
       </div>
 
       <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>

@@ -1,8 +1,29 @@
-export const ALLOWED_BRACKET_SIZES = [4, 8, 16, 32] as const;
-export type BracketSize = (typeof ALLOWED_BRACKET_SIZES)[number];
+export const MIN_LEAGUE_TEAMS = 2;
+export const MAX_LEAGUE_TEAMS = 64;
 
-export function isValidBracketSize(n: number): n is BracketSize {
-  return (ALLOWED_BRACKET_SIZES as readonly number[]).includes(n);
+export function getFairBracketSize(teamCount: number): number {
+  if (teamCount < MIN_LEAGUE_TEAMS) {
+    return MIN_LEAGUE_TEAMS;
+  }
+  let size = MIN_LEAGUE_TEAMS;
+  while (size < teamCount) {
+    size *= 2;
+  }
+  return Math.min(size, MAX_LEAGUE_TEAMS);
+}
+
+export function resolveBracketSize(teamCount: number, storedBracketSize?: number | null): number {
+  if (storedBracketSize != null && storedBracketSize >= MIN_LEAGUE_TEAMS) {
+    return storedBracketSize;
+  }
+  return getFairBracketSize(teamCount);
+}
+
+export function formatTeamCapacity(teamCount: number, maxTeams?: number | null): string {
+  if (maxTeams == null) {
+    return `${teamCount} time${teamCount === 1 ? '' : 's'}`;
+  }
+  return `${teamCount} / ${maxTeams} times`;
 }
 
 export function getBracketSeedOrder(size: number): number[] {
@@ -158,14 +179,15 @@ function advanceRound(matches: BracketMatchView[]): BracketMatchView[] {
 
 export function buildBracketView(
   teams: TeamSeedInput[],
-  maxTeams: number,
+  teamCount: number,
+  storedBracketSize: number | null | undefined,
   matches: MatchInput[] = []
 ): {
   bracketSize: number;
   columns: BracketColumnView[];
   totalRounds: number;
 } {
-  const bracketSize = maxTeams || 8;
+  const bracketSize = resolveBracketSize(teamCount, storedBracketSize);
   const totalRounds = Math.log2(bracketSize);
   const ranked = rankTeamsForSeeding(teams);
   const seedMap = new Map<number, TeamSeedInput>();

@@ -1,8 +1,65 @@
-export const ALLOWED_BRACKET_SIZES = [4, 8, 16, 32] as const;
-export type BracketSize = (typeof ALLOWED_BRACKET_SIZES)[number];
+/** Mínimo de times para gerar chaveamento; máximo suportado pelo algoritmo (potências de 2). */
+export const MIN_LEAGUE_TEAMS = 2;
+export const MAX_LEAGUE_TEAMS = 64;
 
-export function isValidBracketSize(n: number): n is BracketSize {
-  return (ALLOWED_BRACKET_SIZES as readonly number[]).includes(n);
+/** Próxima potência de 2 >= n (chaveamento single-elimination com BYEs para favoritos). */
+export function getFairBracketSize(teamCount: number): number {
+  if (teamCount < MIN_LEAGUE_TEAMS) {
+    return MIN_LEAGUE_TEAMS;
+  }
+  let size = MIN_LEAGUE_TEAMS;
+  while (size < teamCount) {
+    size *= 2;
+  }
+  return Math.min(size, MAX_LEAGUE_TEAMS);
+}
+
+/** Tamanho do bracket em uso: fixado após gerar chaveamento ou estimado pelos times atuais. */
+export function resolveBracketSize(teamCount: number, storedBracketSize?: number | null): number {
+  if (storedBracketSize != null && storedBracketSize >= MIN_LEAGUE_TEAMS) {
+    return storedBracketSize;
+  }
+  return getFairBracketSize(teamCount);
+}
+
+export function isValidRegistrationCap(value: unknown): value is number | null | undefined {
+  if (value === null || value === undefined || value === '') {
+    return true;
+  }
+  const n = Number(value);
+  return Number.isInteger(n) && n >= MIN_LEAGUE_TEAMS && n <= MAX_LEAGUE_TEAMS;
+}
+
+export function parseRegistrationCap(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < MIN_LEAGUE_TEAMS || n > MAX_LEAGUE_TEAMS) {
+    return null;
+  }
+  return n;
+}
+
+export function hasRegistrationSlots(teamCount: number, maxTeams: number | null | undefined): boolean {
+  if (maxTeams == null) {
+    return teamCount < MAX_LEAGUE_TEAMS;
+  }
+  return teamCount < maxTeams;
+}
+
+export function remainingRegistrationSlots(teamCount: number, maxTeams: number | null | undefined): number | null {
+  if (maxTeams == null) {
+    return null;
+  }
+  return Math.max(0, maxTeams - teamCount);
+}
+
+/** @deprecated Use getFairBracketSize — mantido para compatibilidade de imports antigos */
+export const ALLOWED_BRACKET_SIZES = [4, 8, 16, 32] as const;
+
+export function isValidBracketSize(n: number): boolean {
+  return Number.isInteger(n) && n >= MIN_LEAGUE_TEAMS && n <= MAX_LEAGUE_TEAMS && (n & (n - 1)) === 0;
 }
 
 /** Ordem clássica de chaveamento: 1×N, evita confronto precoce entre favoritos */

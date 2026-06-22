@@ -41,16 +41,21 @@ export interface League {
   id: string;
   name: string;
   description: string;
-  maxTeams?: number;
+  maxTeams?: number | null;
+  bracketSize?: number | null;
+  effectiveBracketSize?: number;
   startDate?: Date | string | null;
   endDate?: Date | string | null;
   teams: Team[];
   matches?: Match[];
   status: 'upcoming' | 'ongoing' | 'completed' | 'archived' | string;
+  registrationOpen?: boolean;
   ownerId?: string;
   owner?: { id: string; displayName: string };
   teamCount?: number;
   matchCount?: number;
+  remainingSlots?: number;
+  userHasTeamInLeague?: boolean;
 }
 
 export interface Match {
@@ -65,7 +70,7 @@ export interface Match {
   bracketPosition?: number | null;
   map?: string | null;
   playedAt?: string | null;
-  league?: { id: string; name: string; ownerId: string; maxTeams?: number };
+  league?: { id: string; name: string; ownerId: string; maxTeams?: number | null; bracketSize?: number | null };
   demos?: Demo[];
   aggregatedStats?: MatchPlayerStat[];
   hasGeneralDemo?: boolean;

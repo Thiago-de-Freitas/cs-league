@@ -10,6 +10,7 @@ import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { CS2_MAPS } from '../../Utils/maps';
+import { resolveBracketSize } from '../../Utils/bracket.util';
 
 @Component({
   selector: 'app-match-details',
@@ -271,8 +272,9 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
 
   getRoundLabel(round?: number): string {
     if (!round || !this.match?.league) return '';
-    const max = (this.match as Match & { league?: { maxTeams?: number } }).league;
-    const total = Math.log2(max?.maxTeams || 8);
+    const league = this.match.league as { bracketSize?: number | null; maxTeams?: number | null };
+    const bracketSize = resolveBracketSize(0, league.bracketSize ?? league.maxTeams);
+    const total = Math.log2(bracketSize);
     const remaining = total - round + 1;
     if (remaining === 1) return 'Final';
     if (remaining === 2) return 'Semifinal';

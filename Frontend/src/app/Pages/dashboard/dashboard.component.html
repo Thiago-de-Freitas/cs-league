@@ -10,6 +10,21 @@
   <div *ngIf="loading" class="loading">Carregando...</div>
 
   <div class="dashboard-grid" *ngIf="!loading">
+    <section class="dashboard-card gc-card dashboard-card-full" *ngIf="openLeagues.length > 0">
+      <h2 class="gc-card-title">Ligas com inscrições abertas</h2>
+      <p class="meta mb-4">Inscreva um dos seus times e dispute com outros jogadores.</p>
+      <ul class="gc-list">
+        <li *ngFor="let league of openLeagues" class="gc-list-item">
+          <div class="open-league-info">
+            <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
+            <span class="meta" *ngIf="league.owner">por {{ league.owner.displayName }}</span>
+          </div>
+          <span class="badge badge-orange">Inscrições abertas</span>
+          <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
+        </li>
+      </ul>
+    </section>
+
     <section class="dashboard-card gc-card dashboard-card-full" *ngIf="pendingInvites.length > 0">
       <h2 class="gc-card-title">Convites de Times</h2>
       <ul class="gc-list">
@@ -37,7 +52,7 @@
         <li *ngFor="let league of leagues" class="gc-list-item">
           <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
           <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
-          <span class="meta">{{ league.teamCount || 0 }} times</span>
+          <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
         </li>
       </ul>
       <ng-template #noLeagues>
