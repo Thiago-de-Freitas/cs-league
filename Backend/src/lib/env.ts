@@ -32,7 +32,7 @@ export function getCoreEnvErrors(): string[] {
   return errors;
 }
 
-/** Erros de Redis — bloqueiam só fila de demos, não login/cadastro. */
+/** Erros de Redis — só relevante para fila de demos (opcional no startup). */
 export function getRedisEnvErrors(): string[] {
   if (process.env.NODE_ENV !== 'production') {
     return [];
@@ -41,13 +41,51 @@ export function getRedisEnvErrors(): string[] {
   const errors: string[] = [];
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) {
-    errors.push('REDIS_URL deve ser definido (referência ${{Redis.REDIS_URL}})');
-  } else if (isUnresolvedRailwayRef(redisUrl)) {
-    errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ao serviço API');
+    return errors;
+  }
+  if (isUnresolvedRailwayRef(redisUrl)) {
+    errors.push('REDIS_URL não foi resolvida — vincule o plugin Redis ou cole a URL copiada do serviço Redis');
   } else {
     logRedisUrlWarnings(redisUrl);
   }
   return errors;
+}
+
+/** Avisos quando Redis não está configurado (demos não processam). */
+export function getRedisWarnings(): string[] {
+  if (process.env.NODE_ENV !== 'production') {
+    return [];
+  }
+  if (process.env.REDIS_URL?.trim()) {
+    return [];
+  }
+  return [
+    'REDIS_URL não configurado — login e ligas funcionam, mas demos ficarão em Aguardando até adicionar Redis + Worker.',
+  ];
+}
+
+/** Diagnóstico sem expor secrets (para debug na Railway). */
+export function getEnvConfigStatus() {
+  const cors = process.env.CORS_ORIGIN?.trim() ?? '';
+  const jwt = process.env.JWT_SECRET ?? '';
+  const db = process.env.DATABASE_URL?.trim() ?? '';
+  const redis = process.env.REDIS_URL?.trim() ?? '';
+
+  return {
+    nodeEnv: process.env.NODE_ENV ?? 'development',
+    core: {
+      corsOrigin: { set: cors.length > 0, length: cors.length, unresolvedRef: cors ? isUnresolvedRailwayRef(cors) : false },
+      jwtSecret: { set: jwt.length > 0, length: jwt.length, minLengthOk: jwt.length >= 32 },
+      databaseUrl: { set: db.length > 0, unresolvedRef: db ? isUnresolvedRailwayRef(db) : false },
+    },
+    redis: {
+      set: redis.length > 0,
+      unresolvedRef: redis ? isUnresolvedRailwayRef(redis) : false,
+    },
+    coreErrors: getCoreEnvErrors(),
+    redisErrors: getRedisEnvErrors(),
+    warnings: getRedisWarnings(),
+  };
 }
 
 /** Todos os erros de config (core + redis). */

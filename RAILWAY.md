@@ -94,6 +94,25 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
 
 5. Atualize `CORS_ORIGIN` com a URL gerada e redeploy se necessário
 
+#### Serviço front separado (cs-league-front) — Opção B
+
+Se você criou um serviço **cs-league-front** além da API:
+
+1. **Settings → Root Directory** = `Frontend` (**obrigatório**)
+2. Confirme que o build usa `Frontend/Dockerfile` (logs **não** devem mencionar Prisma)
+3. **Config file**: `Frontend/railway.toml` (sem `preDeployCommand`)
+4. **Variables** — só estas:
+
+| Variável | Valor |
+|----------|--------|
+| `API_URL` | URL base da API (ex.: `https://cs-league-back-production.up.railway.app`) — **sem** `/api` no final |
+| `PORT` | (Railway define) |
+
+5. **Remova** do front: `DATABASE_URL`, `JWT_SECRET`, `REDIS_URL` — o front não usa banco nem Redis
+6. No serviço **API**, `CORS_ORIGIN` = URL pública do **front** (não da API)
+
+> Se o deploy do front falhar com `Environment variable not found: DATABASE_URL` e `prisma/schema.prisma`, o Root Directory **não** está em `Frontend` — o Railway está usando o `railway.toml` da raiz com `npx prisma migrate deploy`.
+
 #### Configurar `REDIS_URL` corretamente (API e Worker)
 
 O hostname `redis` **só existe** na rede do docker-compose local. Na Railway, use a referência ao plugin:
@@ -234,6 +253,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | `REDIS_URL` com `${{Redis.REDIS_URL}}` literal nos logs | Referência não resolvida | No serviço API: Variables → Add Reference → selecione o serviço **Redis** → variável `REDIS_URL` |
 | `[ioredis] getaddrinfo ENOTFOUND redis` | `REDIS_URL=redis://redis:6379` (valor do docker-compose) | No serviço API e Worker, defina `REDIS_URL=${{Redis.REDIS_URL}}` apontando ao plugin Redis |
 | `[redis] connection failed` nos logs | Plugin Redis ausente ou URL errada | Adicione Redis ao projeto; use `${{Redis.REDIS_URL}}` em ambos os serviços |
+| Front: `DATABASE_URL` / `prisma/schema.prisma` no deploy | Root Directory do **cs-league-front** não é `Frontend` | Settings → Root Directory = `Frontend`; remova `DATABASE_URL` das variables do front; redeploy |
+| Front: `API_URL` com `/api/health` | URL do proxy errada | Use só a base da API: `https://cs-league-back-production.up.railway.app` |
 
 ### Logs úteis na Railway
 

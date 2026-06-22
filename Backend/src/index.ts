@@ -14,11 +14,9 @@ import { prisma } from './lib/prisma';
 import { redis, connectRedis } from './lib/redis';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
-import { getCoreEnvErrors, getRedisEnvErrors, getProductionEnvErrors, logProductionEnvErrors } from './lib/env';
+import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
 
 const isProduction = process.env.NODE_ENV === 'production';
-let coreConfigErrors: string[] = isProduction ? getCoreEnvErrors() : [];
-let redisConfigErrors: string[] = isProduction ? getRedisEnvErrors() : [];
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
@@ -40,21 +38,37 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Diagnóstico de env (sem expor valores secretos)
+app.get('/api/health/config', (_req, res) => {
+  res.json(getEnvConfigStatus());
+});
+
 // Readiness — config + dependências externas (Postgres + Redis)
 app.get('/api/health/ready', async (_req, res) => {
-  const configErrors = getProductionEnvErrors();
-  if (configErrors.length > 0) {
+  const coreErrors = getCoreEnvErrors();
+  const redisErrors = getRedisEnvErrors();
+  const warnings = getRedisWarnings();
+
+  if (coreErrors.length > 0) {
     res.status(503).json({
       status: 'error',
       message: 'Configuração incompleta',
-      errors: configErrors,
+      errors: coreErrors,
+      warnings,
     });
     return;
   }
+
   try {
     await prisma.$queryRaw`SELECT 1`;
-    await redis.ping();
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    if (process.env.REDIS_URL?.trim() && redisErrors.length === 0) {
+      await redis.ping();
+    }
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      warnings: [...warnings, ...redisErrors],
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Service unavailable';
     console.error('[health/ready]', message);
@@ -64,15 +78,17 @@ app.get('/api/health/ready', async (_req, res) => {
 
 // Bloqueia API se env core estiver inválida (login, ligas, etc.)
 app.use('/api', (req, res, next) => {
-  if (req.path === '/health' || req.path === '/health/ready') {
+  const p = req.path;
+  if (p === '/health' || p === '/health/ready' || p === '/health/config') {
     next();
     return;
   }
-  if (coreConfigErrors.length > 0) {
+  const coreErrors = getCoreEnvErrors();
+  if (coreErrors.length > 0) {
     res.status(503).json({
       error: 'Serviço em configuração. Verifique variáveis de ambiente na API.',
-      errors: coreConfigErrors,
-      hint: 'Abra https://SUA-API.up.railway.app/api/health/ready para ver detalhes',
+      errors: coreErrors,
+      hint: 'Abra /api/health/config na URL da API para ver o que falta',
     });
     return;
   }
@@ -80,11 +96,12 @@ app.use('/api', (req, res, next) => {
 });
 
 // Demos exigem Redis configurado
-app.use('/api/demos', (req, res, next) => {
-  if (redisConfigErrors.length > 0) {
+app.use('/api/demos', (_req, res, next) => {
+  const redisErrors = getRedisEnvErrors();
+  if (redisErrors.length > 0) {
     res.status(503).json({
       error: 'Fila de demos indisponível. Configure REDIS_URL na API.',
-      errors: redisConfigErrors,
+      errors: redisErrors,
     });
     return;
   }
@@ -168,14 +185,15 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const server = app.listen(PORT, HOST, () => {
   console.log(`API rodando em http://${HOST}:${PORT} (PORT=${PORT}, NODE_ENV=${process.env.NODE_ENV || 'development'})`);
   if (isProduction) {
-    coreConfigErrors = getCoreEnvErrors();
-    redisConfigErrors = getRedisEnvErrors();
-    logProductionEnvErrors(getProductionEnvErrors());
-    if (coreConfigErrors.length > 0) {
-      console.error(`[startup] API no ar, mas ${coreConfigErrors.length} erro(s) core — login/API bloqueados até corrigir env`);
+    const allErrors = getProductionEnvErrors();
+    logProductionEnvErrors(allErrors);
+    const coreErrors = getCoreEnvErrors();
+    const redisErrors = getRedisEnvErrors();
+    if (coreErrors.length > 0) {
+      console.error(`[startup] ${coreErrors.length} erro(s) core — login/API bloqueados até corrigir env`);
     }
-    if (redisConfigErrors.length > 0) {
-      console.error(`[startup] ${redisConfigErrors.length} erro(s) Redis — demos bloqueadas até corrigir REDIS_URL`);
+    if (redisErrors.length > 0) {
+      console.error(`[startup] ${redisErrors.length} erro(s) Redis — demos bloqueadas até corrigir REDIS_URL`);
     }
   }
   void connectRedis();

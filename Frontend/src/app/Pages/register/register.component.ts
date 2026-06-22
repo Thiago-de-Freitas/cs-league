@@ -54,7 +54,12 @@ export class RegisterComponent implements OnInit {
       },
       error: (err) => {
         this.loading = false;
-        this.errorMsg = err.error?.error || 'Erro ao cadastrar.';
+        const errors = err.error?.errors;
+        if (Array.isArray(errors) && errors.length > 0) {
+          this.errorMsg = errors.join(' ');
+        } else {
+          this.errorMsg = err.error?.error || 'Erro ao cadastrar.';
+        }
       }
     });
   }
