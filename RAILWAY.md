@@ -310,7 +310,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | `[ioredis] getaddrinfo ENOTFOUND redis` | `REDIS_URL=redis://redis:6379` (valor do docker-compose) | No serviço API e Worker, defina `REDIS_URL=${{Redis.REDIS_URL}}` apontando ao plugin Redis |
 | `[redis] connection failed` nos logs | Plugin Redis ausente ou URL errada | Adicione Redis ao projeto; use `${{Redis.REDIS_URL}}` em ambos os serviços |
 | Front: `DATABASE_URL` / `prisma/schema.prisma` no deploy | Root Directory do **cs-league-front** não é `Frontend` | Settings → Root Directory = `Frontend`; remova `DATABASE_URL` das variables do front; redeploy |
-| Front: `API_URL` com `/api/health` | URL do proxy errada | Use só a base da API: `https://cs-league-back-production.up.railway.app` |
+| Front: POST `/api/*` retorna **404** | Proxy quebrado (`http-proxy-middleware` v3) ou `API_URL` inválida | Redeploy do front com `serve.prod.cjs` atualizado; `API_URL` = `https://cs-league-back-production.up.railway.app` (URL completa, sem `${{...}}` literal nos logs) |
+| Front: GET `/api/health` retorna HTML do Angular | Mesmo problema — `/api` não está sendo proxiado | Teste `GET .../api/health` — deve retornar JSON `{"status":"ok"}`, não HTML |
 
 ### Logs úteis na Railway
 

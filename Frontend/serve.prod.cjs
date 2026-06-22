@@ -29,34 +29,53 @@ if (isProduction) {
     console.error(`[front] API_URL aponta para localhost (${API_URL}). Use a URL pública da API na Railway.`);
     process.exit(1);
   }
+  if (rawApiUrl.includes('${{') || rawApiUrl.includes('{{')) {
+    console.error(`[front] API_URL não foi resolvida: ${rawApiUrl}`);
+    process.exit(1);
+  }
 }
 
-const proxy = createProxyMiddleware({
-  target: API_URL,
-  changeOrigin: true,
-  xfwd: true,
-  secure: true,
-  on: {
-    error(err, _req, res) {
-      console.error('[front] proxy error:', err.message);
-      if (!res.headersSent && typeof res.writeHead === 'function') {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          error: 'Não foi possível contatar a API. Verifique API_URL no serviço cs-league-front.',
-          detail: err.message,
-        }));
-      }
-    },
-  },
-});
+function isApiPath(pathname) {
+  return pathname === '/api' || pathname.startsWith('/api/') ||
+    pathname === '/uploads' || pathname.startsWith('/uploads/');
+}
 
-app.use('/api', proxy);
-app.use('/uploads', proxy);
+// http-proxy-middleware v3: um middleware na raiz com pathFilter (não montar em app.use('/api'))
+app.use(
+  createProxyMiddleware({
+    target: API_URL,
+    changeOrigin: true,
+    xfwd: true,
+    secure: process.env.PROXY_INSECURE !== 'true',
+    pathFilter: (pathname) => isApiPath(pathname),
+    on: {
+      error(err, _req, res) {
+        console.error('[front] proxy error:', err.message);
+        if (!res.headersSent && typeof res.writeHead === 'function') {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Não foi possível contatar a API. Verifique API_URL no serviço cs-league-front.',
+            detail: err.message,
+          }));
+        }
+      },
+    },
+  }),
+);
 
 app.use(express.static(distPath, { index: false, dotfiles: 'deny', fallthrough: true }));
 
-app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+// SPA fallback — só GET em rotas que não são API
+app.get('*', (req, res, next) => {
+  if (isApiPath(req.path)) {
+    return res.status(502).json({
+      error: 'Proxy /api não encaminhou a requisição. Redeploy o cs-league-front com serve.prod.cjs atualizado.',
+      path: req.path,
+    });
+  }
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) next(err);
+  });
 });
 
 app.listen(PORT, HOST, () => {
