@@ -1,0 +1,74 @@
+<div class="groups-grid" *ngIf="groups.length > 0; else noGroups">
+  <div class="group-card gc-card" *ngFor="let group of groups">
+    <h3 class="group-title">{{ singleGroup ? 'Classificação' : ('Grupo ' + group.name) }}</h3>
+
+    <p *ngIf="hasIncompleteRoundRobin(group)" class="group-warning">
+      Esperado {{ getExpectedMatches(group) }} confrontos (todos contra todos), mas só {{ getTotalMatches(group) }} foram gerados.
+      Recrie a liga ou contate o administrador.
+    </p>
+
+    <div class="group-progress" *ngIf="getTotalMatches(group) > 0">
+      <div class="group-progress-label">
+        <span>{{ getCompletedCount(group) }} / {{ getTotalMatches(group) }} jogos finalizados</span>
+        <span class="group-progress-hint">Todos os confrontos já foram sorteados</span>
+      </div>
+      <div class="group-progress-bar" role="progressbar" [attr.aria-valuenow]="getCompletedCount(group)" [attr.aria-valuemax]="getTotalMatches(group)">
+        <div class="group-progress-fill" [style.width.%]="(getCompletedCount(group) / getTotalMatches(group)) * 100"></div>
+      </div>
+    </div>
+
+    <table class="group-standings">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Time</th>
+          <th>V</th>
+          <th>D</th>
+          <th>Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of group.standings" [class.qualified]="row.rank <= advancePerGroup">
+          <td>{{ row.rank }}</td>
+          <td>{{ row.team.tag || row.team.name }}</td>
+          <td>{{ row.wins }}</td>
+          <td>{{ row.losses }}</td>
+          <td>{{ row.points }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="group-matches" *ngIf="group.matches.length > 0">
+      <h4 class="group-matches-title">Partidas</h4>
+
+      <div class="group-round-block" *ngFor="let round of getRounds(group)">
+        <h5 class="group-round-label">Rodada {{ round }}</h5>
+        <div
+          class="group-match-row"
+          *ngFor="let match of matchesForRound(group, round)"
+          [class.is-completed]="match.status === 'completed'"
+          (click)="onMatchClick(match.id)">
+          <span class="group-match-teams">
+            {{ match.team1.tag || match.team1.name }} vs {{ match.team2.tag || match.team2.name }}
+          </span>
+          <span class="group-match-status">{{ getMatchStatusLabel(match.status) }}</span>
+          <span class="group-match-winner" *ngIf="match.status === 'completed' && match.winner">
+            {{ match.winner.tag || match.winner.name }}
+          </span>
+          <ng-container *ngIf="canRegisterResult?.(match)">
+            <button type="button" class="btn btn-primary btn-small" (click)="onRegisterResult(match, match.team1.id, $event)">
+              Vitória {{ match.team1.tag || match.team1.name }}
+            </button>
+            <button type="button" class="btn btn-primary btn-small" (click)="onRegisterResult(match, match.team2.id, $event)">
+              Vitória {{ match.team2.tag || match.team2.name }}
+            </button>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ng-template #noGroups>
+  <p class="groups-empty">Nenhum grupo gerado ainda.</p>
+</ng-template>

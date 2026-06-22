@@ -5,6 +5,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { resolveBracketSize } from '../lib/bracket';
 import { tryCompleteLeague } from '../lib/leagueComplete';
+import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
 
@@ -17,12 +18,14 @@ async function tryAdvanceBracket(
   match: {
     id: string;
     leagueId: string;
+    phase: string;
     round: number;
     bracketPosition: number | null;
     winnerId: string | null;
   },
   maxTeams: number
 ): Promise<void> {
+  if (match.phase !== 'PLAYOFF') return;
   if (!match.bracketPosition || !match.winnerId) return;
   await advanceBracketFromRound(tx, match.leagueId, match.round, maxTeams);
 }
@@ -66,6 +69,9 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       winner: match.winner,
       winnerId: match.winnerId,
       status: match.status.toLowerCase(),
+      phase: match.phase.toLowerCase(),
+      groupId: match.groupId,
+      groupRound: match.groupRound,
       round: match.round,
       bracketPosition: match.bracketPosition,
       map: match.map,
@@ -122,6 +128,7 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
     }
 
     const loserId = winnerId === match.team1Id ? match.team2Id : match.team1Id;
+    let groupPhaseJustCompleted = false;
 
     await prisma.$transaction(async (tx) => {
       await tx.match.update({
@@ -144,6 +151,20 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         data: { losses: { increment: 1 } },
       });
 
+      if (match.phase === 'GROUP') {
+        const groupMatches = await tx.match.findMany({
+          where: { leagueId: match.leagueId, phase: 'GROUP' },
+        });
+        if (areAllGroupMatchesComplete(groupMatches)) {
+          const existingPlayoffs = await tx.match.count({
+            where: { leagueId: match.leagueId, phase: 'PLAYOFF', round: { gt: 0 } },
+          });
+          if (existingPlayoffs === 0) {
+            groupPhaseJustCompleted = true;
+          }
+        }
+      }
+
       await tryAdvanceBracket(
         tx,
         { ...match, winnerId },
@@ -165,7 +186,7 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       },
     });
 
-    res.json(updated);
+    res.json({ ...updated, groupPhaseJustCompleted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao registrar resultado' });

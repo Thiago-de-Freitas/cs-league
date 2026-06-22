@@ -1,0 +1,39 @@
+<div class="preview-banner">
+  <span class="preview-badge">Prévia</span>
+  <p class="preview-summary">
+    <ng-container *ngIf="singleGroup">
+      {{ totalMatches }} jogos serão criados — cada time enfrenta todos os outros <strong>uma vez</strong>.
+    </ng-container>
+    <ng-container *ngIf="!singleGroup">
+      {{ totalMatches }} jogos no total · top {{ advancePerGroup }} de cada grupo avançam para a fase de liga.
+    </ng-container>
+  </p>
+</div>
+
+<div class="preview-grid">
+  <div class="preview-card gc-card" *ngFor="let plan of plans">
+    <h3 class="preview-card-title">
+      {{ singleGroup ? 'Times do grupo' : ('Grupo ' + plan.name) }}
+      <span class="preview-match-count">{{ plan.matchCount }} jogos</span>
+    </h3>
+
+    <ul class="preview-team-list">
+      <li *ngFor="let team of plan.teams; let i = index">
+        <span class="preview-seed">{{ i + 1 }}</span>
+        {{ team.name }}<span *ngIf="team.tag" class="preview-tag">[{{ team.tag }}]</span>
+      </li>
+    </ul>
+
+    <div class="preview-pairs" *ngIf="plan.pairs.length > 0">
+      <h4 class="preview-pairs-title">Confrontos previstos</h4>
+      <ul class="preview-pair-list">
+        <li *ngFor="let pair of visiblePairs(plan)">
+          {{ pair.team1 }} <span class="preview-vs">vs</span> {{ pair.team2 }}
+        </li>
+      </ul>
+      <p *ngIf="hiddenPairCount(plan) > 0" class="preview-more">
+        + {{ hiddenPairCount(plan) }} confronto(s) a mais
+      </p>
+    </div>
+  </div>
+</div>

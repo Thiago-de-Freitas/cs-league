@@ -10,9 +10,20 @@ import {
   rankTeamsForSeeding,
   resolveBracketSize,
 } from '../lib/bracket';
+import { tryGenerateGroupStagePlayoffs } from '../lib/generateGroupStagePlayoffs';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { canUserAccessLeague } from '../lib/leaguePermissions';
 import { canUserRegisterTeam } from '../lib/leagueRegistration';
+import {
+  areAllGroupMatchesComplete,
+  computeGroupStandings,
+  countRoundRobinMatches,
+  distributeTeamsIntoGroups,
+  generateRoundRobinPairings,
+  isValidAdvancePerGroup,
+  isValidGroupCount,
+  validateGroupStageConfig,
+} from '../lib/groupStage';
 
 const router = Router();
 
@@ -33,6 +44,32 @@ async function getLeagueWithDetails(leagueId: string) {
     where: { id: leagueId },
     include: {
       owner: { select: { id: true, displayName: true } },
+      groups: {
+        orderBy: { order: 'asc' },
+        include: {
+          teams: {
+            include: {
+              team: {
+                include: {
+                  members: {
+                    include: {
+                      user: { select: { id: true, displayName: true, steamId: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          matches: {
+            include: {
+              team1: { select: { id: true, name: true, tag: true } },
+              team2: { select: { id: true, name: true, tag: true } },
+              winner: { select: { id: true, name: true, tag: true } },
+            },
+            orderBy: [{ groupRound: 'asc' }, { createdAt: 'asc' }],
+          },
+        },
+      },
       teams: {
         include: {
           team: {
@@ -53,46 +90,122 @@ async function getLeagueWithDetails(leagueId: string) {
           team2: { select: { id: true, name: true, tag: true } },
           winner: { select: { id: true, name: true, tag: true } },
         },
-        orderBy: [{ round: 'asc' }, { bracketPosition: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [{ phase: 'asc' }, { round: 'asc' }, { groupRound: 'asc' }, { bracketPosition: 'asc' }, { createdAt: 'asc' }],
       },
     },
   });
+}
+
+function formatTeamFromLeagueTeam(lt: {
+  team: {
+    id: string;
+    name: string;
+    tag: string;
+    logoUrl: string | null;
+    ownerId: string;
+    members: { user: { id: string; displayName: string }; role: string }[];
+  };
+  wins: number;
+  losses: number;
+  points: number;
+  seed: number | null;
+  groupId?: string | null;
+}) {
+  return {
+    id: lt.team.id,
+    name: lt.team.name,
+    tag: lt.team.tag,
+    logoUrl: lt.team.logoUrl,
+    ownerId: lt.team.ownerId,
+    wins: lt.wins,
+    losses: lt.losses,
+    points: lt.points,
+    seed: lt.seed,
+    groupId: lt.groupId ?? null,
+    players: lt.team.members.map((m) => ({
+      id: m.user.id,
+      name: m.user.displayName,
+      IGN: m.user.displayName,
+      role: m.role,
+    })),
+  };
 }
 
 function formatLeague(
   league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>,
   matchIdsWithDemo: Set<string> = new Set()
 ) {
+  const groupMatches = league.matches.filter((m) => m.phase === 'GROUP');
+  const playoffMatches = league.matches.filter((m) => m.phase === 'PLAYOFF');
+  const groupPhaseComplete = groupMatches.length > 0 && areAllGroupMatchesComplete(groupMatches);
+  const playoffGenerated = playoffMatches.some((m) => m.round > 0);
+
+  const groups = league.groups.map((g) => {
+    const teamIds = g.teams.map((lt) => lt.teamId);
+    const standings = computeGroupStandings(
+      teamIds,
+      g.matches.map((m) => ({
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        winnerId: m.winnerId,
+        status: m.status,
+      }))
+    );
+    return {
+      id: g.id,
+      name: g.name,
+      order: g.order,
+      teams: g.teams.map(formatTeamFromLeagueTeam),
+      standings: standings.map((s) => {
+        const lt = g.teams.find((t) => t.teamId === s.teamId);
+        return {
+          ...s,
+          team: lt
+            ? { id: lt.team.id, name: lt.team.name, tag: lt.team.tag }
+            : { id: s.teamId, name: '', tag: '' },
+        };
+      }),
+      matches: g.matches.map((m) => ({
+        id: m.id,
+        leagueId: m.leagueId,
+        team1: m.team1,
+        team2: m.team2,
+        winner: m.winner,
+        winnerId: m.winnerId,
+        status: m.status.toLowerCase(),
+        phase: m.phase.toLowerCase(),
+        groupId: m.groupId,
+        groupRound: m.groupRound,
+        map: m.map,
+        playedAt: m.playedAt,
+        hasGeneralDemo: matchIdsWithDemo.has(m.id),
+      })),
+      expectedMatches: countRoundRobinMatches(teamIds.length),
+      matchesComplete: g.matches.length > 0 && areAllGroupMatchesComplete(g.matches),
+    };
+  });
+
   return {
     id: league.id,
     name: league.name,
     description: league.description,
     status: league.status.toLowerCase(),
+    format: league.format.toLowerCase(),
     maxTeams: league.maxTeams,
     bracketSize: league.bracketSize,
+    groupCount: league.groupCount,
+    advancePerGroup: league.advancePerGroup,
     effectiveBracketSize: resolveBracketSize(league.teams.length, league.bracketSize),
     registrationOpen: league.registrationOpen,
+    groupPhaseGenerated: groupMatches.length > 0,
+    groupPhaseComplete,
+    playoffGenerated,
     ownerId: league.ownerId,
     owner: league.owner,
     startDate: league.startDate,
     endDate: league.endDate,
-    teams: league.teams.map((lt) => ({
-      id: lt.team.id,
-      name: lt.team.name,
-      tag: lt.team.tag,
-      logoUrl: lt.team.logoUrl,
-      ownerId: lt.team.ownerId,
-      wins: lt.wins,
-      losses: lt.losses,
-      points: lt.points,
-      seed: lt.seed,
-      players: lt.team.members.map((m) => ({
-        id: m.user.id,
-        name: m.user.displayName,
-        IGN: m.user.displayName,
-        role: m.role,
-      })),
-    })),
+    groups,
+    teams: league.teams.map(formatTeamFromLeagueTeam),
     matches: league.matches.map((m) => ({
       id: m.id,
       leagueId: m.leagueId,
@@ -101,6 +214,9 @@ function formatLeague(
       winner: m.winner,
       winnerId: m.winnerId,
       status: m.status.toLowerCase(),
+      phase: m.phase.toLowerCase(),
+      groupId: m.groupId,
+      groupRound: m.groupRound,
       round: m.round,
       bracketPosition: m.bracketPosition,
       map: m.map,
@@ -232,7 +348,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, startDate, endDate, status, maxTeams, registrationOpen } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, format, groupCount, advancePerGroup } = req.body;
     if (!name) {
       res.status(400).json({ error: 'Nome é obrigatório' });
       return;
@@ -245,6 +361,13 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const leagueFormat = format?.toUpperCase() === 'GROUP_STAGE' ? 'GROUP_STAGE' : 'SINGLE_ELIMINATION';
+    const groups = leagueFormat === 'GROUP_STAGE' && isValidGroupCount(groupCount) ? Number(groupCount) : 2;
+    const advance =
+      leagueFormat === 'GROUP_STAGE' && isValidAdvancePerGroup(advancePerGroup, groups)
+        ? Number(advancePerGroup)
+        : 2;
+
     const registrationCap = parseRegistrationCap(maxTeams);
 
     const league = await prisma.league.create({
@@ -253,6 +376,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         description: description || '',
         maxTeams: registrationCap,
         registrationOpen: registrationOpen === true,
+        format: leagueFormat,
+        groupCount: groups,
+        advancePerGroup: advance,
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -278,13 +404,14 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { name, description, startDate, endDate, status, maxTeams, registrationOpen } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, groupCount, advancePerGroup } = req.body;
+
+    const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
 
     if (registrationOpen === true) {
-      const matchCount = await prisma.match.count({ where: { leagueId: req.params.id } });
-      if (matchCount > 0) {
+      if (existingMatches > 0) {
         res.status(400).json({
-          error: 'Não é possível abrir inscrições após o chaveamento ser gerado.',
+          error: 'Não é possível abrir inscrições após o torneio ter sido iniciado.',
         });
         return;
       }
@@ -313,6 +440,18 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       }
     }
 
+    if (existingMatches === 0) {
+      if (groupCount !== undefined && !isValidGroupCount(groupCount)) {
+        res.status(400).json({ error: 'Número de grupos inválido.' });
+        return;
+      }
+      const gc = groupCount !== undefined ? Number(groupCount) : check.league.groupCount;
+      if (advancePerGroup !== undefined && !isValidAdvancePerGroup(advancePerGroup, gc)) {
+        res.status(400).json({ error: 'Número de classificados inválido.' });
+        return;
+      }
+    }
+
     await prisma.league.update({
       where: { id: req.params.id },
       data: {
@@ -323,6 +462,8 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         ...(status && { status: status.toUpperCase() }),
         ...(maxTeams !== undefined && { maxTeams: parseRegistrationCap(maxTeams) }),
         ...(registrationOpen !== undefined && { registrationOpen: registrationOpen === true }),
+        ...(existingMatches === 0 && groupCount !== undefined && { groupCount: Number(groupCount) }),
+        ...(existingMatches === 0 && advancePerGroup !== undefined && { advancePerGroup: Number(advancePerGroup) }),
       },
     });
 
@@ -693,11 +834,198 @@ router.get('/:id/standings', authMiddleware, async (req: AuthRequest, res: Respo
   }
 });
 
+router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.format !== 'GROUP_STAGE') {
+      res.status(400).json({ error: 'Esta liga não usa formato de fase de grupos.' });
+      return;
+    }
+
+    const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
+    if (existingMatches > 0) {
+      res.status(400).json({ error: 'A fase de grupos já foi gerada.' });
+      return;
+    }
+
+    const leagueTeams = await prisma.leagueTeam.findMany({
+      where: { leagueId: req.params.id },
+      include: { team: { select: { id: true, name: true, tag: true } } },
+    });
+
+    const validation = validateGroupStageConfig(
+      leagueTeams.length,
+      check.league.groupCount,
+      check.league.advancePerGroup
+    );
+    if (!validation.valid) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    const teamsForDistribution = leagueTeams.map((lt) => ({
+      teamId: lt.teamId,
+      wins: lt.wins,
+      losses: lt.losses,
+      points: lt.points,
+      seed: lt.seed,
+    }));
+
+    const distributions = distributeTeamsIntoGroups(teamsForDistribution, check.league.groupCount);
+
+    if (check.league.groupCount === 1 && distributions[0] && distributions[0].teamIds.length !== leagueTeams.length) {
+      res.status(500).json({ error: 'Erro ao distribuir times no grupo único.' });
+      return;
+    }
+
+    let totalMatches = 0;
+    const groupMatchPlans = distributions.map((dist) => {
+      const pairings = generateRoundRobinPairings(dist.teamIds);
+      const expectedMatches = countRoundRobinMatches(dist.teamIds.length);
+      if (pairings.length !== expectedMatches) {
+        throw new Error(`ROUND_ROBIN_COUNT_MISMATCH:${dist.name}:${pairings.length}:${expectedMatches}`);
+      }
+      return {
+        ...dist,
+        pairings,
+        expectedMatches,
+      };
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.leagueTeam.updateMany({
+        where: { leagueId: req.params.id },
+        data: { wins: 0, losses: 0, points: 0, groupId: null },
+      });
+
+      for (const dist of groupMatchPlans) {
+        const group = await tx.leagueGroup.create({
+          data: {
+            leagueId: req.params.id,
+            name: dist.name,
+            order: dist.order,
+          },
+        });
+
+        await tx.leagueTeam.updateMany({
+          where: {
+            leagueId: req.params.id,
+            teamId: { in: dist.teamIds },
+          },
+          data: { groupId: group.id },
+        });
+
+        for (const pairing of dist.pairings) {
+          await tx.match.create({
+            data: {
+              leagueId: req.params.id,
+              groupId: group.id,
+              team1Id: pairing.team1Id,
+              team2Id: pairing.team2Id,
+              phase: 'GROUP',
+              groupRound: pairing.groupRound,
+              round: 0,
+              status: 'SCHEDULED',
+            },
+          });
+          totalMatches++;
+        }
+      }
+
+      await tx.league.update({
+        where: { id: req.params.id },
+        data: { status: 'ONGOING', registrationOpen: false },
+      });
+    });
+
+    const full = await getLeagueWithDetails(req.params.id);
+    res.json({
+      ...formatLeague(full!),
+      groupInfo: {
+        groupCount: check.league.groupCount,
+        totalMatches,
+        roundRobin: true,
+        groups: groupMatchPlans.map((d) => ({
+          name: d.name,
+          teamCount: d.teamIds.length,
+          matchCount: d.pairings.length,
+          expectedMatches: d.expectedMatches,
+        })),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'ROUND_ROBIN_INCOMPLETE') {
+      res.status(500).json({
+        error: 'Não foi possível gerar todos os confrontos. Cada time deve enfrentar todos os outros uma vez.',
+      });
+      return;
+    }
+    if (err instanceof Error && err.message.startsWith('ROUND_ROBIN_COUNT_MISMATCH')) {
+      res.status(500).json({
+        error: 'Não foi possível gerar a quantidade correta de confrontos para o grupo.',
+      });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao gerar fase de grupos' });
+  }
+});
+
 router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
       res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.format === 'GROUP_STAGE') {
+      const groupMatches = await prisma.match.findMany({
+        where: { leagueId: req.params.id, phase: 'GROUP' },
+      });
+      if (groupMatches.length === 0) {
+        res.status(400).json({ error: 'Gere a fase de grupos antes do chaveamento.' });
+        return;
+      }
+      if (!areAllGroupMatchesComplete(groupMatches)) {
+        res.status(400).json({ error: 'Finalize todas as partidas da fase de grupos antes de gerar a fase de liga.' });
+        return;
+      }
+
+      const existingPlayoffs = await prisma.match.count({
+        where: { leagueId: req.params.id, phase: 'PLAYOFF', round: { gt: 0 } },
+      });
+      if (existingPlayoffs > 0) {
+        res.status(400).json({ error: 'A fase de liga já foi gerada.' });
+        return;
+      }
+
+      const result = await prisma.$transaction((tx) =>
+        tryGenerateGroupStagePlayoffs(tx, req.params.id)
+      );
+
+      if (!result.generated) {
+        res.status(400).json({ error: 'Não foi possível gerar a fase de liga.' });
+        return;
+      }
+
+      const full = await getLeagueWithDetails(req.params.id);
+      res.json({
+        ...formatLeague(full!),
+        bracketInfo: {
+          bracketSize: result.bracketSize,
+          round1Matches: result.round1Matches,
+          walkovers: result.walkovers,
+          advancedMatches: result.advancedMatches,
+          qualifiers: result.qualifiers,
+          seedingBy: 'group_standings',
+        },
+      });
       return;
     }
 
@@ -758,6 +1086,7 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
             team2Id: teamB.teamId,
             round: 1,
             bracketPosition: pos,
+            phase: 'PLAYOFF',
             status: 'SCHEDULED',
           },
         });
@@ -820,7 +1149,7 @@ router.post('/:id/matches', authMiddleware, async (req: AuthRequest, res: Respon
     }
 
     const bracketMatchCount = await prisma.match.count({
-      where: { leagueId: req.params.id, round: { gt: 0 } },
+      where: { leagueId: req.params.id, phase: 'PLAYOFF', round: { gt: 0 } },
     });
     if (bracketMatchCount === 0) {
       res.status(400).json({

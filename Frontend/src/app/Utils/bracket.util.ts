@@ -177,6 +177,21 @@ function advanceRound(matches: BracketMatchView[]): BracketMatchView[] {
   return next;
 }
 
+function buildSeedMap(teams: TeamSeedInput[]): Map<number, TeamSeedInput> {
+  const seeded = teams.filter((t) => t.seed != null && t.seed > 0);
+  if (seeded.length >= 2) {
+    const map = new Map<number, TeamSeedInput>();
+    for (const t of seeded) {
+      map.set(t.seed!, t);
+    }
+    return map;
+  }
+  const ranked = rankTeamsForSeeding(teams);
+  const map = new Map<number, TeamSeedInput>();
+  ranked.forEach((t, i) => map.set(i + 1, t));
+  return map;
+}
+
 export function buildBracketView(
   teams: TeamSeedInput[],
   teamCount: number,
@@ -189,9 +204,7 @@ export function buildBracketView(
 } {
   const bracketSize = resolveBracketSize(teamCount, storedBracketSize);
   const totalRounds = Math.log2(bracketSize);
-  const ranked = rankTeamsForSeeding(teams);
-  const seedMap = new Map<number, TeamSeedInput>();
-  ranked.forEach((t, i) => seedMap.set(i + 1, t));
+  const seedMap = buildSeedMap(teams);
 
   const pairings = getFirstRoundPairings(bracketSize);
   let previousRound: BracketMatchView[] = pairings.map(([s1, s2], idx) => {

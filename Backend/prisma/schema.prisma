@@ -37,6 +37,16 @@ enum MatchStatus {
   CANCELLED
 }
 
+enum LeagueFormat {
+  SINGLE_ELIMINATION
+  GROUP_STAGE
+}
+
+enum MatchPhase {
+  GROUP
+  PLAYOFF
+}
+
 enum DemoStatus {
   PENDING
   PROCESSING
@@ -109,8 +119,11 @@ model League {
   name              String
   description       String       @default("")
   status            LeagueStatus @default(UPCOMING)
+  format            LeagueFormat @default(SINGLE_ELIMINATION)
   maxTeams          Int?
   bracketSize       Int?
+  groupCount        Int          @default(2)
+  advancePerGroup   Int          @default(2)
   registrationOpen  Boolean      @default(false)
   ownerId           String
   startDate         DateTime?
@@ -120,20 +133,37 @@ model League {
 
   owner  User         @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   teams  LeagueTeam[]
+  groups LeagueGroup[]
   matches Match[]
+}
+
+model LeagueGroup {
+  id       String @id @default(cuid())
+  leagueId String
+  name     String
+  order    Int    @default(0)
+
+  league  League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  teams   LeagueTeam[]
+  matches Match[]
+
+  @@unique([leagueId, name])
+  @@index([leagueId])
 }
 
 model LeagueTeam {
   id       String @id @default(cuid())
   leagueId String
   teamId   String
+  groupId  String?
   wins     Int    @default(0)
   losses   Int    @default(0)
   points   Int    @default(0)
   seed     Int?
 
-  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  league League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  group  LeagueGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@unique([leagueId, teamId])
 }
@@ -145,6 +175,9 @@ model Match {
   team2Id         String
   winnerId        String?
   status          MatchStatus @default(SCHEDULED)
+  phase           MatchPhase  @default(PLAYOFF)
+  groupId         String?
+  groupRound      Int?
   round           Int         @default(1)
   bracketPosition Int?
   map             String?
@@ -152,10 +185,11 @@ model Match {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  league  League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  team1   Team   @relation("MatchTeam1", fields: [team1Id], references: [id])
-  team2   Team   @relation("MatchTeam2", fields: [team2Id], references: [id])
-  winner  Team?  @relation("MatchWinner", fields: [winnerId], references: [id])
+  league  League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  group   LeagueGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  team1   Team         @relation("MatchTeam1", fields: [team1Id], references: [id])
+  team2   Team         @relation("MatchTeam2", fields: [team2Id], references: [id])
+  winner  Team?        @relation("MatchWinner", fields: [winnerId], references: [id])
   demos   Demo[]
 }
 

@@ -15,7 +15,7 @@ export async function advanceBracketFromRound(
   if (round >= totalRounds) return 0;
 
   const matches = await tx.match.findMany({
-    where: { leagueId, round },
+    where: { leagueId, round, phase: 'PLAYOFF' },
   });
 
   const winnerAt = (pos: number): string | null => {
@@ -35,7 +35,7 @@ export async function advanceBracketFromRound(
     if (!w1 || !w2) continue;
 
     const existing = await tx.match.findFirst({
-      where: { leagueId, round: nextRound, bracketPosition: pos },
+      where: { leagueId, round: nextRound, bracketPosition: pos, phase: 'PLAYOFF' },
     });
 
     if (existing) {
@@ -51,6 +51,7 @@ export async function advanceBracketFromRound(
           team2Id: w2,
           round: nextRound,
           bracketPosition: pos,
+          phase: 'PLAYOFF',
           status: 'SCHEDULED',
         },
       });

@@ -10,9 +10,12 @@ import { AuthService } from '../../Services/auth.service';
 import { MatchService } from '../../Services/match.service';
 import { LeagueTeamsTableComponent } from './league-teams-table.component';
 import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components/league-bracket/league-bracket.component';
+import { LeagueGroupsComponent } from '../../Components/league-groups/league-groups.component';
+import { LeagueGroupsPreviewComponent } from '../../Components/league-groups-preview/league-groups-preview.component';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { getFairBracketSize, formatTeamCapacity, MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
+import { buildGroupPreviewPlans, countRoundRobinMatches } from '../../Utils/group.util';
 import { CS2_MAPS } from '../../Utils/maps';
 
 interface ConfirmConfig {
@@ -38,6 +41,8 @@ interface ConfirmConfig {
     FormsModule,
     LeagueTeamsTableComponent,
     LeagueBracketComponent,
+    LeagueGroupsComponent,
+    LeagueGroupsPreviewComponent,
     ConfirmModalComponent,
   ],
   templateUrl: './league-details.component.html',
@@ -59,6 +64,7 @@ export class LeagueDetailsComponent implements OnInit {
   minTeams = MIN_LEAGUE_TEAMS;
   maxTeamsLimit = MAX_LEAGUE_TEAMS;
   generatingBracket = false;
+  generatingGroups = false;
   deletingLeague = false;
   archivingLeague = false;
   unarchivingLeague = false;
@@ -68,11 +74,13 @@ export class LeagueDetailsComponent implements OnInit {
   resultModalWinnerId = '';
   resultModalMap = '';
   resultModalLoading = false;
+  showPlayoffReadyModal = false;
   cs2Maps = CS2_MAPS;
   myOwnedTeams: Pick<Team, 'id' | 'name' | 'tag' | 'ownerId'>[] = [];
   registerTeamId = '';
   registeringTeam = false;
   togglingRegistration = false;
+  activeConfrontosTab: 'groups' | 'league' | 'bracket' = 'groups';
 
   constructor(
     private route: ActivatedRoute,
@@ -101,6 +109,7 @@ export class LeagueDetailsComponent implements OnInit {
         this.league = league;
         this.newMaxTeams = league.maxTeams ?? null;
         this.isAdmin = this.authService.isLeagueOwner(league.ownerId || '');
+        this.syncConfrontosTab();
         this.loadMyTeamsForRegistration();
         this.isLoading = false;
       },
@@ -159,10 +168,15 @@ export class LeagueDetailsComponent implements OnInit {
     return true;
   }
 
+  get hasTournamentStarted(): boolean {
+    if (this.isGroupStageFormat) return this.hasGroupPhaseGenerated;
+    return this.hasBracketGenerated;
+  }
+
   get isRegistrationOpen(): boolean {
     return !!this.league?.registrationOpen
       && this.league?.status === 'upcoming'
-      && !this.hasBracketGenerated
+      && !this.hasTournamentStarted
       && !this.teamsAtCapacity;
   }
 
@@ -214,7 +228,7 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   toggleRegistrationOpen(event: Event): void {
-    if (!this.leagueId || !this.league || this.hasBracketGenerated) return;
+    if (!this.leagueId || !this.league || this.hasTournamentStarted) return;
     const next = (event.target as HTMLInputElement).checked;
     this.togglingRegistration = true;
     this.leagueService.updateLeague(this.leagueId, { registrationOpen: next }).subscribe({
@@ -235,13 +249,173 @@ export class LeagueDetailsComponent implements OnInit {
     this.notify.error(msg);
   }
 
+  get isGroupStageFormat(): boolean {
+    return this.league?.format === 'group_stage';
+  }
+
+  get isSingleGroupFormat(): boolean {
+    return this.isGroupStageFormat && (this.league?.groupCount ?? 2) === 1;
+  }
+
+  get isMultiGroupFormat(): boolean {
+    return this.isGroupStageFormat && (this.league?.groupCount ?? 2) > 1;
+  }
+
+  get minTeamsForGroupPhase(): number {
+    return this.isSingleGroupFormat ? 3 : 4;
+  }
+
+  get groupPhaseSectionTitle(): string {
+    if (this.isSingleGroupFormat) return 'Todos contra todos';
+    return 'Fase de grupos';
+  }
+
+  get formatBadgeLabel(): string {
+    if (!this.isGroupStageFormat) return '';
+    return this.isSingleGroupFormat ? 'Grupo único' : 'Vários grupos';
+  }
+
+  /** Jogos no turno único: cada time enfrenta todos os outros 1 vez */
+  get expectedRoundRobinMatches(): number {
+    const n = this.league?.teams.length ?? 0;
+    return countRoundRobinMatches(n);
+  }
+
+  get groupPreviewPlans() {
+    if (!this.league || !this.isGroupStageFormat || this.hasGroupPhaseGenerated) return [];
+    const teams = this.league.teams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      tag: t.tag,
+      wins: t.wins,
+      losses: t.losses,
+      points: t.points,
+      seed: t.seed,
+    }));
+    return buildGroupPreviewPlans(teams, this.league.groupCount ?? 2);
+  }
+
+  get showGroupPreview(): boolean {
+    return this.isGroupStageFormat && !this.hasGroupPhaseGenerated && this.groupPreviewPlans.length > 0;
+  }
+
+  get previewMatchTotal(): number {
+    return this.groupPreviewPlans.reduce((sum, p) => sum + p.matchCount, 0);
+  }
+
+  get multiGroupPreviewLabel(): string {
+    if (!this.groupPreviewPlans.length) return '—';
+    return `${this.previewMatchTotal} jogos previstos`;
+  }
+
+  get confrontosTabs(): { id: 'groups' | 'league'; label: string; disabled: boolean; badge?: string }[] {
+    if (!this.isGroupStageFormat) return [];
+    const previewTotal = this.previewMatchTotal;
+    return [
+      {
+        id: 'groups',
+        label: this.isSingleGroupFormat ? 'Todos contra todos' : 'Grupos',
+        disabled: false,
+        badge: this.hasGroupPhaseGenerated
+          ? `${this.groupMatches.length} jogos`
+          : this.showGroupPreview
+            ? `${previewTotal} previstos`
+            : undefined,
+      },
+      {
+        id: 'league',
+        label: 'Fase de liga',
+        disabled: !this.hasPlayoffBracket,
+        badge: this.hasPlayoffBracket ? `${this.playoffMatches.length} jogos` : undefined,
+      },
+    ];
+  }
+
+  get pendingPlayoffMatches(): Match[] {
+    return this.playoffMatches.filter(
+      (m) => m.status !== 'completed' && m.team1?.id && m.team2?.id
+    );
+  }
+
+  /** Times com seed definido (classificados) para exibir o mata-mata da fase de liga */
+  get playoffBracketTeams(): Team[] {
+    if (!this.league) return [];
+    const seeded = this.league.teams.filter((t) => t.seed != null && t.seed > 0);
+    if (seeded.length >= 2) {
+      return [...seeded].sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0));
+    }
+    return this.league.teams;
+  }
+
+  setConfrontosTab(tab: 'groups' | 'league' | 'bracket'): void {
+    if (tab === 'league' && !this.hasPlayoffBracket) return;
+    this.activeConfrontosTab = tab;
+  }
+
+  private syncConfrontosTab(): void {
+    if (!this.league) return;
+    if (!this.isGroupStageFormat) {
+      this.activeConfrontosTab = 'bracket';
+      return;
+    }
+    if (this.hasPlayoffBracket && this.groupPhaseComplete) {
+      this.activeConfrontosTab = 'league';
+      return;
+    }
+    this.activeConfrontosTab = 'groups';
+  }
+
+  get hasGroupPhaseGenerated(): boolean {
+    return !!this.league?.groupPhaseGenerated;
+  }
+
+  get hasPlayoffBracket(): boolean {
+    if (this.league?.playoffGenerated != null) return this.league.playoffGenerated;
+    const matches = this.league?.matches || [];
+    return matches.some((m) => m.phase === 'playoff' && (m.round ?? 0) > 0);
+  }
+
+  get groupPhaseComplete(): boolean {
+    return !!this.league?.groupPhaseComplete;
+  }
+
+  get canGenerateGroups(): boolean {
+    return (
+      this.isAdmin &&
+      !this.isArchived &&
+      this.isGroupStageFormat &&
+      !this.hasGroupPhaseGenerated &&
+      (this.league?.teams.length ?? 0) >= this.minTeamsForGroupPhase
+    );
+  }
+
+  get canGenerateLeaguePhase(): boolean {
+    return (
+      this.isAdmin &&
+      !this.isArchived &&
+      this.isGroupStageFormat &&
+      this.hasGroupPhaseGenerated &&
+      this.groupPhaseComplete &&
+      !this.hasPlayoffBracket
+    );
+  }
+
+  get playoffMatches(): Match[] {
+    return (this.league?.matches || []).filter((m) => m.phase === 'playoff' || (!m.phase && (m.round ?? 0) > 0));
+  }
+
+  get groupMatches(): Match[] {
+    return (this.league?.matches || []).filter((m) => m.phase === 'group');
+  }
+
   get hasBracketGenerated(): boolean {
+    if (this.isGroupStageFormat) return this.hasPlayoffBracket;
     const matches = this.league?.matches || [];
     return matches.some((m) => m.round != null && m.round > 0);
   }
 
   onBracketSeedAssign(event: BracketSeedAssignEvent): void {
-    if (!this.leagueId || !this.league || this.hasBracketGenerated) return;
+    if (!this.leagueId || !this.league || this.hasTournamentStarted) return;
 
     const teams = this.league.teams.map((t) => ({ ...t }));
 
@@ -303,12 +477,55 @@ export class LeagueDetailsComponent implements OnInit {
       next: (league) => {
         this.league = league;
         this.generatingBracket = false;
+        this.syncConfrontosTab();
+        this.notify.success(this.isGroupStageFormat ? 'Fase de liga gerada com sucesso!' : 'Chaveamento gerado com sucesso!');
       },
       error: (err) => {
         this.generatingBracket = false;
-        this.apiError(err, 'Erro ao gerar chaveamento');
+        this.apiError(err, this.isGroupStageFormat ? 'Erro ao gerar fase de liga' : 'Erro ao gerar chaveamento');
       }
     });
+  }
+
+  generateGroups(): void {
+    if (!this.leagueId) return;
+    this.generatingGroups = true;
+    this.leagueService.generateGroups(this.leagueId).subscribe({
+      next: (league) => {
+        this.league = league;
+        this.generatingGroups = false;
+        this.syncConfrontosTab();
+        this.notify.success(this.isSingleGroupFormat ? 'Confrontos gerados com sucesso!' : 'Fase de grupos gerada com sucesso!');
+      },
+      error: (err) => {
+        this.generatingGroups = false;
+        this.apiError(err, 'Erro ao gerar fase de grupos');
+      }
+    });
+  }
+
+  onGroupRegisterResult(event: { match: Match; winnerId: string }): void {
+    if (!this.leagueId) return;
+    this.matchService.registerResult(event.match.id, event.winnerId).subscribe({
+      next: (res) => {
+        this.fetchLeagueDetails(this.leagueId!);
+        this.notify.success('Resultado registrado.');
+        if (res.groupPhaseJustCompleted && this.isAdmin) {
+          this.showPlayoffReadyModal = true;
+        }
+      },
+      error: (err) => this.apiError(err, 'Erro ao registrar resultado'),
+    });
+  }
+
+  closePlayoffReadyModal(): void {
+    if (this.generatingBracket) return;
+    this.showPlayoffReadyModal = false;
+  }
+
+  generatePlayoffFromModal(): void {
+    this.showPlayoffReadyModal = false;
+    this.generateBracket();
   }
 
   openAddTeam(): void {
@@ -416,7 +633,9 @@ export class LeagueDetailsComponent implements OnInit {
       next: () => {
         this.resultModalLoading = false;
         this.closeResultModal();
-        if (this.leagueId) this.fetchLeagueDetails(this.leagueId);
+        if (this.leagueId) {
+          this.fetchLeagueDetails(this.leagueId);
+        }
         this.notify.success('Resultado registrado com sucesso.');
       },
       error: (err) => {
@@ -436,7 +655,7 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   onTeamsReordered(teams: Team[]): void {
-    if (!this.leagueId || this.hasBracketGenerated) return;
+    if (!this.leagueId || this.hasTournamentStarted) return;
     const payload = teams.map((t, i) => ({ teamId: t.id, seed: i + 1 }));
     this.leagueService.updateTeamsOrder(this.leagueId, payload).subscribe();
   }
@@ -572,6 +791,16 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.confirmLoading) {
       this.confirmConfig = null;
     }
+  }
+
+  getMatchLabel(match: Match): string {
+    if (match.phase === 'group' && match.groupRound) {
+      const group = this.league?.groups?.find((g) => g.id === match.groupId);
+      const groupName = group ? `Grupo ${group.name}` : 'Grupo';
+      return `${groupName} · R${match.groupRound}`;
+    }
+    if (match.round) return `R${match.round}`;
+    return '';
   }
 
   getMatchStatusLabel(status: string): string {

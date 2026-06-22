@@ -1,0 +1,150 @@
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.group-card {
+  padding: 1rem;
+}
+
+.group-title {
+  margin: 0 0 0.75rem;
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: 1rem;
+}
+
+.group-warning {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gc-red);
+  border-radius: 4px;
+  background: var(--gc-bg-secondary);
+  color: var(--gc-red);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+}
+
+.group-standings {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+}
+
+.group-standings th,
+.group-standings td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--gc-border);
+  text-align: left;
+}
+
+.group-standings th {
+  color: var(--gc-text-label);
+  font-weight: 600;
+}
+
+.group-standings tr.qualified td:first-child {
+  color: var(--gc-green);
+}
+
+.group-matches-title {
+  margin: 0 0 0.5rem;
+  color: var(--gc-text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.group-match-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--gc-border);
+  cursor: pointer;
+}
+
+.group-match-row:hover {
+  background: var(--gc-surface-elevated);
+}
+
+.group-match-round {
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+}
+
+.group-match-teams {
+  flex: 1;
+  color: var(--gc-text);
+  font-family: var(--font-body);
+}
+
+.group-match-status {
+  color: var(--gc-text-secondary);
+  font-size: 0.8rem;
+}
+
+.group-match-winner {
+  color: var(--gc-green);
+  font-size: 0.8rem;
+}
+
+.groups-empty {
+  color: var(--gc-text-secondary);
+  font-family: var(--font-body);
+}
+
+.group-progress {
+  margin-bottom: 1rem;
+}
+
+.group-progress-label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--gc-text-secondary);
+}
+
+.group-progress-hint {
+  color: var(--gc-text-label);
+  font-size: 0.75rem;
+}
+
+.group-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gc-bg-secondary);
+  overflow: hidden;
+}
+
+.group-progress-fill {
+  height: 100%;
+  background: var(--gc-green);
+  transition: width 0.2s ease;
+}
+
+.group-round-block {
+  margin-bottom: 1rem;
+}
+
+.group-round-label {
+  margin: 0 0 0.35rem;
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.group-match-row.is-completed {
+  opacity: 0.85;
+}

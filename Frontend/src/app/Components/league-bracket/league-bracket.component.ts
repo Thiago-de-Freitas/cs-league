@@ -71,7 +71,9 @@ export class LeagueBracketComponent implements OnChanges {
     this.hasTeams = this.teams.length >= 2;
     if (!this.hasTeams) return;
 
-    const view = buildBracketView(this.teams, this.teams.length, this.bracketSize, this.matches);
+    const seededCount = this.teams.filter((t) => t.seed != null && t.seed > 0).length;
+    const teamCount = seededCount >= 2 ? seededCount : this.teams.length;
+    const view = buildBracketView(this.teams, teamCount, this.bracketSize, this.matches);
     this.resolvedBracketSize = view.bracketSize;
     this.columns = view.columns;
     const firstRoundMatches = view.columns[0]?.matches.length ?? 1;

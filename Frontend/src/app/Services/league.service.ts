@@ -30,11 +30,14 @@ export class LeagueService {
     endDate?: string;
     status?: string;
     registrationOpen?: boolean;
+    format?: string;
+    groupCount?: number;
+    advancePerGroup?: number;
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data);
   }
 
-  updateLeague(id: string, data: Partial<League> & { maxTeams?: number | null }): Observable<League> {
+  updateLeague(id: string, data: Partial<League> & { maxTeams?: number | null; groupCount?: number; advancePerGroup?: number }): Observable<League> {
     return this.http.put<League>(`${this.apiUrl}/${id}`, data);
   }
 
@@ -72,6 +75,10 @@ export class LeagueService {
 
   generateBracket(leagueId: string): Observable<League & { bracketInfo?: unknown }> {
     return this.http.post<League & { bracketInfo?: unknown }>(`${this.apiUrl}/${leagueId}/bracket/generate`, {});
+  }
+
+  generateGroups(leagueId: string): Observable<League & { groupInfo?: unknown }> {
+    return this.http.post<League & { groupInfo?: unknown }>(`${this.apiUrl}/${leagueId}/groups/generate`, {});
   }
 
   getStandings(leagueId: string): Observable<unknown[]> {

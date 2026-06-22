@@ -29,9 +29,29 @@ export class CreateLeagueModalComponent {
     this.form = this.fb.group({
       leagueName: ['', Validators.required],
       description: ['', Validators.maxLength(500)],
+      format: ['single_elimination'],
+      groupCount: [2],
+      advancePerGroup: [2],
       maxTeams: [''],
       registrationOpen: [false],
     });
+  }
+
+  get isGroupStage(): boolean {
+    const f = this.form.get('format')?.value;
+    return f === 'single_group' || f === 'multi_group';
+  }
+
+  get isSingleGroup(): boolean {
+    return this.form.get('format')?.value === 'single_group';
+  }
+
+  get isMultiGroup(): boolean {
+    return this.form.get('format')?.value === 'multi_group';
+  }
+
+  get minTeamsForFormat(): number {
+    return this.isSingleGroup ? 3 : this.isMultiGroup ? 4 : MIN_LEAGUE_TEAMS;
   }
 
   onBackdropClick(event: MouseEvent): void {
@@ -54,7 +74,7 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams, registrationOpen } = this.form.value;
+    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup } = this.form.value;
     const capRaw = String(maxTeams ?? '').trim();
     let registrationCap: number | null = null;
     if (capRaw) {
@@ -66,11 +86,28 @@ export class CreateLeagueModalComponent {
       }
     }
 
+    let apiFormat = 'single_elimination';
+    let apiGroupCount: number | undefined;
+    let apiAdvance: number | undefined;
+
+    if (format === 'single_group') {
+      apiFormat = 'group_stage';
+      apiGroupCount = 1;
+      apiAdvance = Number(advancePerGroup) || 2;
+    } else if (format === 'multi_group') {
+      apiFormat = 'group_stage';
+      apiGroupCount = Number(groupCount) || 2;
+      apiAdvance = Number(advancePerGroup) || 2;
+    }
+
     this.leagueService.createLeague({
       name: leagueName,
       description,
       maxTeams: registrationCap,
       registrationOpen: !!registrationOpen,
+      format: apiFormat,
+      groupCount: apiGroupCount,
+      advancePerGroup: apiAdvance,
     }).subscribe({
       next: (league) => {
         this.loading = false;

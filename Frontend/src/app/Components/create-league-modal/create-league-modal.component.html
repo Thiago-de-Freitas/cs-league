@@ -32,6 +32,49 @@
       </div>
 
       <div class="form-group">
+        <label for="format" class="form-label">Formato do torneio</label>
+        <select id="format" formControlName="format" class="input-field">
+          <option value="single_elimination">Liga — eliminatória direta</option>
+          <option value="single_group">Grupo único — todos contra todos → fase de liga</option>
+          <option value="multi_group">Vários grupos — top N de cada → fase de liga</option>
+        </select>
+        <p class="form-hint" *ngIf="form.get('format')?.value === 'single_elimination'">
+          Mata-mata desde o início. Sem fase de grupos.
+        </p>
+        <p class="form-hint" *ngIf="isSingleGroup">
+          Todos os times se enfrentam <strong>pelo menos uma vez</strong> (todos contra todos).
+          Os melhores colocados avançam para a fase de liga (mata-mata).
+        </p>
+        <p class="form-hint" *ngIf="isMultiGroup">
+          Dentro de cada grupo, todos se enfrentam <strong>pelo menos uma vez</strong>.
+          Os melhores de cada grupo avançam para a fase de liga (mata-mata).
+        </p>
+      </div>
+
+      <div class="form-group" *ngIf="isMultiGroup">
+        <label for="group-count" class="form-label">Número de grupos</label>
+        <input id="group-count" type="number" formControlName="groupCount" class="input-field" min="2" max="8">
+        <p class="form-hint">Mínimo 2 grupos. Times distribuídos automaticamente por seed.</p>
+      </div>
+
+      <div class="form-group" *ngIf="isGroupStage">
+        <label for="advance-per-group" class="form-label">
+          {{ isSingleGroup ? 'Classificados para a fase de liga' : 'Classificados por grupo' }}
+        </label>
+        <input
+          id="advance-per-group"
+          type="number"
+          formControlName="advancePerGroup"
+          class="input-field"
+          [attr.min]="2"
+          [attr.max]="isSingleGroup ? 32 : 4">
+        <p class="form-hint">
+          <span *ngIf="isSingleGroup">Quantos times avançam do grupo único para o mata-mata.</span>
+          <span *ngIf="isMultiGroup">Quantos times de cada grupo avançam para o mata-mata.</span>
+        </p>
+      </div>
+
+      <div class="form-group">
         <label for="max-teams" class="form-label">Limite de vagas (opcional)</label>
         <input
           id="max-teams"
@@ -43,7 +86,10 @@
           placeholder="Ilimitado — chaveamento se adapta aos times inscritos">
         <p class="form-hint">
           Deixe em branco para aceitar qualquer quantidade (até {{ maxTeamsLimit }}).
-          O chaveamento usa a próxima potência de 2 (ex.: 5 times → bracket de 8 com BYEs para favoritos).
+          <span *ngIf="form.get('format')?.value === 'single_elimination'">
+            O chaveamento usa a próxima potência de 2 (ex.: 5 times → bracket de 8 com BYEs).
+          </span>
+          <span *ngIf="isGroupStage">Mínimo de {{ minTeamsForFormat }} times para iniciar a fase de grupos.</span>
         </p>
       </div>
 

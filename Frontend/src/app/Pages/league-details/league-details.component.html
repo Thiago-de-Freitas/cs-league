@@ -7,6 +7,7 @@
       <span *ngIf="league.startDate">Início: {{ league.startDate | date:'mediumDate' }}</span>
       <span *ngIf="league.endDate">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
+      <span *ngIf="isGroupStageFormat" class="badge badge-orange">{{ formatBadgeLabel }}</span>
       <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Inscrições abertas</span>
     </div>
     <p *ngIf="isArchived" class="archived-notice">Esta liga está arquivada e não aparece na página inicial.</p>
@@ -20,7 +21,7 @@
       <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
         [teams]="league.teams || []"
-        [canManageLeague]="isAdmin && !isArchived && !hasBracketGenerated"
+        [canManageLeague]="isAdmin && !isArchived && !hasTournamentStarted"
         [canRemoveTeams]="isAdmin && !isArchived"
         (teamsReordered)="onTeamsReordered($event)"
         (editTeam)="onEditTeam($event)"
@@ -65,10 +66,24 @@
           </button>
         </div>
 
-        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived">
+        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat">
           <span class="admin-stat-label">Chaveamento previsto</span>
           <span class="admin-stat-value">{{ previewBracketSize }} slots</span>
           <span class="admin-stat-note">{{ league.teams.length }} time(s) · BYEs para favoritos se necessário</span>
+        </div>
+
+        <div class="admin-stat" *ngIf="isGroupStageFormat && !hasGroupPhaseGenerated && !isArchived">
+          <span class="admin-stat-label">{{ isSingleGroupFormat ? 'Grupo único' : 'Configuração de grupos' }}</span>
+          <span class="admin-stat-value" *ngIf="isMultiGroupFormat">{{ league.groupCount }} grupos</span>
+          <span class="admin-stat-value" *ngIf="isSingleGroupFormat">Todos contra todos</span>
+          <span class="admin-stat-note">
+            <span *ngIf="isSingleGroupFormat">
+              {{ expectedRoundRobinMatches }} jogos · todos contra todos · top {{ league.advancePerGroup }} avançam
+            </span>
+            <span *ngIf="isMultiGroupFormat">
+              {{ multiGroupPreviewLabel }} · top {{ league.advancePerGroup }} de cada grupo avançam
+            </span>
+          </span>
         </div>
 
         <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived">
@@ -101,7 +116,7 @@
         </div>
       </div>
 
-      <div class="admin-settings" *ngIf="!hasBracketGenerated && !isArchived">
+      <div class="admin-settings" *ngIf="!hasTournamentStarted && !isArchived">
         <div class="admin-setting-row">
           <div class="admin-setting-copy">
             <span class="admin-setting-title">Inscrições abertas para outros jogadores</span>
@@ -128,6 +143,23 @@
           <button
             type="button"
             class="btn btn-success"
+            *ngIf="canGenerateGroups"
+            (click)="generateGroups()"
+            [disabled]="generatingGroups || league.teams.length < minTeamsForGroupPhase">
+            {{ generatingGroups ? 'Gerando...' : (isSingleGroupFormat ? 'Gerar confrontos' : 'Gerar fase de grupos') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-success"
+            *ngIf="canGenerateLeaguePhase"
+            (click)="generateBracket()"
+            [disabled]="generatingBracket">
+            {{ generatingBracket ? 'Gerando...' : 'Gerar chaveamento' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-success"
+            *ngIf="!isGroupStageFormat"
             (click)="generateBracket()"
             [disabled]="generatingBracket || league.teams.length < 2">
             {{ generatingBracket ? 'Gerando...' : (hasBracketGenerated ? 'Regenerar chaveamento' : 'Gerar chaveamento') }}
@@ -162,8 +194,22 @@
         </div>
       </div>
 
-      <p *ngIf="!hasBracketGenerated && !isArchived" class="admin-footnote">
+      <p *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat" class="admin-footnote">
         Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.
+      </p>
+      <p *ngIf="isSingleGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
+        Adicione pelo menos 3 times e clique em <strong>Gerar confrontos</strong>.
+        A prévia aparece na aba <strong>Todos contra todos</strong> em Confrontos.
+      </p>
+      <p *ngIf="isMultiGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
+        Adicione pelo menos 4 times e clique em <strong>Gerar fase de grupos</strong>.
+        A prévia dos confrontos aparece na aba <strong>Grupos</strong> em Confrontos.
+      </p>
+      <p *ngIf="isGroupStageFormat && hasGroupPhaseGenerated && !groupPhaseComplete && !isArchived" class="admin-footnote">
+        Registre os resultados de todas as partidas da fase de grupos.
+      </p>
+      <p *ngIf="canGenerateLeaguePhase" class="admin-footnote">
+        Fase de grupos concluída. Clique em <strong>Gerar chaveamento</strong> para criar o mata-mata com os classificados.
       </p>
 
       <div *ngIf="showAddTeam && !isArchived" class="admin-inline-panel">
@@ -205,45 +251,117 @@
       </div>
     </div>
 
-    <div class="section-card">
-      <h2 class="section-title">Partidas</h2>
-      <div *ngIf="league.matches && league.matches.length > 0; else noMatches">
-        <div *ngFor="let match of league.matches" class="match-row">
-          <span>
-            <span class="match-round" *ngIf="match.round">R{{ match.round }}</span>
-            {{ match.team1.name }} vs {{ match.team2.name }}
-          </span>
-          <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
-          <span class="match-winner" *ngIf="match.status === 'completed' && match.winner">
-            Vencedor: {{ match.winner.tag || match.winner.name }}
-          </span>
-          <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
-          <ng-container *ngIf="canRegisterResultForMatch(match)">
-            <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
-              Vitória {{ match.team1.tag || match.team1.name }}
-            </button>
-            <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
-              Vitória {{ match.team2.tag || match.team2.name }}
-            </button>
+    <div class="section-card confrontos-card">
+      <h2 class="section-title">Confrontos</h2>
+
+      <!-- Eliminatória direta -->
+      <ng-container *ngIf="!isGroupStageFormat">
+        <app-league-bracket
+          [teams]="league.teams"
+          [bracketSize]="league.bracketSize ?? null"
+          [matches]="league.matches || []"
+          [canManage]="isAdmin && !isArchived"
+          [bracketLocked]="hasBracketGenerated"
+          (seedAssign)="onBracketSeedAssign($event)"
+          (matchClick)="goToMatch($event)">
+        </app-league-bracket>
+
+        <div *ngIf="hasBracketGenerated && pendingPlayoffMatches.length > 0" class="confrontos-pending">
+          <h3 class="confrontos-subtitle">Registrar resultados</h3>
+          <div *ngFor="let match of pendingPlayoffMatches" class="match-row">
+            <span>
+              <span class="match-round" *ngIf="getMatchLabel(match)">{{ getMatchLabel(match) }}</span>
+              {{ match.team1.name }} vs {{ match.team2.name }}
+            </span>
+            <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
+            <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
+            <ng-container *ngIf="canRegisterResultForMatch(match)">
+              <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
+                Vitória {{ match.team1.tag || match.team1.name }}
+              </button>
+              <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
+                Vitória {{ match.team2.tag || match.team2.name }}
+              </button>
+            </ng-container>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Formato com fase de grupos -->
+      <ng-container *ngIf="isGroupStageFormat">
+        <nav class="gc-tabs" aria-label="Fases do torneio">
+          <button
+            type="button"
+            class="gc-tab"
+            *ngFor="let tab of confrontosTabs"
+            [class.is-active]="activeConfrontosTab === tab.id"
+            [disabled]="tab.disabled"
+            (click)="setConfrontosTab(tab.id)">
+            {{ tab.label }}
+            <span *ngIf="tab.badge" class="gc-tab-badge">{{ tab.badge }}</span>
+          </button>
+        </nav>
+
+        <div class="gc-tab-panel" *ngIf="activeConfrontosTab === 'groups'">
+          <app-league-groups-preview
+            *ngIf="showGroupPreview"
+            [plans]="groupPreviewPlans"
+            [singleGroup]="isSingleGroupFormat"
+            [advancePerGroup]="league.advancePerGroup || 2">
+          </app-league-groups-preview>
+
+          <p *ngIf="!showGroupPreview && !hasGroupPhaseGenerated" class="confrontos-empty">
+            Adicione times e gere os confrontos na seção <strong>Administração</strong>.
+          </p>
+
+          <app-league-groups
+            *ngIf="hasGroupPhaseGenerated"
+            [groups]="league.groups || []"
+            [advancePerGroup]="league.advancePerGroup || 2"
+            [singleGroup]="isSingleGroupFormat"
+            [canRegisterResult]="canRegisterResultForMatch.bind(this)"
+            (matchClick)="goToMatch($event)"
+            (registerResult)="onGroupRegisterResult($event)">
+          </app-league-groups>
+        </div>
+
+        <div class="gc-tab-panel" *ngIf="activeConfrontosTab === 'league'">
+          <p *ngIf="!hasPlayoffBracket" class="confrontos-empty">
+            Finalize todos os jogos da fase de grupos para liberar a fase de liga.
+          </p>
+
+          <ng-container *ngIf="hasPlayoffBracket">
+            <app-league-bracket
+              [teams]="playoffBracketTeams"
+              [bracketSize]="league.bracketSize ?? null"
+              [matches]="playoffMatches"
+              [canManage]="false"
+              [bracketLocked]="true"
+              (matchClick)="goToMatch($event)">
+            </app-league-bracket>
+
+            <div *ngIf="pendingPlayoffMatches.length > 0" class="confrontos-pending">
+              <h3 class="confrontos-subtitle">Registrar resultados</h3>
+              <div *ngFor="let match of pendingPlayoffMatches" class="match-row">
+                <span>
+                  <span class="match-round" *ngIf="getMatchLabel(match)">{{ getMatchLabel(match) }}</span>
+                  {{ match.team1.name }} vs {{ match.team2.name }}
+                </span>
+                <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
+                <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
+                <ng-container *ngIf="canRegisterResultForMatch(match)">
+                  <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
+                    Vitória {{ match.team1.tag || match.team1.name }}
+                  </button>
+                  <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
+                    Vitória {{ match.team2.tag || match.team2.name }}
+                  </button>
+                </ng-container>
+              </div>
+            </div>
           </ng-container>
         </div>
-      </div>
-      <ng-template #noMatches>
-        <p>Nenhuma partida cadastrada.</p>
-      </ng-template>
-    </div>
-
-    <div class="section-card">
-      <h2 class="section-title">Chaveamento</h2>
-      <app-league-bracket
-        [teams]="league.teams"
-        [bracketSize]="league.bracketSize ?? null"
-        [matches]="league.matches || []"
-        [canManage]="isAdmin && !isArchived"
-        [bracketLocked]="hasBracketGenerated"
-        (seedAssign)="onBracketSeedAssign($event)"
-        (matchClick)="goToMatch($event)">
-      </app-league-bracket>
+      </ng-container>
     </div>
   </section>
 </div>
@@ -299,6 +417,39 @@
         <button type="button" class="btn btn-ghost" (click)="closeResultModal()" [disabled]="resultModalLoading">Cancelar</button>
         <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading">
           {{ resultModalLoading ? 'Salvando...' : 'Confirmar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  *ngIf="showPlayoffReadyModal"
+  class="gc-modal-backdrop"
+  (click)="$event.target === $event.currentTarget && closePlayoffReadyModal()"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="playoff-ready-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="playoff-ready-title" class="gc-modal-title">Fase de grupos concluída</h2>
+        <p class="gc-modal-subtitle">O último jogo foi finalizado e o mata-mata está disponível.</p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="closePlayoffReadyModal()" [disabled]="generatingBracket" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="gc-modal-body">
+      <p>
+        Todos os jogos da fase de grupos foram concluídos. Os melhores colocados estão definidos
+        e você pode gerar o chaveamento do mata-mata agora ou fazer isso mais tarde pelo botão
+        <strong>Gerar chaveamento</strong> na administração.
+      </p>
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="closePlayoffReadyModal()" [disabled]="generatingBracket">
+          Aguardar
+        </button>
+        <button type="button" class="btn btn-primary" (click)="generatePlayoffFromModal()" [disabled]="generatingBracket">
+          {{ generatingBracket ? 'Gerando...' : 'Gerar chaveamento agora' }}
         </button>
       </div>
     </div>

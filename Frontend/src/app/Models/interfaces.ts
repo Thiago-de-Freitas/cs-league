@@ -27,6 +27,7 @@ export interface Team {
   losses: number;
   points: number;
   seed?: number;
+  groupId?: string | null;
   invites?: TeamInvite[];
 }
 
@@ -41,9 +42,16 @@ export interface League {
   id: string;
   name: string;
   description: string;
+  format?: 'single_elimination' | 'group_stage' | string;
   maxTeams?: number | null;
   bracketSize?: number | null;
   effectiveBracketSize?: number;
+  groupCount?: number;
+  advancePerGroup?: number;
+  groupPhaseGenerated?: boolean;
+  groupPhaseComplete?: boolean;
+  playoffGenerated?: boolean;
+  groups?: LeagueGroup[];
   startDate?: Date | string | null;
   endDate?: Date | string | null;
   teams: Team[];
@@ -58,6 +66,27 @@ export interface League {
   userHasTeamInLeague?: boolean;
 }
 
+export interface LeagueGroup {
+  id: string;
+  name: string;
+  order: number;
+  teams: Team[];
+  standings: GroupStanding[];
+  matches: Match[];
+  expectedMatches?: number;
+  matchesComplete?: boolean;
+}
+
+export interface GroupStanding {
+  teamId: string;
+  team: { id: string; name: string; tag: string };
+  wins: number;
+  losses: number;
+  points: number;
+  played: number;
+  rank: number;
+}
+
 export interface Match {
   id: string;
   leagueId: string;
@@ -66,6 +95,9 @@ export interface Match {
   winner?: { id: string; name: string; tag: string } | null;
   winnerId?: string | null;
   status: string;
+  phase?: 'group' | 'playoff' | string;
+  groupId?: string | null;
+  groupRound?: number | null;
   round?: number;
   bracketPosition?: number | null;
   map?: string | null;
