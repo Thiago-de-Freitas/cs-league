@@ -80,9 +80,52 @@ app.get('/api/health/ready', async (_req, res) => {
       : 0;
 
     const demoWarnings: string[] = [];
-    if (demoQueueLength !== null && demoQueueLength > 0) {
+    let worker: {
+      alive: boolean;
+      lastSeenSecondsAgo: number | null;
+      filesOnDisk: number | null;
+      storagePath: string | null;
+    } = {
+      alive: false,
+      lastSeenSecondsAgo: null,
+      filesOnDisk: null,
+      storagePath: null,
+    };
+
+    if (process.env.REDIS_URL?.trim() && redisErrors.length === 0) {
+      const [heartbeat, workerFiles, workerPath] = await redis.mget(
+        'demo:worker:heartbeat',
+        'demo:worker:files_on_disk',
+        'demo:worker:storage_path',
+      );
+      if (heartbeat) {
+        const age = Math.round(Date.now() / 1000 - Number(heartbeat));
+        worker = {
+          alive: age < 120,
+          lastSeenSecondsAgo: age,
+          filesOnDisk: workerFiles !== null ? Number(workerFiles) : null,
+          storagePath: workerPath,
+        };
+      }
+    }
+
+    if (demoQueueLength !== null && demoQueueLength > 0 && !worker.alive) {
       demoWarnings.push(
-        `${demoQueueLength} job(s) na fila demo:queue — se persistir, verifique se cs-league-worker está online e com o mesmo REDIS_URL e volume /data`
+        `${demoQueueLength} job(s) na fila, mas o worker não envia heartbeat — verifique se cs-league-worker está Online (restartPolicy ALWAYS) e com REDIS_URL=${{Redis.REDIS_URL}}`
+      );
+    } else if (demoQueueLength !== null && demoQueueLength > 0 && worker.alive) {
+      demoWarnings.push(
+        `${demoQueueLength} job(s) na fila com worker ativo — confira logs do worker (arquivo .dem ou parse da demo)`
+      );
+    }
+
+    if (
+      worker.alive &&
+      worker.filesOnDisk !== null &&
+      demoFilesOnDisk !== worker.filesOnDisk
+    ) {
+      demoWarnings.push(
+        `Volume não compartilhado: API vê ${demoFilesOnDisk} .dem, worker vê ${worker.filesOnDisk}. Use o MESMO volume Railway em cs-league-back e cs-league-worker (Settings → Volume → Connect existing volume).`
       );
     }
 
@@ -94,6 +137,7 @@ app.get('/api/health/ready', async (_req, res) => {
         storagePath: demoStoragePath,
         filesOnDisk: demoFilesOnDisk,
         queueLength: demoQueueLength,
+        worker,
       },
     });
   } catch (err) {

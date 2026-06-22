@@ -4,6 +4,7 @@
 import json
 import os
 import re
+import ssl
 import sys
 import time
 import traceback
@@ -18,7 +19,11 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
 DEMO_STORAGE_PATH = os.environ.get("DEMO_STORAGE_PATH")
 DEMO_QUEUE = "demo:queue"
+WORKER_HEARTBEAT_KEY = "demo:worker:heartbeat"
+WORKER_STORAGE_KEY = "demo:worker:files_on_disk"
+WORKER_STORAGE_PATH_KEY = "demo:worker:storage_path"
 POLL_TIMEOUT = 5
+HEARTBEAT_TTL = 90
 WORKER_DIR = Path(__file__).resolve().parent
 BACKEND_DEMOS = WORKER_DIR.parent / "Backend" / "data" / "demos"
 
@@ -36,6 +41,7 @@ def get_demo_storage_dir() -> Path:
             storage = (WORKER_DIR / storage).resolve()
     else:
         storage = BACKEND_DEMOS.resolve()
+    storage.mkdir(parents=True, exist_ok=True)
     return storage
 
 
@@ -124,7 +130,7 @@ def log_startup_diagnostics(r: redis.Redis) -> None:
     print(f"DEMO_STORAGE_PATH={storage}")
     print(f"Storage existe: {storage.exists()}")
     if storage.exists():
-        dem_count = sum(1 for _ in storage.glob("*.dem"))
+        dem_count = count_demo_files()
         print(f"Arquivos .dem no storage: {dem_count}")
     else:
         print("AVISO: diretório de demos inexistente — monte volume /data na API e no worker")
@@ -148,12 +154,32 @@ def log_startup_diagnostics(r: redis.Redis) -> None:
 
 def create_redis_client():
     # socket_timeout=None evita TimeoutError no brpop quando a fila está vazia
-    return redis.from_url(
-        REDIS_URL,
-        socket_connect_timeout=5,
-        socket_timeout=None,
-        decode_responses=True,
-    )
+    kwargs: dict = {
+        "socket_connect_timeout": 10,
+        "socket_timeout": None,
+        "decode_responses": True,
+        "health_check_interval": 30,
+    }
+    if REDIS_URL.startswith("rediss://"):
+        kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    return redis.from_url(REDIS_URL, **kwargs)
+
+
+def count_demo_files() -> int:
+    storage = get_demo_storage_dir()
+    if not storage.exists():
+        return 0
+    return sum(1 for _ in storage.glob("*.dem"))
+
+
+def publish_worker_status(r: redis.Redis) -> None:
+    storage = get_demo_storage_dir()
+    now = str(time.time())
+    pipe = r.pipeline()
+    pipe.set(WORKER_HEARTBEAT_KEY, now, ex=HEARTBEAT_TTL)
+    pipe.set(WORKER_STORAGE_KEY, str(count_demo_files()), ex=HEARTBEAT_TTL)
+    pipe.set(WORKER_STORAGE_PATH_KEY, str(storage), ex=HEARTBEAT_TTL)
+    pipe.execute()
 
 
 def get_db_connection():
@@ -445,13 +471,21 @@ def main():
     r = create_redis_client()
     log_startup_diagnostics(r)
 
+    idle_ticks = 0
     while True:
         try:
+            publish_worker_status(r)
             result = r.brpop(DEMO_QUEUE, timeout=POLL_TIMEOUT)
             if result is None:
+                idle_ticks += 1
+                if idle_ticks % 12 == 0:
+                    qlen = r.llen(DEMO_QUEUE)
+                    print(f"Aguardando jobs... fila {DEMO_QUEUE}: {qlen} item(s)")
                 continue
 
+            idle_ticks = 0
             _, payload = result
+            print(f"Job recebido da fila ({len(payload)} bytes)")
             parsed = parse_job_payload(payload)
             if not parsed:
                 demo_id = try_extract_demo_id(payload)

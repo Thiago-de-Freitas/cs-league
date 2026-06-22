@@ -132,7 +132,8 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 
 3. **Volume persistente** (Settings → Volumes):
    - Mount path: `/data`
-   - API e Worker devem usar o **mesmo volume** para demos e logos
+   - **Compartilhar entre API e Worker:** no segundo serviço, use **Add Volume → Connect existing volume** (selecione o volume já criado no `cs-league-back`). Dois volumes diferentes com mount `/data` **não** compartilham arquivos.
+   - `GET /api/health/ready` → compare `demos.filesOnDisk` (API) com `demos.worker.filesOnDisk` — devem ser iguais
 
 4. **Networking** → **Generate Domain** para obter a URL pública
 
@@ -195,7 +196,8 @@ O hostname `redis` **só existe** na rede do docker-compose local. Na Railway, u
 | `REDIS_URL` | `${{Redis.REDIS_URL}}` — **não** `redis://redis:6379` (hostname só existe no docker-compose local) |
 | `DEMO_STORAGE_PATH` | `/data/demos` |
 
-5. **Volume**: monte o **mesmo volume** em `/data` (mesmo nome/volume compartilhado entre serviços)
+5. **Volume**: monte o **mesmo volume** em `/data` (Settings → Volumes → **Connect existing volume** do cs-league-back)
+6. **Deploy**: `restartPolicyType = ALWAYS` em `Worker/railway.toml` — evita worker parado após crashes
 
 > Sem volume compartilhado, uploads de demo na API não serão encontrados pelo Worker.
 
