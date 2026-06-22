@@ -92,12 +92,58 @@ def parse_job_payload(payload: str) -> tuple[str, str] | None:
         return None
     if not is_valid_demo_id(demo_id):
         return None
-
-    resolved = resolve_demo_path(file_path)
-    if not resolved:
+    if not file_path.strip() or "\x00" in file_path:
         return None
 
-    return demo_id, resolved
+    return demo_id, file_path
+
+
+def try_extract_demo_id(payload: str) -> str | None:
+    try:
+        job = json.loads(payload)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(job, dict):
+        return None
+    demo_id = job.get("demoId")
+    if isinstance(demo_id, str) and is_valid_demo_id(demo_id):
+        return demo_id
+    return None
+
+
+def mask_redis_url(url: str) -> str:
+    if "@" not in url:
+        return url
+    prefix, host = url.rsplit("@", 1)
+    return f"{prefix.split('://')[0]}://***@{host}"
+
+
+def log_startup_diagnostics(r: redis.Redis) -> None:
+    storage = get_demo_storage_dir()
+    print(f"REDIS_URL={mask_redis_url(REDIS_URL)}")
+    print(f"DEMO_STORAGE_PATH={storage}")
+    print(f"Storage existe: {storage.exists()}")
+    if storage.exists():
+        dem_count = sum(1 for _ in storage.glob("*.dem"))
+        print(f"Arquivos .dem no storage: {dem_count}")
+    else:
+        print("AVISO: diretório de demos inexistente — monte volume /data na API e no worker")
+
+    try:
+        r.ping()
+        queue_len = r.llen(DEMO_QUEUE)
+        print(f"Redis OK — fila {DEMO_QUEUE}: {queue_len} job(s) pendente(s)")
+    except redis.RedisError as err:
+        print(f"ERRO: Redis indisponível: {err}")
+        sys.exit(1)
+
+    try:
+        conn = get_db_connection()
+        conn.close()
+        print("Postgres OK")
+    except Exception as err:
+        print(f"ERRO: Postgres indisponível: {err}")
+        sys.exit(1)
 
 
 def create_redis_client():
@@ -346,7 +392,13 @@ def parse_demo(file_path: str) -> list[dict]:
 def process_job(demo_id: str, file_path: str):
     resolved = resolve_demo_path(file_path)
     if not resolved:
-        update_demo_status(demo_id, "FAILED", "Arquivo da demo inválido ou fora do diretório permitido.")
+        storage = get_demo_storage_dir()
+        update_demo_status(
+            demo_id,
+            "FAILED",
+            f"Arquivo da demo não encontrado no worker ({storage}). "
+            "Monte o mesmo volume /data na API e no worker com DEMO_STORAGE_PATH=/data/demos.",
+        )
         return
 
     file_path = resolved
@@ -391,6 +443,7 @@ def process_job(demo_id: str, file_path: str):
 def main():
     print("Worker iniciado, aguardando jobs...")
     r = create_redis_client()
+    log_startup_diagnostics(r)
 
     while True:
         try:
@@ -401,7 +454,14 @@ def main():
             _, payload = result
             parsed = parse_job_payload(payload)
             if not parsed:
-                print("Job Redis inválido ou rejeitado por segurança — ignorando")
+                demo_id = try_extract_demo_id(payload)
+                if demo_id:
+                    update_demo_status(
+                        demo_id,
+                        "FAILED",
+                        "Job da fila inválido ou caminho da demo rejeitado.",
+                    )
+                print(f"Job Redis inválido — descartado: {payload[:200]}")
                 continue
 
             demo_id, file_path = parsed

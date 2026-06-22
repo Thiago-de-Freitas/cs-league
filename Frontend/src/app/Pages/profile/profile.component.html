@@ -167,7 +167,28 @@
           <button type="button" class="btn btn-primary btn-small" (click)="openUploadModal()">+ Enviar</button>
         </div>
 
-        <app-demo-status-loader *ngIf="hasPendingDemos && !demosLoading" [block]="true" status="processing"></app-demo-status-loader>
+        <app-demo-status-loader *ngIf="hasProcessingDemos && !demosLoading" [block]="true" status="processing"></app-demo-status-loader>
+
+        <div *ngIf="!demosLoading && hasStuckPendingDemos" class="demo-stuck-banner gc-card">
+          <p class="demo-stuck-title">Análise demorando mais que o esperado</p>
+          <p class="meta demo-stuck-text">
+            <ng-container *ngIf="demoQueueAvailable; else queueUnavailable">
+              A fila está ativa, mas o worker pode estar offline ou a demo não entrou na fila (envio anterior com Redis indisponível).
+              Clique em Reenfileirar pendentes ou use Reprocessar em cada arquivo.
+            </ng-container>
+            <ng-template #queueUnavailable>
+              A fila de processamento está indisponível na API. Contate o administrador (REDIS_URL).
+            </ng-template>
+          </p>
+          <button
+            *ngIf="demoQueueAvailable && requeueableCount > 0"
+            type="button"
+            class="btn btn-secondary btn-small"
+            (click)="requeueAllPending()"
+            [disabled]="requeueAllLoading">
+            {{ requeueAllLoading ? 'Reenfileirando...' : 'Reenfileirar pendentes (' + requeueableCount + ')' }}
+          </button>
+        </div>
 
         <div *ngIf="demosLoading" class="loading">Carregando demos...</div>
 

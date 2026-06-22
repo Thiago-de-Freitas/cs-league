@@ -11,7 +11,8 @@ import matchRoutes from './routes/matches';
 import demoRoutes from './routes/demos';
 import rankingsRoutes from './routes/rankings';
 import { prisma } from './lib/prisma';
-import { redis, connectRedis } from './lib/redis';
+import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
+import { getDemoStoragePath } from './lib/demoStorage';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
@@ -66,13 +67,34 @@ app.get('/api/health/ready', async (_req, res) => {
 
   try {
     await prisma.$queryRaw`SELECT 1`;
+    let demoQueueLength: number | null = null;
     if (process.env.REDIS_URL?.trim() && redisErrors.length === 0) {
+      await connectRedis();
       await redis.ping();
+      demoQueueLength = await redis.llen(DEMO_QUEUE);
     }
+
+    const demoStoragePath = getDemoStoragePath();
+    const demoFilesOnDisk = fs.existsSync(demoStoragePath)
+      ? fs.readdirSync(demoStoragePath).filter((f) => f.toLowerCase().endsWith('.dem')).length
+      : 0;
+
+    const demoWarnings: string[] = [];
+    if (demoQueueLength !== null && demoQueueLength > 0) {
+      demoWarnings.push(
+        `${demoQueueLength} job(s) na fila demo:queue — se persistir, verifique se cs-league-worker está online e com o mesmo REDIS_URL e volume /data`
+      );
+    }
+
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      warnings: [...warnings, ...redisErrors],
+      warnings: [...warnings, ...redisErrors, ...demoWarnings],
+      demos: {
+        storagePath: demoStoragePath,
+        filesOnDisk: demoFilesOnDisk,
+        queueLength: demoQueueLength,
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Service unavailable';

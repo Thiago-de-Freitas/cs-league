@@ -101,6 +101,13 @@ export class DemoService {
     return this.http.post<Demo>(`${this.apiUrl}/${demoId}/reprocess`, {});
   }
 
+  requeuePendingPersonalDemos(): Observable<{ requeued: number; skipped: { id: string; fileName: string; reason: string }[]; total: number }> {
+    return this.http.post<{ requeued: number; skipped: { id: string; fileName: string; reason: string }[]; total: number }>(
+      `${this.apiUrl}/personal/requeue-pending`,
+      {}
+    );
+  }
+
   deleteDemo(demoId: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${demoId}`);
   }

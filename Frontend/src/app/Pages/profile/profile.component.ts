@@ -35,7 +35,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
   showUploadModal = false;
   reprocessingId: string | null = null;
   deletingId: string | null = null;
+  requeueAllLoading = false;
+  demoQueueAvailable = true;
   private listPollSub?: Subscription;
+  private readonly stuckPendingMs = 2 * 60 * 1000;
 
   constructor(
     private fb: FormBuilder,
@@ -77,6 +80,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     this.loadStatsOverview();
     this.loadPersonalDemos();
+    this.loadDemoQueueHealth();
   }
 
   ngOnDestroy(): void {
@@ -128,6 +132,38 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   get hasPendingDemos(): boolean {
     return this.personalDemos.some((d) => d.status === 'pending' || d.status === 'processing');
+  }
+
+  get hasProcessingDemos(): boolean {
+    return this.personalDemos.some((d) => d.status === 'processing');
+  }
+
+  get hasStuckPendingDemos(): boolean {
+    return this.personalDemos.some((d) => this.isDemoStuck(d));
+  }
+
+  get requeueableCount(): number {
+    return this.personalDemos.filter((d) => d.status === 'pending' || d.status === 'failed').length;
+  }
+
+  loadDemoQueueHealth(): void {
+    this.demoService.getDemoHealthConfig().subscribe({
+      next: (config) => {
+        this.demoQueueAvailable = config.redis?.queueAvailable !== false && !(config.redisErrors?.length);
+      },
+      error: () => {
+        this.demoQueueAvailable = true;
+      },
+    });
+  }
+
+  isDemoStuck(demo: Demo): boolean {
+    if (demo.status !== 'pending' && demo.status !== 'processing') {
+      return false;
+    }
+    const since = demo.updatedAt || demo.createdAt;
+    if (!since) return false;
+    return Date.now() - new Date(since).getTime() > this.stuckPendingMs;
   }
 
   setupListPolling(): void {
@@ -243,6 +279,36 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   viewDemo(demoId: string): void {
     this.router.navigate(['/demo', demoId]);
+  }
+
+  requeueAllPending(): void {
+    if (this.requeueAllLoading || this.requeueableCount === 0) return;
+
+    this.requeueAllLoading = true;
+    this.demoService.requeuePendingPersonalDemos().subscribe({
+      next: (result) => {
+        this.requeueAllLoading = false;
+        if (result.requeued > 0) {
+          this.notify.success(
+            `${result.requeued} demo(s) reenfileirada(s). Aguarde o worker processar.`
+          );
+        } else if (result.total === 0) {
+          this.notify.info('Nenhuma demo pendente para reenfileirar.');
+        } else {
+          this.notify.warning('Nenhuma demo pôde ser reenfileirada. Verifique se o worker está online.');
+        }
+        if (result.skipped.length > 0) {
+          this.notify.warning(
+            `${result.skipped.length} demo(s) sem arquivo no servidor (volume compartilhado entre API e worker).`
+          );
+        }
+        this.loadPersonalDemos();
+      },
+      error: (err) => {
+        this.requeueAllLoading = false;
+        this.notify.error(err.error?.error || 'Erro ao reenfileirar demos pendentes');
+      },
+    });
   }
 
   reprocessDemo(demo: Demo): void {

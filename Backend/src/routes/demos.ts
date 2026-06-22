@@ -120,6 +120,54 @@ router.get('/personal', authMiddleware, async (req: AuthRequest, res: Response) 
   }
 });
 
+router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+  try {
+    const demos = await prisma.demo.findMany({
+      where: {
+        uploadedById: req.user!.userId,
+        isPersonal: true,
+        status: { in: ['PENDING', 'FAILED'] },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let requeued = 0;
+    const skipped: { id: string; fileName: string; reason: string }[] = [];
+
+    for (const demo of demos) {
+      const absolutePath = tryResolveDemoFilePath(demo.filePath);
+      if (!absolutePath || !fs.existsSync(absolutePath)) {
+        skipped.push({
+          id: demo.id,
+          fileName: demo.fileName,
+          reason: 'Arquivo da demo não encontrado no servidor',
+        });
+        continue;
+      }
+
+      await prisma.demo.update({
+        where: { id: demo.id },
+        data: { status: 'PENDING', errorMessage: null, filePath: absolutePath },
+      });
+      await enqueueDemoJob(demo.id, absolutePath);
+      requeued++;
+    }
+
+    res.json({ requeued, skipped, total: demos.length });
+  } catch (err) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('Fila Redis indisponível') || message.includes('Redis')) {
+      res.status(503).json({
+        error: 'Fila de processamento de demos indisponível. Verifique REDIS_URL na API.',
+        code: 'DEMO_QUEUE_UNAVAILABLE',
+      });
+      return;
+    }
+    res.status(500).json({ error: 'Erro ao reenfileirar demos pendentes' });
+  }
+});
+
 router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {

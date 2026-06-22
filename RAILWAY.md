@@ -302,6 +302,7 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | `/api/health` retorna 503 | Versão antiga checava DB/Redis no health | Redeploy com versão atual: `/api/health` = liveness (200); use `/api/health/ready` para deps |
 | `/api/health/ready` retorna 503 | Postgres ou Redis inacessível | Confira `${{Postgres.DATABASE_URL}}` e `${{Redis.REDIS_URL}}` nas variables |
 | Demo em "Aguardando" | Worker parado ou volume diferente | Verifique logs do Worker e paths `DEMO_STORAGE_PATH` |
+| Jobs em `demo:queue` no Redis mas demos não processam | Worker offline, `REDIS_URL` diferente da API, ou volume `/data` não compartilhado | Confira logs do **cs-league-worker** (`Redis OK — fila demo:queue: N job(s)`). Monte o **mesmo volume** em `/data` na API e no worker. `GET /api/health/ready` mostra `demos.queueLength` e `demos.filesOnDisk` |
 | CORS no browser | `CORS_ORIGIN` incorreto | Use a URL pública exata (com `https://`) |
 | Build Angular falha (SSL npm) | Node incompatível | Use Node 20 LTS localmente |
 | Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs do **preDeploy** |
