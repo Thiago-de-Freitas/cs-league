@@ -105,6 +105,12 @@ export function getEnvConfigStatus() {
       unresolvedRef: redis ? isUnresolvedRailwayRef(redis) : false,
       queueAvailable: getRedisEnvErrors().length === 0,
     },
+    internalServiceKey: {
+      set: (process.env.INTERNAL_SERVICE_KEY?.trim() ?? '').length > 0,
+      unresolvedRef: process.env.INTERNAL_SERVICE_KEY
+        ? isUnresolvedRailwayRef(process.env.INTERNAL_SERVICE_KEY)
+        : false,
+    },
     coreErrors: getCoreEnvErrors(),
     redisErrors: getRedisEnvErrors(),
     warnings: getRedisWarnings(),

@@ -119,7 +119,7 @@ app.get('/api/health/ready', async (_req, res) => {
 
     if (demoQueueLength !== null && demoQueueLength > 0 && !worker.alive) {
       demoWarnings.push(
-        `${demoQueueLength} job(s) na fila, mas o worker não envia heartbeat — verifique se cs-league-worker está Online (restartPolicy ALWAYS) e com REDIS_URL=${{Redis.REDIS_URL}}`
+        `${demoQueueLength} job(s) na fila, mas o worker não envia heartbeat — verifique se cs-league-worker está Online e com REDIS_URL do plugin Redis`
       );
     } else if (demoQueueLength !== null && demoQueueLength > 0 && worker.alive) {
       demoWarnings.push(

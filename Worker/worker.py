@@ -87,16 +87,24 @@ def resolve_demo_path(file_path: str) -> str | None:
     return None
 
 
-def fetch_demo_from_api(demo_id: str) -> str | None:
+def fetch_demo_from_api(demo_id: str) -> tuple[str | None, str | None]:
     if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
-        return None
+        missing = []
+        if not BACKEND_INTERNAL_URL:
+            missing.append("BACKEND_INTERNAL_URL")
+        if not INTERNAL_SERVICE_KEY:
+            missing.append("INTERNAL_SERVICE_KEY")
+        return None, f"Variáveis ausentes no worker: {', '.join(missing)}"
+
+    if "${{" in BACKEND_INTERNAL_URL or "${{" in INTERNAL_SERVICE_KEY:
+        return None, "Referências Railway não resolvidas (${{...}}) — use Add Reference na UI"
 
     cache_dir = get_demo_storage_dir() / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     dest = cache_dir / f"{demo_id}.dem"
 
     if dest.is_file() and dest.stat().st_size > 0:
-        return str(dest)
+        return str(dest), None
 
     url = f"{BACKEND_INTERNAL_URL}/api/internal/demos/{demo_id}/file"
     print(f"Baixando demo {demo_id} da API ({BACKEND_INTERNAL_URL})...")
@@ -109,24 +117,29 @@ def fetch_demo_from_api(demo_id: str) -> str | None:
         with urllib.request.urlopen(req, timeout=300) as resp:
             data = resp.read()
         if not data:
-            print(f"Resposta vazia ao baixar demo {demo_id}")
-            return None
+            return None, "API retornou arquivo vazio"
         dest.write_bytes(data)
         print(f"Demo {demo_id} em cache ({len(data)} bytes): {dest}")
-        return str(dest)
+        return str(dest), None
     except urllib.error.HTTPError as err:
-        body = err.read().decode("utf-8", errors="replace")[:200]
-        print(f"HTTP {err.code} ao baixar demo {demo_id}: {body}")
-        return None
+        body = err.read().decode("utf-8", errors="replace")[:300]
+        if err.code == 403:
+            return None, "API rejeitou a chave (403) — INTERNAL_SERVICE_KEY deve ser igual no back e no worker"
+        if err.code == 503 and "INTERNAL_SERVICE_KEY" in body:
+            return None, "API sem INTERNAL_SERVICE_KEY — configure no cs-league-back e redeploy"
+        if err.code == 404:
+            return None, "Arquivo não encontrado na API (404) — demo pode ter sido enviada antes do volume /data"
+        return None, f"Erro HTTP {err.code} ao baixar da API: {body}"
+    except urllib.error.URLError as err:
+        return None, f"Worker não alcança a API em {BACKEND_INTERNAL_URL}: {err.reason}"
     except Exception as err:
-        print(f"Erro ao baixar demo {demo_id} da API: {err}")
-        return None
+        return None, f"Erro ao baixar demo da API: {err}"
 
 
-def ensure_demo_file(demo_id: str, file_path: str) -> str | None:
+def ensure_demo_file(demo_id: str, file_path: str) -> tuple[str | None, str | None]:
     resolved = resolve_demo_path(file_path)
     if resolved:
-        return resolved
+        return resolved, None
     return fetch_demo_from_api(demo_id)
 
 
@@ -171,6 +184,28 @@ def mask_redis_url(url: str) -> str:
     return f"{prefix.split('://')[0]}://***@{host}"
 
 
+def verify_backend_connectivity() -> None:
+    if not BACKEND_INTERNAL_URL:
+        print("AVISO: BACKEND_INTERNAL_URL não definido no worker")
+        return
+    if "${{" in BACKEND_INTERNAL_URL:
+        print("ERRO: BACKEND_INTERNAL_URL contém ${{...}} literal — referência não resolvida na Railway")
+        return
+    if not INTERNAL_SERVICE_KEY:
+        print("AVISO: INTERNAL_SERVICE_KEY não definido no worker")
+        return
+    if "${{" in INTERNAL_SERVICE_KEY:
+        print("ERRO: INTERNAL_SERVICE_KEY contém ${{...}} literal — use Shared Variable")
+        return
+
+    health_url = f"{BACKEND_INTERNAL_URL}/api/health"
+    try:
+        with urllib.request.urlopen(health_url, timeout=10) as resp:
+            print(f"API acessível ({health_url}) — status {resp.status}")
+    except Exception as err:
+        print(f"ERRO: worker não alcança a API em {BACKEND_INTERNAL_URL}: {err}")
+
+
 def log_startup_diagnostics(r: redis.Redis) -> None:
     storage = get_demo_storage_dir()
     print(f"REDIS_URL={mask_redis_url(REDIS_URL)}")
@@ -199,6 +234,8 @@ def log_startup_diagnostics(r: redis.Redis) -> None:
     except Exception as err:
         print(f"ERRO: Postgres indisponível: {err}")
         sys.exit(1)
+
+    verify_backend_connectivity()
 
 
 def create_redis_client():
@@ -465,13 +502,12 @@ def parse_demo(file_path: str) -> list[dict]:
 
 
 def process_job(demo_id: str, file_path: str):
-    resolved = ensure_demo_file(demo_id, file_path)
+    resolved, fetch_error = ensure_demo_file(demo_id, file_path)
     if not resolved:
         update_demo_status(
             demo_id,
             "FAILED",
-            "Arquivo da demo indisponível. Na Railway, configure BACKEND_INTERNAL_URL "
-            "(http://cs-league-back.railway.internal:PORT) e INTERNAL_SERVICE_KEY no worker.",
+            fetch_error or "Arquivo da demo indisponível.",
         )
         return
 
