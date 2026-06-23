@@ -1,16 +1,34 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay, tap } from 'rxjs';
 import { Team, TeamInvite, User } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class TeamService {
   private apiUrl = '/api/teams';
+  private teamsCache: Observable<Team[]> | null = null;
+  private invitesCache: Observable<TeamInvite[]> | null = null;
 
   constructor(private http: HttpClient) {}
 
+  invalidateTeams(): void {
+    this.teamsCache = null;
+  }
+
+  invalidateInvites(): void {
+    this.invitesCache = null;
+  }
+
+  invalidateAll(): void {
+    this.invalidateTeams();
+    this.invalidateInvites();
+  }
+
   getTeams(): Observable<Team[]> {
-    return this.http.get<Team[]>(this.apiUrl);
+    if (!this.teamsCache) {
+      this.teamsCache = this.http.get<Team[]>(this.apiUrl).pipe(shareReplay(1));
+    }
+    return this.teamsCache;
   }
 
   getTeamById(id: string): Observable<Team> {
@@ -18,25 +36,35 @@ export class TeamService {
   }
 
   createTeam(name: string, tag: string): Observable<Team> {
-    return this.http.post<Team>(this.apiUrl, { name, tag });
+    return this.http.post<Team>(this.apiUrl, { name, tag }).pipe(
+      tap(() => this.invalidateTeams())
+    );
   }
 
   updateTeam(id: string, data: { name?: string; tag?: string }): Observable<Team> {
-    return this.http.put<Team>(`${this.apiUrl}/${id}`, data);
+    return this.http.put<Team>(`${this.apiUrl}/${id}`, data).pipe(
+      tap(() => this.invalidateTeams())
+    );
   }
 
   deleteTeam(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
+      tap(() => this.invalidateAll())
+    );
   }
 
   uploadLogo(teamId: string, file: File): Observable<Team> {
     const formData = new FormData();
     formData.append('logo', file);
-    return this.http.post<Team>(`${this.apiUrl}/${teamId}/logo`, formData);
+    return this.http.post<Team>(`${this.apiUrl}/${teamId}/logo`, formData).pipe(
+      tap(() => this.invalidateTeams())
+    );
   }
 
   removeLogo(teamId: string): Observable<Team> {
-    return this.http.delete<Team>(`${this.apiUrl}/${teamId}/logo`);
+    return this.http.delete<Team>(`${this.apiUrl}/${teamId}/logo`).pipe(
+      tap(() => this.invalidateTeams())
+    );
   }
 
   inviteUser(teamId: string, userId: string): Observable<unknown> {
@@ -44,15 +72,22 @@ export class TeamService {
   }
 
   rejectInvite(teamId: string, inviteId: string): Observable<{ success: boolean }> {
-    return this.http.post<{ success: boolean }>(`${this.apiUrl}/${teamId}/invites/${inviteId}/reject`, {});
+    return this.http.post<{ success: boolean }>(`${this.apiUrl}/${teamId}/invites/${inviteId}/reject`, {}).pipe(
+      tap(() => this.invalidateInvites())
+    );
   }
 
   acceptInvite(teamId: string, inviteId: string): Observable<Team> {
-    return this.http.post<Team>(`${this.apiUrl}/${teamId}/invites/${inviteId}/accept`, {});
+    return this.http.post<Team>(`${this.apiUrl}/${teamId}/invites/${inviteId}/accept`, {}).pipe(
+      tap(() => this.invalidateAll())
+    );
   }
 
   getPendingInvites(): Observable<TeamInvite[]> {
-    return this.http.get<TeamInvite[]>(`${this.apiUrl}/invites/pending`);
+    if (!this.invitesCache) {
+      this.invitesCache = this.http.get<TeamInvite[]>(`${this.apiUrl}/invites/pending`).pipe(shareReplay(1));
+    }
+    return this.invitesCache;
   }
 
   searchUsers(query: string): Observable<User[]> {

@@ -58,6 +58,7 @@ export interface League {
   defaultMatchTime?: string;
   scheduleTimezone?: string;
   scheduleConfigured?: boolean;
+  scheduleWeekOverrides?: { weekStart: string; daysOfWeek: number[] }[];
   teams: Team[];
   matches?: Match[];
   status: 'upcoming' | 'ongoing' | 'completed' | 'archived' | string;

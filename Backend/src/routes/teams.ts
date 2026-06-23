@@ -125,11 +125,12 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       },
       include: {
         members: {
-          include: {
-            user: { select: { id: true, displayName: true, email: true, steamId: true } },
+          select: {
+            role: true,
+            user: { select: { id: true, displayName: true } },
           },
         },
-        leagueTeams: true,
+        leagueTeams: { select: { wins: true, losses: true, points: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

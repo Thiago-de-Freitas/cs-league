@@ -69,42 +69,52 @@ export class DashboardComponent implements OnInit {
           })
         );
 
+    const leagueId = this.rankingLeagueId || undefined;
+    this.rankingsLoading = true;
+
     forkJoin({
       leagues: this.leagueService.getLeagues(this.showArchivedLeagues).pipe(safe('ligas', [] as League[])),
       openLeagues: this.leagueService.getOpenLeagues().pipe(safe('ligas abertas', [] as League[])),
       teams: this.teamService.getTeams().pipe(safe('times', [] as Team[])),
       invites: this.teamService.getPendingInvites().pipe(safe('convites', [] as TeamInvite[])),
+      playerRankings: this.rankingsService.getPlayerRankings(leagueId).pipe(safe('ranking de jogadores', [] as PlayerRankingEntry[])),
+      teamRankings: this.rankingsService.getTeamRankings().pipe(safe('ranking de times', [] as TeamRankingEntry[])),
     })
-      .pipe(finalize(() => (this.loading = false)))
+      .pipe(finalize(() => {
+        this.loading = false;
+        this.rankingsLoading = false;
+      }))
       .subscribe({
-        next: ({ leagues, openLeagues, teams, invites }) => {
+        next: ({ leagues, openLeagues, teams, invites, playerRankings, teamRankings }) => {
           this.leagues = leagues;
           const myIds = new Set(leagues.map((l) => l.id));
           this.openLeagues = openLeagues.filter((l) => !myIds.has(l.id));
           this.teams = teams;
           this.pendingInvites = invites;
+          this.playerRankings = playerRankings;
+          this.teamRankings = teamRankings;
         },
       });
-    this.loadRankings();
   }
 
   loadRankings(): void {
     this.rankingsLoading = true;
     const leagueId = this.rankingLeagueId || undefined;
-    this.rankingsService.getPlayerRankings(leagueId).subscribe({
-      next: (players) => (this.playerRankings = players),
-      error: () => (this.playerRankings = [])
-    });
-    this.rankingsService.getTeamRankings().subscribe({
-      next: (teams) => {
-        this.teamRankings = teams;
-        this.rankingsLoading = false;
-      },
-      error: () => {
-        this.teamRankings = [];
-        this.rankingsLoading = false;
-      }
-    });
+    forkJoin({
+      playerRankings: this.rankingsService.getPlayerRankings(leagueId),
+      teamRankings: this.rankingsService.getTeamRankings(),
+    })
+      .pipe(finalize(() => (this.rankingsLoading = false)))
+      .subscribe({
+        next: ({ playerRankings, teamRankings }) => {
+          this.playerRankings = playerRankings;
+          this.teamRankings = teamRankings;
+        },
+        error: () => {
+          this.playerRankings = [];
+          this.teamRankings = [];
+        },
+      });
   }
 
   onRankingLeagueChange(): void {
@@ -183,7 +193,7 @@ export class DashboardComponent implements OnInit {
 
   onLeagueCreated(league: League): void {
     this.showCreateLeagueModal = false;
-    this.leagueService.getLeagues().subscribe({
+    this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
       next: (leagues) => (this.leagues = leagues)
     });
     this.router.navigate(['/league-details', league.id]);

@@ -115,8 +115,10 @@ export class LeagueDetailsComponent implements OnInit {
         this.newMaxTeams = league.maxTeams ?? null;
         this.isAdmin = this.authService.isLeagueOwner(league.ownerId || '');
         this.syncConfrontosTab();
-        this.loadMyTeamsForRegistration();
         this.isLoading = false;
+        if (this.canShowPlayerRegistration) {
+          queueMicrotask(() => this.loadMyTeamsForRegistration());
+        }
       },
       error: () => {
         this.errorMsg = 'Erro ao carregar detalhes da liga.';

@@ -15,7 +15,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
   return next(req).pipe(
     catchError((err) => {
-      if (err.status === 401) {
+      const isAuthRoute = req.url.includes('/api/auth/login') || req.url.includes('/api/auth/register');
+      if (err.status === 401 && !isAuthRoute) {
         auth.logout();
         router.navigate(['/login']);
       }

@@ -51,6 +51,8 @@ export async function getPlayerRankings(limit = 10, leagueId?: string): Promise<
       hsPercent: true,
       kast: true,
     },
+    orderBy: { id: 'desc' },
+    take: 4000,
   });
 
   const byKey = new Map<
@@ -201,58 +203,44 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
 }
 
 export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
-  const leagueTeams = await prisma.leagueTeam.findMany({
-    select: {
-      wins: true,
-      losses: true,
-      team: {
-        select: {
-          id: true,
-          name: true,
-          tag: true,
-          logoUrl: true,
-        },
-      },
-    },
+  const grouped = await prisma.leagueTeam.groupBy({
+    by: ['teamId'],
+    _sum: { wins: true, losses: true },
+    _count: { _all: true },
   });
 
-  const byTeam = new Map<
-    string,
-    {
-      team: { id: string; name: string; tag: string; logoUrl: string | null };
-      wins: number;
-      losses: number;
-      leagues: number;
-    }
-  >();
+  const ranked = grouped
+    .map((g) => ({
+      teamId: g.teamId,
+      wins: g._sum.wins ?? 0,
+      losses: g._sum.losses ?? 0,
+      leagues: g._count._all,
+    }))
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses)
+    .slice(0, limit);
 
-  for (const lt of leagueTeams) {
-    const existing = byTeam.get(lt.team.id);
-    if (existing) {
-      existing.wins += lt.wins;
-      existing.losses += lt.losses;
-      existing.leagues += 1;
-    } else {
-      byTeam.set(lt.team.id, {
-        team: lt.team,
-        wins: lt.wins,
-        losses: lt.losses,
-        leagues: 1,
-      });
-    }
-  }
+  if (ranked.length === 0) return [];
 
-  return [...byTeam.values()]
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.team.name.localeCompare(b.team.name))
-    .slice(0, limit)
-    .map((entry, index) => ({
-      rank: index + 1,
-      teamId: entry.team.id,
-      name: entry.team.name,
-      tag: entry.team.tag,
-      logoUrl: entry.team.logoUrl,
-      wins: entry.wins,
-      losses: entry.losses,
-      leagues: entry.leagues,
-    }));
+  const teams = await prisma.team.findMany({
+    where: { id: { in: ranked.map((r) => r.teamId) } },
+    select: { id: true, name: true, tag: true, logoUrl: true },
+  });
+  const teamMap = new Map(teams.map((t) => [t.id, t]));
+
+  return ranked
+    .map((entry, index) => {
+      const team = teamMap.get(entry.teamId);
+      if (!team) return null;
+      return {
+        rank: index + 1,
+        teamId: team.id,
+        name: team.name,
+        tag: team.tag,
+        logoUrl: team.logoUrl,
+        wins: entry.wins,
+        losses: entry.losses,
+        leagues: entry.leagues,
+      };
+    })
+    .filter((e): e is TeamRankingEntry => e !== null);
 }

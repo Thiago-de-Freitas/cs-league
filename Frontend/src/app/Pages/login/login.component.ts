@@ -31,9 +31,11 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.authService.isLoggedIn) {
-      this.router.navigate(['/dashboard']);
-    }
+    if (!this.authService.isLoggedIn) return;
+    this.authService.getMe().subscribe({
+      next: () => this.router.navigate(['/dashboard']),
+      error: () => this.authService.logout(),
+    });
   }
 
   onSubmit(): void {
@@ -53,6 +55,7 @@ export class LoginComponent implements OnInit {
       },
       error: (err) => {
         this.loading = false;
+        if (err.status === 401) this.authService.logout();
         this.loginError = err.error?.error || 'Erro ao fazer login.';
       }
     });

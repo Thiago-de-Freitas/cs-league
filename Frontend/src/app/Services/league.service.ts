@@ -1,25 +1,48 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay, tap } from 'rxjs';
 import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class LeagueService {
   private apiUrl = '/api/leagues';
+  private leaguesCache = new Map<string, Observable<League[]>>();
+  private openLeaguesCache: Observable<League[]> | null = null;
 
   constructor(private http: HttpClient) {}
 
+  private leaguesCacheKey(includeArchived: boolean): string {
+    return includeArchived ? 'archived' : 'active';
+  }
+
+  invalidateLeagues(): void {
+    this.leaguesCache.clear();
+    this.openLeaguesCache = null;
+  }
+
   getLeagues(includeArchived = false): Observable<League[]> {
-    const params = includeArchived ? '?includeArchived=true' : '';
-    return this.http.get<League[]>(`${this.apiUrl}${params}`);
+    const key = this.leaguesCacheKey(includeArchived);
+    if (!this.leaguesCache.has(key)) {
+      const params = includeArchived ? '?includeArchived=true' : '';
+      const request$ = this.http.get<League[]>(`${this.apiUrl}${params}`).pipe(shareReplay(1));
+      this.leaguesCache.set(key, request$);
+    }
+    return this.leaguesCache.get(key)!;
   }
 
   getOpenLeagues(): Observable<League[]> {
-    return this.http.get<League[]>(`${this.apiUrl}/open`);
+    if (!this.openLeaguesCache) {
+      this.openLeaguesCache = this.http.get<League[]>(`${this.apiUrl}/open`).pipe(shareReplay(1));
+    }
+    return this.openLeaguesCache;
   }
 
   getLeagueById(id: string): Observable<League> {
     return this.http.get<League>(`${this.apiUrl}/${id}`);
+  }
+
+  private afterLeagueMutation<T>(): (source: Observable<T>) => Observable<T> {
+    return (source) => source.pipe(tap(() => this.invalidateLeagues()));
   }
 
   createLeague(data: {
@@ -34,27 +57,31 @@ export class LeagueService {
     groupCount?: number;
     advancePerGroup?: number;
   }): Observable<League> {
-    return this.http.post<League>(this.apiUrl, data);
+    return this.http.post<League>(this.apiUrl, data).pipe(this.afterLeagueMutation());
   }
 
   updateLeague(id: string, data: Partial<League> & { maxTeams?: number | null; groupCount?: number; advancePerGroup?: number }): Observable<League> {
-    return this.http.put<League>(`${this.apiUrl}/${id}`, data);
+    return this.http.put<League>(`${this.apiUrl}/${id}`, data).pipe(this.afterLeagueMutation());
   }
 
   deleteLeague(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(this.afterLeagueMutation());
   }
 
   archiveLeague(id: string): Observable<{ id: string; status: string; message: string }> {
-    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/archive`, {});
+    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/archive`, {}).pipe(
+      this.afterLeagueMutation()
+    );
   }
 
   unarchiveLeague(id: string): Observable<{ id: string; status: string; message: string }> {
-    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/unarchive`, {});
+    return this.http.post<{ id: string; status: string; message: string }>(`${this.apiUrl}/${id}/unarchive`, {}).pipe(
+      this.afterLeagueMutation()
+    );
   }
 
   addTeamsToLeague(leagueId: string, teamIds: string[]): Observable<League> {
-    return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams/bulk`, { teamIds });
+    return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams/bulk`, { teamIds }).pipe(this.afterLeagueMutation());
   }
 
   getAvailableTeams(leagueId: string): Observable<{ id: string; name: string; tag: string }[]> {
@@ -62,23 +89,27 @@ export class LeagueService {
   }
 
   addTeamToLeague(leagueId: string, teamId: string, seed?: number): Observable<League> {
-    return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams`, { teamId, seed });
+    return this.http.post<League>(`${this.apiUrl}/${leagueId}/teams`, { teamId, seed }).pipe(this.afterLeagueMutation());
   }
 
   registerTeamInLeague(leagueId: string, teamId: string): Observable<League> {
-    return this.http.post<League>(`${this.apiUrl}/${leagueId}/register`, { teamId });
+    return this.http.post<League>(`${this.apiUrl}/${leagueId}/register`, { teamId }).pipe(this.afterLeagueMutation());
   }
 
   removeTeamFromLeague(leagueId: string, teamId: string): Observable<League> {
-    return this.http.delete<League>(`${this.apiUrl}/${leagueId}/teams/${teamId}`);
+    return this.http.delete<League>(`${this.apiUrl}/${leagueId}/teams/${teamId}`).pipe(this.afterLeagueMutation());
   }
 
   generateBracket(leagueId: string): Observable<League & { bracketInfo?: unknown }> {
-    return this.http.post<League & { bracketInfo?: unknown }>(`${this.apiUrl}/${leagueId}/bracket/generate`, {});
+    return this.http.post<League & { bracketInfo?: unknown }>(`${this.apiUrl}/${leagueId}/bracket/generate`, {}).pipe(
+      this.afterLeagueMutation()
+    );
   }
 
   generateGroups(leagueId: string): Observable<League & { groupInfo?: unknown }> {
-    return this.http.post<League & { groupInfo?: unknown }>(`${this.apiUrl}/${leagueId}/groups/generate`, {});
+    return this.http.post<League & { groupInfo?: unknown }>(`${this.apiUrl}/${leagueId}/groups/generate`, {}).pipe(
+      this.afterLeagueMutation()
+    );
   }
 
   getStandings(leagueId: string): Observable<unknown[]> {

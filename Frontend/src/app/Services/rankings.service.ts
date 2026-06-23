@@ -1,17 +1,29 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay } from 'rxjs';
 import { PlayerRankingEntry, TeamRankingEntry, PlayerProfileStats } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class RankingsService {
   private apiUrl = '/api/rankings';
+  private playerCache = new Map<string, Observable<PlayerRankingEntry[]>>();
+  private teamRankingsCache: Observable<TeamRankingEntry[]> | null = null;
 
   constructor(private http: HttpClient) {}
 
+  invalidateAll(): void {
+    this.playerCache.clear();
+    this.teamRankingsCache = null;
+  }
+
   getPlayerRankings(leagueId?: string): Observable<PlayerRankingEntry[]> {
-    const params = leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : '';
-    return this.http.get<PlayerRankingEntry[]>(`${this.apiUrl}/players${params}`);
+    const key = leagueId || '';
+    if (!this.playerCache.has(key)) {
+      const params = leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : '';
+      const request$ = this.http.get<PlayerRankingEntry[]>(`${this.apiUrl}/players${params}`).pipe(shareReplay(1));
+      this.playerCache.set(key, request$);
+    }
+    return this.playerCache.get(key)!;
   }
 
   getPlayerProfile(steamId: string): Observable<PlayerProfileStats> {
@@ -19,6 +31,9 @@ export class RankingsService {
   }
 
   getTeamRankings(): Observable<TeamRankingEntry[]> {
-    return this.http.get<TeamRankingEntry[]>(`${this.apiUrl}/teams`);
+    if (!this.teamRankingsCache) {
+      this.teamRankingsCache = this.http.get<TeamRankingEntry[]>(`${this.apiUrl}/teams`).pipe(shareReplay(1));
+    }
+    return this.teamRankingsCache;
   }
 }

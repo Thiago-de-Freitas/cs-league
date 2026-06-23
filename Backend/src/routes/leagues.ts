@@ -35,6 +35,26 @@ import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syn
 
 const router = Router();
 
+const teamWithRosterSelect = {
+  id: true,
+  name: true,
+  tag: true,
+  logoUrl: true,
+  ownerId: true,
+  members: {
+    select: {
+      role: true,
+      user: { select: { id: true, displayName: true, steamId: true } },
+    },
+  },
+} as const;
+
+const matchWithTeamsSelect = {
+  team1: { select: { id: true, name: true, tag: true } },
+  team2: { select: { id: true, name: true, tag: true } },
+  winner: { select: { id: true, name: true, tag: true } },
+} as const;
+
 async function getMatchIdsWithGeneralDemo(leagueId: string): Promise<Set<string>> {
   const demos = await prisma.demo.findMany({
     where: {
@@ -57,47 +77,19 @@ async function getLeagueWithDetails(leagueId: string) {
         include: {
           teams: {
             include: {
-              team: {
-                include: {
-                  members: {
-                    include: {
-                      user: { select: { id: true, displayName: true, steamId: true } },
-                    },
-                  },
-                },
-              },
+              team: { select: teamWithRosterSelect },
             },
-          },
-          matches: {
-            include: {
-              team1: { select: { id: true, name: true, tag: true } },
-              team2: { select: { id: true, name: true, tag: true } },
-              winner: { select: { id: true, name: true, tag: true } },
-            },
-            orderBy: [{ groupRound: 'asc' }, { createdAt: 'asc' }],
           },
         },
       },
       teams: {
         include: {
-          team: {
-            include: {
-              members: {
-                include: {
-                  user: { select: { id: true, displayName: true, steamId: true } },
-                },
-              },
-            },
-          },
+          team: { select: teamWithRosterSelect },
         },
         orderBy: [{ seed: 'asc' }, { points: 'desc' }, { wins: 'desc' }],
       },
       matches: {
-        include: {
-          team1: { select: { id: true, name: true, tag: true } },
-          team2: { select: { id: true, name: true, tag: true } },
-          winner: { select: { id: true, name: true, tag: true } },
-        },
+        include: matchWithTeamsSelect,
         orderBy: [{ phase: 'asc' }, { round: 'asc' }, { groupRound: 'asc' }, { bracketPosition: 'asc' }, { createdAt: 'asc' }],
       },
     },
@@ -141,18 +133,47 @@ function formatTeamFromLeagueTeam(lt: {
 
 function formatLeague(
   league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>,
-  matchIdsWithDemo: Set<string> = new Set()
+  matchIdsWithDemo: Set<string> = new Set(),
+  weekOverrides: { weekStart: string; daysOfWeek: number[] }[] = []
 ) {
   const groupMatches = league.matches.filter((m) => m.phase === 'GROUP');
   const playoffMatches = league.matches.filter((m) => m.phase === 'PLAYOFF');
   const groupPhaseComplete = groupMatches.length > 0 && areAllGroupMatchesComplete(groupMatches);
   const playoffGenerated = playoffMatches.some((m) => m.round > 0);
 
+  const matchesByGroupId = new Map<string, typeof league.matches>();
+  for (const m of groupMatches) {
+    if (!m.groupId) continue;
+    const list = matchesByGroupId.get(m.groupId) ?? [];
+    list.push(m);
+    matchesByGroupId.set(m.groupId, list);
+  }
+
+  const formatMatch = (m: (typeof league.matches)[number]) => ({
+    id: m.id,
+    leagueId: m.leagueId,
+    team1: m.team1,
+    team2: m.team2,
+    winner: m.winner,
+    winnerId: m.winnerId,
+    status: m.status.toLowerCase(),
+    phase: m.phase.toLowerCase(),
+    groupId: m.groupId,
+    groupRound: m.groupRound,
+    round: m.round,
+    bracketPosition: m.bracketPosition,
+    map: m.map,
+    scheduledAt: m.scheduledAt,
+    playedAt: m.playedAt,
+    hasGeneralDemo: matchIdsWithDemo.has(m.id),
+  });
+
   const groups = league.groups.map((g) => {
+    const gMatches = matchesByGroupId.get(g.id) ?? [];
     const teamIds = g.teams.map((lt) => lt.teamId);
     const standings = computeGroupStandings(
       teamIds,
-      g.matches.map((m) => ({
+      gMatches.map((m) => ({
         team1Id: m.team1Id,
         team2Id: m.team2Id,
         winnerId: m.winnerId,
@@ -173,24 +194,9 @@ function formatLeague(
             : { id: s.teamId, name: '', tag: '' },
         };
       }),
-      matches: g.matches.map((m) => ({
-        id: m.id,
-        leagueId: m.leagueId,
-        team1: m.team1,
-        team2: m.team2,
-        winner: m.winner,
-        winnerId: m.winnerId,
-        status: m.status.toLowerCase(),
-        phase: m.phase.toLowerCase(),
-        groupId: m.groupId,
-        groupRound: m.groupRound,
-        map: m.map,
-        scheduledAt: m.scheduledAt,
-        playedAt: m.playedAt,
-        hasGeneralDemo: matchIdsWithDemo.has(m.id),
-      })),
+      matches: gMatches.map(formatMatch),
       expectedMatches: countRoundRobinMatches(teamIds.length),
-      matchesComplete: g.matches.length > 0 && areAllGroupMatchesComplete(g.matches),
+      matchesComplete: gMatches.length > 0 && areAllGroupMatchesComplete(gMatches),
     };
   });
 
@@ -217,26 +223,10 @@ function formatLeague(
     defaultMatchTime: league.defaultMatchTime,
     scheduleTimezone: league.scheduleTimezone,
     scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
+    scheduleWeekOverrides: weekOverrides,
     groups,
     teams: league.teams.map(formatTeamFromLeagueTeam),
-    matches: league.matches.map((m) => ({
-      id: m.id,
-      leagueId: m.leagueId,
-      team1: m.team1,
-      team2: m.team2,
-      winner: m.winner,
-      winnerId: m.winnerId,
-      status: m.status.toLowerCase(),
-      phase: m.phase.toLowerCase(),
-      groupId: m.groupId,
-      groupRound: m.groupRound,
-      round: m.round,
-      bracketPosition: m.bracketPosition,
-      map: m.map,
-      scheduledAt: m.scheduledAt,
-      playedAt: m.playedAt,
-      hasGeneralDemo: matchIdsWithDemo.has(m.id),
-    })),
+    matches: league.matches.map(formatMatch),
     createdAt: league.createdAt,
   };
 }
@@ -266,9 +256,17 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
         ],
       },
-      include: {
-        teams: { include: { team: true } },
-        _count: { select: { matches: true } },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        maxTeams: true,
+        registrationOpen: true,
+        ownerId: true,
+        startDate: true,
+        endDate: true,
+        _count: { select: { teams: true, matches: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -284,7 +282,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         ownerId: l.ownerId,
         startDate: l.startDate,
         endDate: l.endDate,
-        teamCount: l.teams.length,
+        teamCount: l._count.teams,
         matchCount: l._count.matches,
       }))
     );
@@ -297,25 +295,25 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 router.get('/open', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const ownedTeams = await prisma.team.findMany({
-      where: { ownerId: userId },
-      select: { id: true },
-    });
+    const [ownedTeams, leagues] = await Promise.all([
+      prisma.team.findMany({
+        where: { ownerId: userId },
+        select: { id: true },
+      }),
+      prisma.league.findMany({
+        where: {
+          registrationOpen: true,
+          status: 'UPCOMING',
+        },
+        include: {
+          owner: { select: { id: true, displayName: true } },
+          teams: { select: { teamId: true } },
+          _count: { select: { matches: true, teams: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
     const ownedTeamIds = new Set(ownedTeams.map((t) => t.id));
-
-    const leagues = await prisma.league.findMany({
-      where: {
-        registrationOpen: true,
-        status: 'UPCOMING',
-      },
-      include: {
-        owner: { select: { id: true, displayName: true } },
-        teams: { select: { teamId: true } },
-        _count: { select: { matches: true, teams: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
     res.json(
       leagues
         .filter((l) => l._count.matches === 0 && hasRegistrationSlots(l._count.teams, l.maxTeams))
@@ -347,13 +345,28 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const league = await getLeagueWithDetails(req.params.id);
+    const leagueId = req.params.id;
+    const [league, matchIdsWithDemo, weekOverrideRows] = await Promise.all([
+      getLeagueWithDetails(leagueId),
+      getMatchIdsWithGeneralDemo(leagueId),
+      prisma.leagueScheduleWeek.findMany({
+        where: { leagueId },
+        orderBy: { weekStart: 'asc' },
+        select: { weekStart: true, daysOfWeek: true },
+      }),
+    ]);
+
     if (!league) {
       res.status(404).json({ error: 'Liga não encontrada' });
       return;
     }
-    const matchIdsWithDemo = await getMatchIdsWithGeneralDemo(req.params.id);
-    res.json(formatLeague(league, matchIdsWithDemo));
+
+    const weekOverrides = weekOverrideRows.map((r) => ({
+      weekStart: weekStartKey(r.weekStart, league.scheduleTimezone),
+      daysOfWeek: parseDefaultMatchDays(r.daysOfWeek) ?? [],
+    }));
+
+    res.json(formatLeague(league, matchIdsWithDemo, weekOverrides));
   } catch (err) {
     console.error('GET /api/leagues/:id', err);
     res.status(500).json({ error: 'Erro ao buscar liga' });

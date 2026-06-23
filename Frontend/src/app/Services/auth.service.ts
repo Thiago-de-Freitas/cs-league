@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, shareReplay, tap } from 'rxjs';
 import { AuthResponse, User } from '../Models/interfaces';
+import { LeagueService } from './league.service';
+import { RankingsService } from './rankings.service';
+import { TeamService } from './team.service';
 
 const TOKEN_KEY = 'cs_league_token';
 const USER_KEY = 'cs_league_user';
@@ -10,9 +13,15 @@ const USER_KEY = 'cs_league_user';
 export class AuthService {
   private apiUrl = '/api/auth';
   private currentUserSubject = new BehaviorSubject<User | null>(this.loadUser());
+  private meCache: Observable<User> | null = null;
   currentUser$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private teamService: TeamService,
+    private leagueService: LeagueService,
+    private rankingsService: RankingsService
+  ) {}
 
   private loadUser(): User | null {
     const raw = localStorage.getItem(USER_KEY);
@@ -46,16 +55,24 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    this.meCache = null;
     this.currentUserSubject.next(null);
+    this.teamService.invalidateAll();
+    this.leagueService.invalidateLeagues();
+    this.rankingsService.invalidateAll();
   }
 
   getMe(): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/me`).pipe(
-      tap((user) => {
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-        this.currentUserSubject.next(user);
-      })
-    );
+    if (!this.meCache) {
+      this.meCache = this.http.get<User>(`${this.apiUrl}/me`).pipe(
+        tap((user) => {
+          localStorage.setItem(USER_KEY, JSON.stringify(user));
+          this.currentUserSubject.next(user);
+        }),
+        shareReplay(1)
+      );
+    }
+    return this.meCache;
   }
 
   updateProfile(data: { displayName?: string; steamId?: string }): Observable<User> {
@@ -63,6 +80,7 @@ export class AuthService {
       tap((user) => {
         localStorage.setItem(USER_KEY, JSON.stringify(user));
         this.currentUserSubject.next(user);
+        this.meCache = null;
       })
     );
   }
@@ -96,6 +114,10 @@ export class AuthService {
   private setSession(res: AuthResponse): void {
     localStorage.setItem(TOKEN_KEY, res.token);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+    this.meCache = null;
+    this.teamService.invalidateAll();
+    this.leagueService.invalidateLeagues();
+    this.rankingsService.invalidateAll();
     this.currentUserSubject.next(res.user);
   }
 }

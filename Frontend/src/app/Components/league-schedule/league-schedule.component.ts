@@ -56,9 +56,9 @@ export class LeagueScheduleComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['league'] && this.league) {
       this.applyLeagueSchedule(this.league);
-    }
-    if (changes['leagueId'] && this.leagueId) {
-      this.loadSchedule();
+      if (this.league.scheduleWeekOverrides) {
+        this.weekOverrides = this.league.scheduleWeekOverrides;
+      }
     }
   }
 
