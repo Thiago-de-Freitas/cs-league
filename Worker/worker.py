@@ -88,16 +88,14 @@ def resolve_demo_path(file_path: str) -> str | None:
 
 
 def fetch_demo_from_api(demo_id: str) -> tuple[str | None, str | None]:
-    if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
-        missing = []
-        if not BACKEND_INTERNAL_URL:
-            missing.append("BACKEND_INTERNAL_URL")
-        if not INTERNAL_SERVICE_KEY:
-            missing.append("INTERNAL_SERVICE_KEY")
-        return None, f"Variáveis ausentes no worker: {', '.join(missing)}"
+    url_error = validate_backend_internal_url(BACKEND_INTERNAL_URL)
+    if url_error:
+        return None, url_error
 
-    if "${{" in BACKEND_INTERNAL_URL or "${{" in INTERNAL_SERVICE_KEY:
-        return None, "Referências Railway não resolvidas (${{...}}) — use Add Reference na UI"
+    if not INTERNAL_SERVICE_KEY:
+        return None, "INTERNAL_SERVICE_KEY ausente no worker"
+    if "${{" in INTERNAL_SERVICE_KEY:
+        return None, "INTERNAL_SERVICE_KEY contém referência Railway não resolvida (${{...}})"
 
     cache_dir = get_demo_storage_dir() / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -184,12 +182,37 @@ def mask_redis_url(url: str) -> str:
     return f"{prefix.split('://')[0]}://***@{host}"
 
 
+def validate_backend_internal_url(url: str) -> str | None:
+    """Retorna mensagem de erro se BACKEND_INTERNAL_URL estiver mal configurada."""
+    if not url:
+        return "BACKEND_INTERNAL_URL não definido no worker"
+    if "${{" in url:
+        return "BACKEND_INTERNAL_URL contém referência Railway não resolvida (${{...}})"
+    if "::" in url or url.rstrip("/").endswith(":"):
+        return (
+            f"BACKEND_INTERNAL_URL sem porta (valor: {url}). "
+            "No cs-league-worker use Add Reference → serviço cs-league-back → "
+            "RAILWAY_PRIVATE_DOMAIN e PORT. Ex.: http://cs-league-back.railway.internal:8080"
+        )
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return f"BACKEND_INTERNAL_URL inválida: {url}"
+    if parsed.port is None:
+        return (
+            f"BACKEND_INTERNAL_URL sem porta (valor: {url}). "
+            "Inclua a porta do cs-league-back (geralmente ${{cs-league-back.PORT}})."
+        )
+    if not parsed.hostname.endswith(".railway.internal"):
+        print(f"AVISO: hostname {parsed.hostname} não parece rede privada Railway (.railway.internal)")
+    return None
+
+
 def verify_backend_connectivity() -> None:
-    if not BACKEND_INTERNAL_URL:
-        print("AVISO: BACKEND_INTERNAL_URL não definido no worker")
-        return
-    if "${{" in BACKEND_INTERNAL_URL:
-        print("ERRO: BACKEND_INTERNAL_URL contém ${{...}} literal — referência não resolvida na Railway")
+    url_error = validate_backend_internal_url(BACKEND_INTERNAL_URL)
+    if url_error:
+        print(f"ERRO: {url_error}")
         return
     if not INTERNAL_SERVICE_KEY:
         print("AVISO: INTERNAL_SERVICE_KEY não definido no worker")
