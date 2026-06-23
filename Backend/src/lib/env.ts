@@ -2,6 +2,14 @@ function isUnresolvedRailwayRef(value: string): boolean {
   return value.includes('${{') || value.includes('{{');
 }
 
+function normalizeOriginForDisplay(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/+$/, '');
+  }
+}
+
 /** Erros que impedem login, ligas, etc. (core da API). */
 export function getCoreEnvErrors(): string[] {
   if (process.env.NODE_ENV !== 'production') {
@@ -97,6 +105,9 @@ export function getEnvConfigStatus() {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     core: {
       corsOrigin: { set: cors.length > 0, length: cors.length, unresolvedRef: cors ? isUnresolvedRailwayRef(cors) : false },
+      corsAllowedOrigins: cors
+        ? cors.split(',').map((o) => normalizeOriginForDisplay(o.trim())).filter(Boolean)
+        : [],
       jwtSecret: { set: jwt.length > 0, length: jwt.length, minLengthOk: jwt.length >= 32 },
       databaseUrl: { set: db.length > 0, unresolvedRef: db ? isUnresolvedRailwayRef(db) : false },
     },

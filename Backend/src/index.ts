@@ -185,9 +185,29 @@ app.get('/api/internal/demos/:id/file', internalServiceAuth, async (req, res) =>
   }
 });
 
+// CORS antes de qualquer bloqueio — upload direto front→back exige preflight com Authorization
+const corsOptions = cors({
+  origin(origin, callback) {
+    if (!origin || corsOrigins.includes(normalizeOrigin(origin))) {
+      callback(null, true);
+      return;
+    }
+    if (isProduction) {
+      console.warn(`[cors] origem rejeitada: ${origin}`);
+    }
+    callback(new Error('Origem não permitida pelo CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400,
+});
+
+app.use(corsOptions);
+
 // Bloqueia API se env core estiver inválida (login, ligas, etc.)
 app.use('/api', (req, res, next) => {
-  if (isApiHealthPath(req) || isApiInternalPath(req)) {
+  if (isApiHealthPath(req) || isApiInternalPath(req) || req.method === 'OPTIONS') {
     next();
     return;
   }
@@ -207,17 +227,6 @@ app.use(securityHeaders);
 
 app.use(express.json({ limit: '1mb' }));
 
-const corsOptions = cors({
-  origin(origin, callback) {
-    if (!origin || corsOrigins.includes(normalizeOrigin(origin))) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error('Origem não permitida pelo CORS'));
-  },
-  credentials: true,
-});
-
 const teamLogosPath = process.env.TEAM_LOGO_STORAGE_PATH
   || path.join(__dirname, '../data/team-logos');
 
@@ -229,13 +238,13 @@ app.use('/uploads/team-logos', (req, res, next) => {
   next();
 }, express.static(teamLogosPath, { dotfiles: 'deny', index: false }));
 
-app.use('/api/auth', corsOptions, authRoutes);
-app.use('/api/users', corsOptions, userRoutes);
-app.use('/api/teams', corsOptions, teamRoutes);
-app.use('/api/leagues', corsOptions, leagueRoutes);
-app.use('/api/matches', corsOptions, matchRoutes);
-app.use('/api/demos', corsOptions, demoRoutes);
-app.use('/api/rankings', corsOptions, rankingsRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/leagues', leagueRoutes);
+app.use('/api/matches', matchRoutes);
+app.use('/api/demos', demoRoutes);
+app.use('/api/rankings', rankingsRoutes);
 
 if (serveFrontend) {
   app.use(express.static(publicPath, { dotfiles: 'deny', index: false }));
