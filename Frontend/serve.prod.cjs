@@ -14,6 +14,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const rawApiUrl = (process.env.API_URL || '').trim();
 const API_URL = (rawApiUrl || 'http://localhost:3000').replace(/\/+$/, '');
 const distPath = path.join(__dirname, 'dist/cs-league/browser');
+const PROXY_TIMEOUT_MS = 900_000;
 
 if (!fs.existsSync(path.join(distPath, 'index.html'))) {
   console.error(`[front] Build não encontrado em ${distPath}. Rode npm run build antes.`);
@@ -40,11 +41,6 @@ function isApiPath(pathname) {
     pathname === '/uploads' || pathname.startsWith('/uploads/');
 }
 
-// Uploads grandes vão direto à API (runtime-config.json); proxy só para rotas leves.
-app.get('/runtime-config.json', (_req, res) => {
-  res.json({ apiBaseUrl: API_URL });
-});
-
 // http-proxy-middleware v3: um middleware na raiz com pathFilter (não montar em app.use('/api'))
 app.use(
   createProxyMiddleware({
@@ -52,8 +48,8 @@ app.use(
     changeOrigin: true,
     xfwd: true,
     secure: process.env.PROXY_INSECURE !== 'true',
-    proxyTimeout: 600_000,
-    timeout: 600_000,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+    timeout: PROXY_TIMEOUT_MS,
     pathFilter: (pathname) => isApiPath(pathname),
     on: {
       error(err, _req, res) {
@@ -74,7 +70,7 @@ app.use(express.static(distPath, { index: false, dotfiles: 'deny', fallthrough: 
 
 // SPA fallback — só GET em rotas que não são API
 app.get('*', (req, res, next) => {
-  if (req.path === '/runtime-config.json' || isApiPath(req.path)) {
+  if (isApiPath(req.path)) {
     return res.status(502).json({
       error: 'Proxy /api não encaminhou a requisição. Redeploy o cs-league-front com serve.prod.cjs atualizado.',
       path: req.path,
@@ -85,7 +81,17 @@ app.get('*', (req, res, next) => {
   });
 });
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`[front] Servindo ${distPath}`);
   console.log(`[front] http://${HOST}:${PORT} — proxy /api e /uploads -> ${API_URL}`);
+  console.log(`[front] proxy timeout ${PROXY_TIMEOUT_MS}ms`);
 });
+
+// Demos grandes (~100MB+) precisam de mais tempo que o default do Node (~40–120s)
+server.timeout = 0;
+if (typeof server.requestTimeout !== 'undefined') {
+  server.requestTimeout = 0;
+}
+if (typeof server.headersTimeout !== 'undefined') {
+  server.headersTimeout = 0;
+}

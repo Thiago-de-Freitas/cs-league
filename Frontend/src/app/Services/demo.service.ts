@@ -2,7 +2,6 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
 import { Observable, interval, switchMap, takeWhile, startWith, filter, map } from 'rxjs';
 import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalStatsOverview } from '../Models/interfaces';
-import { ApiConfigService } from './api-config.service';
 
 export interface DemoUploadProgress {
   phase: 'uploading' | 'done';
@@ -20,10 +19,7 @@ export interface DemoHealthConfig {
 export class DemoService {
   private apiUrl = '/api/demos';
 
-  constructor(
-    private http: HttpClient,
-    private apiConfig: ApiConfigService
-  ) {}
+  constructor(private http: HttpClient) {}
 
   getDemoHealthConfig(): Observable<DemoHealthConfig> {
     return this.http.get<DemoHealthConfig>('/api/health/config');
@@ -48,26 +44,25 @@ export class DemoService {
     if (options?.isPersonal) {
       formData.append('isPersonal', 'true');
     }
-    return this.apiConfig.getDemoUploadUrl().pipe(
-      switchMap((uploadUrl) =>
-        this.http.post<Demo>(uploadUrl, formData, {
-          reportProgress: true,
-          observe: 'events',
-        })
-      ),
-      map((event: HttpEvent<Demo>) => {
-        if (event.type === HttpEventType.UploadProgress) {
-          const total = event.total ?? file.size;
-          const progress = total > 0 ? Math.round((100 * event.loaded) / total) : 0;
-          return { phase: 'uploading' as const, progress };
-        }
-        if (event.type === HttpEventType.Response) {
-          return { phase: 'done' as const, progress: 100, demo: event.body ?? undefined };
-        }
-        return { phase: 'uploading' as const, progress: 0 };
-      }),
-      filter((e) => e.phase === 'uploading' || e.demo != null)
-    );
+    return this.http
+      .post<Demo>(`${this.apiUrl}/upload`, formData, {
+        reportProgress: true,
+        observe: 'events',
+      })
+      .pipe(
+        map((event: HttpEvent<Demo>) => {
+          if (event.type === HttpEventType.UploadProgress) {
+            const total = event.total ?? file.size;
+            const progress = total > 0 ? Math.round((100 * event.loaded) / total) : 0;
+            return { phase: 'uploading' as const, progress };
+          }
+          if (event.type === HttpEventType.Response) {
+            return { phase: 'done' as const, progress: 100, demo: event.body ?? undefined };
+          }
+          return { phase: 'uploading' as const, progress: 0 };
+        }),
+        filter((e) => e.phase === 'uploading' || e.demo != null)
+      );
   }
 
   validatePersonalDemo(): Observable<PersonalDemoValidation> {

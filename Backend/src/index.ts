@@ -303,6 +303,14 @@ const server = app.listen(PORT, HOST, () => {
   void connectRedis();
 });
 
+server.timeout = 0;
+if (typeof server.requestTimeout !== 'undefined') {
+  server.requestTimeout = 0;
+}
+if (typeof server.headersTimeout !== 'undefined') {
+  server.headersTimeout = 0;
+}
+
 function shutdown() {
   server.close(async () => {
     try {
