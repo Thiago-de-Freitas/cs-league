@@ -47,6 +47,12 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'cs-league-front' });
 });
 
+// Config em runtime — browser usa URL direta da API para uploads grandes
+app.get('/runtime-config.json', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ apiBaseUrl: API_URL });
+});
+
 // Estáticos ANTES do proxy — evita que assets (.js) passem pelo proxy da API
 app.use(
   express.static(distPath, {

@@ -232,6 +232,12 @@ export class DemoUploadModalComponent implements OnInit {
       error: (err) => {
         this.uploading = false;
         this.uploadProgress = 0;
+        const status = err.status;
+        if (status === 0 || status === 499 || status === 502 || status === 504) {
+          this.errorMsg =
+            'Upload interrompido (timeout ou conexão). Tente novamente com arquivo menor ou conexão mais estável.';
+          return;
+        }
         this.errorMsg =
           err.error?.error ||
           (err.status === 503
