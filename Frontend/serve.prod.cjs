@@ -40,6 +40,11 @@ function isApiPath(pathname) {
     pathname === '/uploads' || pathname.startsWith('/uploads/');
 }
 
+// Uploads grandes vão direto à API (runtime-config.json); proxy só para rotas leves.
+app.get('/runtime-config.json', (_req, res) => {
+  res.json({ apiBaseUrl: API_URL });
+});
+
 // http-proxy-middleware v3: um middleware na raiz com pathFilter (não montar em app.use('/api'))
 app.use(
   createProxyMiddleware({
@@ -47,6 +52,8 @@ app.use(
     changeOrigin: true,
     xfwd: true,
     secure: process.env.PROXY_INSECURE !== 'true',
+    proxyTimeout: 600_000,
+    timeout: 600_000,
     pathFilter: (pathname) => isApiPath(pathname),
     on: {
       error(err, _req, res) {
@@ -67,7 +74,7 @@ app.use(express.static(distPath, { index: false, dotfiles: 'deny', fallthrough: 
 
 // SPA fallback — só GET em rotas que não são API
 app.get('*', (req, res, next) => {
-  if (isApiPath(req.path)) {
+  if (req.path === '/runtime-config.json' || isApiPath(req.path)) {
     return res.status(502).json({
       error: 'Proxy /api não encaminhou a requisição. Redeploy o cs-league-front com serve.prod.cjs atualizado.',
       path: req.path,
