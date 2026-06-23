@@ -14,7 +14,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 const rawApiUrl = (process.env.API_URL || '').trim();
 const API_URL = (rawApiUrl || 'http://localhost:3000').replace(/\/+$/, '');
 const distPath = path.join(__dirname, 'dist/cs-league/browser');
-const PROXY_TIMEOUT_MS = 900_000;
+const PROXY_TIMEOUT_MS = 120_000;
+const SERVER_TIMEOUT_MS = 120_000;
 
 if (!fs.existsSync(path.join(distPath, 'index.html'))) {
   console.error(`[front] Build não encontrado em ${distPath}. Rode npm run build antes.`);
@@ -41,7 +42,26 @@ function isApiPath(pathname) {
     pathname === '/uploads' || pathname.startsWith('/uploads/');
 }
 
-// http-proxy-middleware v3: um middleware na raiz com pathFilter (não montar em app.use('/api'))
+// Liveness — healthcheck Railway (não passa pelo proxy da API)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', service: 'cs-league-front' });
+});
+
+// Estáticos ANTES do proxy — evita que assets (.js) passem pelo proxy da API
+app.use(
+  express.static(distPath, {
+    index: false,
+    dotfiles: 'deny',
+    fallthrough: true,
+    maxAge: isProduction ? '1h' : 0,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }),
+);
+
 app.use(
   createProxyMiddleware({
     target: API_URL,
@@ -66,9 +86,7 @@ app.use(
   }),
 );
 
-app.use(express.static(distPath, { index: false, dotfiles: 'deny', fallthrough: true }));
-
-// SPA fallback — só GET em rotas que não são API
+// SPA fallback — só GET em rotas que não são API nem arquivo estático
 app.get('*', (req, res, next) => {
   if (isApiPath(req.path)) {
     return res.status(502).json({
@@ -84,14 +102,13 @@ app.get('*', (req, res, next) => {
 const server = app.listen(PORT, HOST, () => {
   console.log(`[front] Servindo ${distPath}`);
   console.log(`[front] http://${HOST}:${PORT} — proxy /api e /uploads -> ${API_URL}`);
-  console.log(`[front] proxy timeout ${PROXY_TIMEOUT_MS}ms`);
+  console.log(`[front] server timeout ${SERVER_TIMEOUT_MS}ms`);
 });
 
-// Demos grandes (~100MB+) precisam de mais tempo que o default do Node (~40–120s)
-server.timeout = 0;
+server.timeout = SERVER_TIMEOUT_MS;
 if (typeof server.requestTimeout !== 'undefined') {
-  server.requestTimeout = 0;
+  server.requestTimeout = SERVER_TIMEOUT_MS;
 }
 if (typeof server.headersTimeout !== 'undefined') {
-  server.headersTimeout = 0;
+  server.headersTimeout = SERVER_TIMEOUT_MS + 5000;
 }

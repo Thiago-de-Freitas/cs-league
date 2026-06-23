@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize, timeout } from 'rxjs/operators';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
 import { RankingsService } from '../../Services/rankings.service';
@@ -26,6 +27,7 @@ export class DashboardComponent implements OnInit {
   openLeagues: League[] = [];
   teams: Team[] = [];
   loading = true;
+  loadError = '';
   userName = '';
   showCreateLeagueModal = false;
   showCreateTeamModal = false;
@@ -55,22 +57,34 @@ export class DashboardComponent implements OnInit {
 
   loadData(): void {
     this.loading = true;
+    this.loadError = '';
+    const requestTimeoutMs = 60_000;
+    const safe = <T>(label: string, fallback: T) =>
+      (source: import('rxjs').Observable<T>) =>
+        source.pipe(
+          timeout(requestTimeoutMs),
+          catchError(() => {
+            this.loadError = `Não foi possível carregar ${label}. Verifique sua conexão e tente novamente.`;
+            return of(fallback);
+          })
+        );
+
     forkJoin({
-      leagues: this.leagueService.getLeagues(this.showArchivedLeagues),
-      openLeagues: this.leagueService.getOpenLeagues(),
-      teams: this.teamService.getTeams(),
-      invites: this.teamService.getPendingInvites(),
-    }).subscribe({
-      next: ({ leagues, openLeagues, teams, invites }) => {
-        this.leagues = leagues;
-        const myIds = new Set(leagues.map((l) => l.id));
-        this.openLeagues = openLeagues.filter((l) => !myIds.has(l.id));
-        this.teams = teams;
-        this.pendingInvites = invites;
-        this.loading = false;
-      },
-      error: () => (this.loading = false),
-    });
+      leagues: this.leagueService.getLeagues(this.showArchivedLeagues).pipe(safe('ligas', [] as League[])),
+      openLeagues: this.leagueService.getOpenLeagues().pipe(safe('ligas abertas', [] as League[])),
+      teams: this.teamService.getTeams().pipe(safe('times', [] as Team[])),
+      invites: this.teamService.getPendingInvites().pipe(safe('convites', [] as TeamInvite[])),
+    })
+      .pipe(finalize(() => (this.loading = false)))
+      .subscribe({
+        next: ({ leagues, openLeagues, teams, invites }) => {
+          this.leagues = leagues;
+          const myIds = new Set(leagues.map((l) => l.id));
+          this.openLeagues = openLeagues.filter((l) => !myIds.has(l.id));
+          this.teams = teams;
+          this.pendingInvites = invites;
+        },
+      });
     this.loadRankings();
   }
 

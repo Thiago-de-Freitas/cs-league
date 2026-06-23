@@ -9,6 +9,8 @@
 
   <div *ngIf="loading" class="loading">Carregando...</div>
 
+  <div *ngIf="loadError && !loading" class="error-message mb-4 page-inner">{{ loadError }}</div>
+
   <div class="dashboard-grid" *ngIf="!loading">
     <section class="dashboard-card gc-card dashboard-card-full" *ngIf="openLeagues.length > 0">
       <h2 class="gc-card-title">Ligas com inscrições abertas</h2>
