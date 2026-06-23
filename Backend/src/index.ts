@@ -15,6 +15,9 @@ import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
 import { getDemoStoragePath } from './lib/demoStorage';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
+import { internalServiceAuth } from './middleware/internalService';
+import { tryResolveDemoFilePath } from './lib/demoStorage';
+import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -35,6 +38,11 @@ const publicPath = path.join(__dirname, '../public');
 function isApiHealthPath(req: express.Request): boolean {
   const pathname = req.originalUrl.split('?')[0];
   return pathname === '/api/health' || pathname.startsWith('/api/health/');
+}
+
+function isApiInternalPath(req: express.Request): boolean {
+  const pathname = req.originalUrl.split('?')[0];
+  return pathname.startsWith('/api/internal/');
 }
 const serveFrontend = process.env.SERVE_FRONTEND === 'true'
   || (isProduction && fs.existsSync(publicPath));
@@ -121,11 +129,11 @@ app.get('/api/health/ready', async (_req, res) => {
 
     if (
       worker.alive &&
-      worker.filesOnDisk !== null &&
-      demoFilesOnDisk !== worker.filesOnDisk
+      worker.filesOnDisk === 0 &&
+      demoFilesOnDisk > 0
     ) {
       demoWarnings.push(
-        `Volume não compartilhado: API vê ${demoFilesOnDisk} .dem, worker vê ${worker.filesOnDisk}. Use o MESMO volume Railway em cs-league-back e cs-league-worker (Settings → Volume → Connect existing volume).`
+        `Worker não acessa o disco da API (${demoFilesOnDisk} .dem na API). Na Railway volumes não são compartilhados — configure BACKEND_INTERNAL_URL e INTERNAL_SERVICE_KEY no cs-league-worker.`
       );
     }
 
@@ -147,9 +155,39 @@ app.get('/api/health/ready', async (_req, res) => {
   }
 });
 
+// Worker baixa .dem da API (Railway não compartilha volume entre serviços)
+app.get('/api/internal/demos/:id/file', internalServiceAuth, async (req, res) => {
+  try {
+    const demoId = req.params.id;
+    if (!isValidResourceId(demoId)) {
+      res.status(400).json({ error: 'ID de demo inválido' });
+      return;
+    }
+
+    const demo = await prisma.demo.findUnique({ where: { id: demoId } });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+
+    const absolutePath = tryResolveDemoFilePath(demo.filePath);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      res.status(404).json({ error: 'Arquivo da demo não encontrado na API' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${demo.fileName.replace(/"/g, '')}"`);
+    fs.createReadStream(absolutePath).pipe(res);
+  } catch (err) {
+    console.error('[internal/demos/file]', err);
+    res.status(500).json({ error: 'Erro ao servir arquivo da demo' });
+  }
+});
+
 // Bloqueia API se env core estiver inválida (login, ligas, etc.)
 app.use('/api', (req, res, next) => {
-  if (isApiHealthPath(req)) {
+  if (isApiHealthPath(req) || isApiInternalPath(req)) {
     next();
     return;
   }

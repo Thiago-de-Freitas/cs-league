@@ -9,6 +9,8 @@ import sys
 import time
 import traceback
 import uuid
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import psycopg2
@@ -18,6 +20,8 @@ from demoparser2 import DemoParser
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
 DEMO_STORAGE_PATH = os.environ.get("DEMO_STORAGE_PATH")
+BACKEND_INTERNAL_URL = os.environ.get("BACKEND_INTERNAL_URL", "").rstrip("/")
+INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 DEMO_QUEUE = "demo:queue"
 WORKER_HEARTBEAT_KEY = "demo:worker:heartbeat"
 WORKER_STORAGE_KEY = "demo:worker:files_on_disk"
@@ -83,6 +87,49 @@ def resolve_demo_path(file_path: str) -> str | None:
     return None
 
 
+def fetch_demo_from_api(demo_id: str) -> str | None:
+    if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
+        return None
+
+    cache_dir = get_demo_storage_dir() / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    dest = cache_dir / f"{demo_id}.dem"
+
+    if dest.is_file() and dest.stat().st_size > 0:
+        return str(dest)
+
+    url = f"{BACKEND_INTERNAL_URL}/api/internal/demos/{demo_id}/file"
+    print(f"Baixando demo {demo_id} da API ({BACKEND_INTERNAL_URL})...")
+    req = urllib.request.Request(
+        url,
+        headers={"X-Internal-Service-Key": INTERNAL_SERVICE_KEY},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = resp.read()
+        if not data:
+            print(f"Resposta vazia ao baixar demo {demo_id}")
+            return None
+        dest.write_bytes(data)
+        print(f"Demo {demo_id} em cache ({len(data)} bytes): {dest}")
+        return str(dest)
+    except urllib.error.HTTPError as err:
+        body = err.read().decode("utf-8", errors="replace")[:200]
+        print(f"HTTP {err.code} ao baixar demo {demo_id}: {body}")
+        return None
+    except Exception as err:
+        print(f"Erro ao baixar demo {demo_id} da API: {err}")
+        return None
+
+
+def ensure_demo_file(demo_id: str, file_path: str) -> str | None:
+    resolved = resolve_demo_path(file_path)
+    if resolved:
+        return resolved
+    return fetch_demo_from_api(demo_id)
+
+
 def parse_job_payload(payload: str) -> tuple[str, str] | None:
     try:
         job = json.loads(payload)
@@ -127,6 +174,8 @@ def mask_redis_url(url: str) -> str:
 def log_startup_diagnostics(r: redis.Redis) -> None:
     storage = get_demo_storage_dir()
     print(f"REDIS_URL={mask_redis_url(REDIS_URL)}")
+    print(f"BACKEND_INTERNAL_URL={BACKEND_INTERNAL_URL or '(não definido — só volume local)'}")
+    print(f"INTERNAL_SERVICE_KEY={'set' if INTERNAL_SERVICE_KEY else 'missing'}")
     print(f"DEMO_STORAGE_PATH={storage}")
     print(f"Storage existe: {storage.exists()}")
     if storage.exists():
@@ -416,14 +465,13 @@ def parse_demo(file_path: str) -> list[dict]:
 
 
 def process_job(demo_id: str, file_path: str):
-    resolved = resolve_demo_path(file_path)
+    resolved = ensure_demo_file(demo_id, file_path)
     if not resolved:
-        storage = get_demo_storage_dir()
         update_demo_status(
             demo_id,
             "FAILED",
-            f"Arquivo da demo não encontrado no worker ({storage}). "
-            "Monte o mesmo volume /data na API e no worker com DEMO_STORAGE_PATH=/data/demos.",
+            "Arquivo da demo indisponível. Na Railway, configure BACKEND_INTERNAL_URL "
+            "(http://cs-league-back.railway.internal:PORT) e INTERNAL_SERVICE_KEY no worker.",
         )
         return
 

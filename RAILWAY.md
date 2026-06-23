@@ -130,10 +130,10 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 | `NODE_ENV` | Não | `production` (já no Dockerfile) |
 | `SERVE_FRONTEND` | Não | `true` — opcional; detectado se `/public` existir |
 
-3. **Volume persistente** (Settings → Volumes):
+3. **Volume persistente** (só na API — cs-league-back):
+   - Command Palette (`Ctrl+K` / `⌘K`) → **Add Volume**, ou clique direito no serviço no canvas
    - Mount path: `/data`
-   - **Compartilhar entre API e Worker:** no segundo serviço, use **Add Volume → Connect existing volume** (selecione o volume já criado no `cs-league-back`). Dois volumes diferentes com mount `/data` **não** compartilham arquivos.
-   - `GET /api/health/ready` → compare `demos.filesOnDisk` (API) com `demos.worker.filesOnDisk` — devem ser iguais
+   - **A Railway não permite compartilhar o mesmo volume entre dois serviços.** O worker baixa o `.dem` da API via rede privada (`BACKEND_INTERNAL_URL`).
 
 4. **Networking** → **Generate Domain** para obter a URL pública
 
@@ -196,10 +196,10 @@ O hostname `redis` **só existe** na rede do docker-compose local. Na Railway, u
 | `REDIS_URL` | `${{Redis.REDIS_URL}}` — **não** `redis://redis:6379` (hostname só existe no docker-compose local) |
 | `DEMO_STORAGE_PATH` | `/data/demos` |
 
-5. **Volume**: monte o **mesmo volume** em `/data` (Settings → Volumes → **Connect existing volume** do cs-league-back)
-6. **Deploy**: `restartPolicyType = ALWAYS` em `Worker/railway.toml` — evita worker parado após crashes
+5. **Volume**: opcional no worker (cache local em `/data/demos/cache`). Demos vêm da API via `BACKEND_INTERNAL_URL`.
+6. **Deploy**: `restartPolicyType = ALWAYS` em `Worker/railway.toml`
 
-> Sem volume compartilhado, uploads de demo na API não serão encontrados pelo Worker.
+> Na Railway cada volume pertence a **um** serviço. Configure `BACKEND_INTERNAL_URL` e `INTERNAL_SERVICE_KEY` (Shared Variable) para o worker buscar arquivos na API.
 
 ### 4. Migrar banco e seed (opcional)
 
@@ -304,7 +304,8 @@ Para a maioria dos casos, o deploy unificado (raiz `Dockerfile`) é mais simples
 | `/api/health` retorna 503 | Versão antiga checava DB/Redis no health | Redeploy com versão atual: `/api/health` = liveness (200); use `/api/health/ready` para deps |
 | `/api/health/ready` retorna 503 | Postgres ou Redis inacessível | Confira `${{Postgres.DATABASE_URL}}` e `${{Redis.REDIS_URL}}` nas variables |
 | Demo em "Aguardando" | Worker parado ou volume diferente | Verifique logs do Worker e paths `DEMO_STORAGE_PATH` |
-| Jobs em `demo:queue` no Redis mas demos não processam | Worker offline, `REDIS_URL` diferente da API, ou volume `/data` não compartilhado | Confira logs do **cs-league-worker** (`Redis OK — fila demo:queue: N job(s)`). Monte o **mesmo volume** em `/data` na API e no worker. `GET /api/health/ready` mostra `demos.queueLength` e `demos.filesOnDisk` |
+| Jobs em `demo:queue` no Redis mas demos não processam | Worker offline ou Root Directory errado | Root Directory do worker = `Worker`. Deploy Logs devem mostrar `Worker iniciado...` |
+| Demo **FALHOU** — arquivo não encontrado no worker | Railway **não compartilha volume** entre serviços | Volume só no **back**. No worker: `BACKEND_INTERNAL_URL` + `INTERNAL_SERVICE_KEY` (Shared Variable) |
 | CORS no browser | `CORS_ORIGIN` incorreto | Use a URL pública exata (com `https://`) |
 | Build Angular falha (SSL npm) | Node incompatível | Use Node 20 LTS localmente |
 | Migration falha | Banco vazio ou URL errada | Confira `DATABASE_URL` e logs do **preDeploy** |
