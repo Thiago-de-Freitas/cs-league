@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { League } from '../Models/interfaces';
+import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class LeagueService {
@@ -91,5 +91,43 @@ export class LeagueService {
 
   createMatch(leagueId: string, team1Id: string, team2Id: string, map?: string): Observable<unknown> {
     return this.http.post(`${this.apiUrl}/${leagueId}/matches`, { team1Id, team2Id, map });
+  }
+
+  getSchedule(leagueId: string): Observable<LeagueScheduleConfig> {
+    return this.http.get<LeagueScheduleConfig>(`${this.apiUrl}/${leagueId}/schedule`);
+  }
+
+  updateSchedule(
+    leagueId: string,
+    data: Partial<{
+      startDate: string | null;
+      defaultMatchDays: number[];
+      defaultMatchTime: string;
+      scheduleTimezone: string;
+    }>
+  ): Observable<LeagueScheduleConfig> {
+    return this.http.put<LeagueScheduleConfig>(`${this.apiUrl}/${leagueId}/schedule`, data);
+  }
+
+  upsertWeekOverride(
+    leagueId: string,
+    weekStart: string,
+    daysOfWeek: number[]
+  ): Observable<LeagueScheduleWeekOverride> {
+    return this.http.put<LeagueScheduleWeekOverride>(
+      `${this.apiUrl}/${leagueId}/schedule/weeks/${weekStart}`,
+      { daysOfWeek }
+    );
+  }
+
+  deleteWeekOverride(leagueId: string, weekStart: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${leagueId}/schedule/weeks/${weekStart}`);
+  }
+
+  regenerateSchedule(leagueId: string): Observable<{ updatedCount: number; league: League }> {
+    return this.http.post<{ updatedCount: number; league: League }>(
+      `${this.apiUrl}/${leagueId}/schedule/regenerate`,
+      {}
+    );
   }
 }

@@ -54,6 +54,10 @@ export interface League {
   groups?: LeagueGroup[];
   startDate?: Date | string | null;
   endDate?: Date | string | null;
+  defaultMatchDays?: number[];
+  defaultMatchTime?: string;
+  scheduleTimezone?: string;
+  scheduleConfigured?: boolean;
   teams: Team[];
   matches?: Match[];
   status: 'upcoming' | 'ongoing' | 'completed' | 'archived' | string;
@@ -101,6 +105,7 @@ export interface Match {
   round?: number;
   bracketPosition?: number | null;
   map?: string | null;
+  scheduledAt?: string | null;
   playedAt?: string | null;
   league?: { id: string; name: string; ownerId: string; maxTeams?: number | null; bracketSize?: number | null };
   demos?: Demo[];
@@ -109,6 +114,21 @@ export interface Match {
   permissions?: {
     canRegisterResult?: boolean;
   };
+}
+
+export interface LeagueScheduleConfig {
+  startDate?: string | null;
+  endDate?: string | null;
+  defaultMatchDays: number[];
+  defaultMatchTime: string;
+  scheduleTimezone: string;
+  scheduleConfigured?: boolean;
+  weekOverrides: LeagueScheduleWeekOverride[];
+}
+
+export interface LeagueScheduleWeekOverride {
+  weekStart: string;
+  daysOfWeek: number[];
 }
 
 export interface Demo {

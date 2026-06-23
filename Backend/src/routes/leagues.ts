@@ -24,6 +24,14 @@ import {
   isValidGroupCount,
   validateGroupStageConfig,
 } from '../lib/groupStage';
+import {
+  isScheduleConfigured,
+  parseDefaultMatchDays,
+  parseMatchTime,
+  parseWeekStartParam,
+  weekStartKey,
+} from '../lib/matchSchedule';
+import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 
 const router = Router();
 
@@ -177,6 +185,7 @@ function formatLeague(
         groupId: m.groupId,
         groupRound: m.groupRound,
         map: m.map,
+        scheduledAt: m.scheduledAt,
         playedAt: m.playedAt,
         hasGeneralDemo: matchIdsWithDemo.has(m.id),
       })),
@@ -204,6 +213,10 @@ function formatLeague(
     owner: league.owner,
     startDate: league.startDate,
     endDate: league.endDate,
+    defaultMatchDays: parseDefaultMatchDays(league.defaultMatchDays) ?? [],
+    defaultMatchTime: league.defaultMatchTime,
+    scheduleTimezone: league.scheduleTimezone,
+    scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
     groups,
     teams: league.teams.map(formatTeamFromLeagueTeam),
     matches: league.matches.map((m) => ({
@@ -220,6 +233,7 @@ function formatLeague(
       round: m.round,
       bracketPosition: m.bracketPosition,
       map: m.map,
+      scheduledAt: m.scheduledAt,
       playedAt: m.playedAt,
       hasGeneralDemo: matchIdsWithDemo.has(m.id),
     })),
@@ -834,6 +848,209 @@ router.get('/:id/standings', authMiddleware, async (req: AuthRequest, res: Respo
   }
 });
 
+router.get('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const access = await canUserAccessLeague(req.user!.userId, req.user!.role, req.params.id);
+    if (!access.allowed) {
+      res.status(access.error === 'Liga não encontrada.' ? 404 : 403).json({ error: access.error });
+      return;
+    }
+
+    const league = await prisma.league.findUnique({ where: { id: req.params.id } });
+    if (!league) {
+      res.status(404).json({ error: 'Liga não encontrada' });
+      return;
+    }
+
+    const overrides = await loadWeekOverrides(prisma, req.params.id);
+
+    res.json({
+      startDate: league.startDate,
+      endDate: league.endDate,
+      defaultMatchDays: parseDefaultMatchDays(league.defaultMatchDays) ?? [],
+      defaultMatchTime: league.defaultMatchTime,
+      scheduleTimezone: league.scheduleTimezone,
+      scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
+      weekOverrides: overrides.map((o) => ({
+        weekStart: weekStartKey(o.weekStart, league.scheduleTimezone),
+        daysOfWeek: o.daysOfWeek,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar calendário' });
+  }
+});
+
+router.put('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.groupCount !== 1 || check.league.format !== 'GROUP_STAGE') {
+      res.status(400).json({ error: 'Calendário configurável apenas para ligas de grupo único.' });
+      return;
+    }
+
+    const { startDate, defaultMatchDays, defaultMatchTime, scheduleTimezone } = req.body;
+    const days = defaultMatchDays !== undefined ? parseDefaultMatchDays(defaultMatchDays) : null;
+
+    if (defaultMatchDays !== undefined && !days) {
+      res.status(400).json({ error: 'Informe pelo menos um dia da semana válido (0–6).' });
+      return;
+    }
+
+    if (defaultMatchTime !== undefined && !parseMatchTime(String(defaultMatchTime))) {
+      res.status(400).json({ error: 'Horário padrão inválido. Use formato HH:mm.' });
+      return;
+    }
+
+    const updated = await prisma.league.update({
+      where: { id: req.params.id },
+      data: {
+        ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+        ...(days && { defaultMatchDays: days }),
+        ...(defaultMatchTime !== undefined && { defaultMatchTime: String(defaultMatchTime) }),
+        ...(scheduleTimezone !== undefined && { scheduleTimezone: String(scheduleTimezone) }),
+      },
+    });
+
+    const overrides = await loadWeekOverrides(prisma, req.params.id);
+
+    res.json({
+      startDate: updated.startDate,
+      endDate: updated.endDate,
+      defaultMatchDays: parseDefaultMatchDays(updated.defaultMatchDays) ?? [],
+      defaultMatchTime: updated.defaultMatchTime,
+      scheduleTimezone: updated.scheduleTimezone,
+      scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(updated)),
+      weekOverrides: overrides.map((o) => ({
+        weekStart: weekStartKey(o.weekStart, updated.scheduleTimezone),
+        daysOfWeek: o.daysOfWeek,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar calendário' });
+  }
+});
+
+router.put('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.groupCount !== 1 || check.league.format !== 'GROUP_STAGE') {
+      res.status(400).json({ error: 'Overrides de semana apenas para ligas de grupo único.' });
+      return;
+    }
+
+    const days = parseDefaultMatchDays(req.body.daysOfWeek);
+    if (!days) {
+      res.status(400).json({ error: 'Informe pelo menos um dia da semana válido (0–6).' });
+      return;
+    }
+
+    const weekStart = parseWeekStartParam(req.params.weekStart, check.league.scheduleTimezone);
+    if (!weekStart) {
+      res.status(400).json({ error: 'weekStart deve ser uma segunda-feira no formato YYYY-MM-DD.' });
+      return;
+    }
+
+    const row = await prisma.leagueScheduleWeek.upsert({
+      where: {
+        leagueId_weekStart: { leagueId: req.params.id, weekStart },
+      },
+      create: {
+        leagueId: req.params.id,
+        weekStart,
+        daysOfWeek: days,
+      },
+      update: { daysOfWeek: days },
+    });
+
+    res.json({
+      weekStart: weekStartKey(row.weekStart, check.league.scheduleTimezone),
+      daysOfWeek: parseDefaultMatchDays(row.daysOfWeek) ?? [],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao salvar semana do calendário' });
+  }
+});
+
+router.delete('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    const weekStart = parseWeekStartParam(req.params.weekStart, check.league.scheduleTimezone);
+    if (!weekStart) {
+      res.status(400).json({ error: 'weekStart inválido.' });
+      return;
+    }
+
+    await prisma.leagueScheduleWeek.deleteMany({
+      where: { leagueId: req.params.id, weekStart },
+    });
+
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover override de semana' });
+  }
+});
+
+router.post('/:id/schedule/regenerate', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.groupCount !== 1 || check.league.format !== 'GROUP_STAGE') {
+      res.status(400).json({ error: 'Regeneração de calendário apenas para ligas de grupo único.' });
+      return;
+    }
+
+    const groupMatchCount = await prisma.match.count({
+      where: { leagueId: req.params.id, phase: 'GROUP' },
+    });
+    if (groupMatchCount === 0) {
+      res.status(400).json({ error: 'Gere a fase de grupos antes de regenerar o calendário.' });
+      return;
+    }
+
+    let updatedCount = 0;
+    await prisma.$transaction(async (tx) => {
+      updatedCount = await applyGroupMatchSchedule(tx, req.params.id, check.league!);
+    });
+
+    const full = await getLeagueWithDetails(req.params.id);
+    res.json({
+      updatedCount,
+      league: formatLeague(full!),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'SCHEDULE_NOT_CONFIGURED') {
+      res.status(400).json({ error: 'Configure data de início e dias da semana antes de regenerar o calendário.' });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao regenerar calendário' });
+  }
+});
+
 router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
@@ -865,6 +1082,13 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
     );
     if (!validation.valid) {
       res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    if (check.league.groupCount === 1 && !isScheduleConfigured(leagueToScheduleConfig(check.league))) {
+      res.status(400).json({
+        error: 'Configure a data de início e os dias da semana antes de gerar a fase de grupos.',
+      });
       return;
     }
 
@@ -941,6 +1165,10 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
         where: { id: req.params.id },
         data: { status: 'ONGOING', registrationOpen: false },
       });
+
+      if (check.league.groupCount === 1) {
+        await applyGroupMatchSchedule(tx, req.params.id, check.league);
+      }
     });
 
     const full = await getLeagueWithDetails(req.params.id);
@@ -959,6 +1187,12 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
       },
     });
   } catch (err) {
+    if (err instanceof Error && err.message === 'SCHEDULE_NOT_CONFIGURED') {
+      res.status(400).json({
+        error: 'Configure a data de início e os dias da semana antes de gerar a fase de grupos.',
+      });
+      return;
+    }
     if (err instanceof Error && err.message === 'ROUND_ROBIN_INCOMPLETE') {
       res.status(500).json({
         error: 'Não foi possível gerar todos os confrontos. Cada time deve enfrentar todos os outros uma vez.',

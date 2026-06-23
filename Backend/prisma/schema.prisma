@@ -128,13 +128,31 @@ model League {
   ownerId           String
   startDate         DateTime?
   endDate           DateTime?
+  defaultMatchDays  Json?
+  defaultMatchTime  String       @default("20:00")
+  scheduleTimezone  String       @default("America/Sao_Paulo")
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  owner  User         @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  teams  LeagueTeam[]
-  groups LeagueGroup[]
-  matches Match[]
+  owner           User                 @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  teams           LeagueTeam[]
+  groups          LeagueGroup[]
+  matches         Match[]
+  scheduleWeeks   LeagueScheduleWeek[]
+}
+
+model LeagueScheduleWeek {
+  id         String   @id @default(cuid())
+  leagueId   String
+  weekStart  DateTime
+  daysOfWeek Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, weekStart])
+  @@index([leagueId])
 }
 
 model LeagueGroup {
@@ -181,7 +199,8 @@ model Match {
   round           Int         @default(1)
   bracketPosition Int?
   map             String?
-  playedAt  DateTime?
+  scheduledAt     DateTime?
+  playedAt        DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 

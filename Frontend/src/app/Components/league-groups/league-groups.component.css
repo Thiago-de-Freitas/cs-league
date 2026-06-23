@@ -85,6 +85,19 @@
   font-family: var(--font-body);
 }
 
+.group-round-date {
+  color: var(--gc-text-secondary);
+  font-family: var(--font-body);
+  text-transform: none;
+  font-weight: normal;
+}
+
+.group-match-scheduled {
+  color: var(--gc-orange);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 .group-match-status {
   color: var(--gc-text-secondary);
   font-size: 0.8rem;

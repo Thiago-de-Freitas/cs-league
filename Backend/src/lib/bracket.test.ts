@@ -7,6 +7,7 @@ import {
   remainingRegistrationSlots,
   parseRegistrationCap,
   getFirstRoundPairings,
+  computeWalkoverWinners,
 } from './bracket';
 
 describe('getFairBracketSize', () => {
@@ -60,5 +61,20 @@ describe('getFirstRoundPairings fairness', () => {
   it('pairs seed 1 with lowest seed in 8-team bracket', () => {
     const pairs = getFirstRoundPairings(8);
     assert.deepEqual(pairs[0], [1, 8]);
+  });
+});
+
+describe('computeWalkoverWinners', () => {
+  it('marks seed 1 as walkover when seed 8 slot is empty in 8-team bracket', () => {
+    const seedToTeam = new Map<number, string>([
+      [1, 'team-seed-1'],
+      [2, 'team-seed-2'],
+      [3, 'team-seed-3'],
+      [4, 'team-seed-4'],
+      [5, 'team-seed-5'],
+    ]);
+    const walkovers = computeWalkoverWinners(seedToTeam, 8);
+    assert.equal(walkovers.get(1), 'team-seed-1');
+    assert.ok(walkovers.size >= 1);
   });
 });

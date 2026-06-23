@@ -9,10 +9,17 @@
         <span class="badge status-{{ match.status }}">{{ getStatusLabel(match.status) }}</span>
         <span class="badge badge-orange" *ngIf="match.round">{{ getRoundLabel(match.round) }}</span>
         <span class="meta" *ngIf="match.map">Mapa: {{ match.map }}</span>
+        <span class="meta" *ngIf="match.scheduledAt && match.status !== 'completed'">
+          Agendado para: <strong>{{ match.scheduledAt | date:'medium' }}</strong>
+        </span>
+        <span class="meta" *ngIf="match.playedAt">
+          Jogado em: <strong>{{ match.playedAt | date:'medium' }}</strong>
+        </span>
         <span class="meta" *ngIf="match.winner">Vencedor: <strong>{{ match.winner.name }}</strong></span>
       </div>
       <div class="match-actions">
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
+        <button class="btn btn-secondary btn-small" (click)="openReschedule()" *ngIf="canReschedule">Remarcar</button>
         <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="match.status !== 'completed'">Enviar Demo</button>
         <ng-container *ngIf="canRegisterResult">
           <button class="btn btn-primary btn-small" (click)="registerResult(match.team1.id)">
@@ -166,6 +173,36 @@
         <button type="button" class="btn btn-ghost" (click)="closeResultModal()" [disabled]="resultModalLoading">Cancelar</button>
         <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading">
           {{ resultModalLoading ? 'Salvando...' : 'Confirmar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  *ngIf="showReschedule && match"
+  class="gc-modal-backdrop"
+  (click)="$event.target === $event.currentTarget && closeReschedule()"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="match-reschedule-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="match-reschedule-title" class="gc-modal-title">Remarcar jogo</h2>
+        <p class="gc-modal-subtitle">{{ match.team1.name }} vs {{ match.team2.name }}</p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="closeReschedule()" [disabled]="rescheduleLoading" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="gc-modal-body">
+      <div class="form-group">
+        <label class="form-label" for="match-reschedule-datetime">Nova data e horário</label>
+        <input id="match-reschedule-datetime" type="datetime-local" class="input-field" [(ngModel)]="rescheduleDateTime" [disabled]="rescheduleLoading" />
+      </div>
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="closeReschedule()" [disabled]="rescheduleLoading">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmReschedule()" [disabled]="rescheduleLoading || !rescheduleDateTime">
+          {{ rescheduleLoading ? 'Salvando...' : 'Confirmar' }}
         </button>
       </div>
     </div>

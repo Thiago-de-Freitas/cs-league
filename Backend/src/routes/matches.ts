@@ -8,6 +8,7 @@ import { tryCompleteLeague } from '../lib/leagueComplete';
 import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
+import { syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 
 const router = Router();
 
@@ -75,6 +76,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       round: match.round,
       bracketPosition: match.bracketPosition,
       map: match.map,
+      scheduledAt: match.scheduledAt,
       playedAt: match.playedAt,
       demos: match.demos.map((d) => ({
         id: d.id,
@@ -190,6 +192,66 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao registrar resultado' });
+  }
+});
+
+router.patch('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const match = await prisma.match.findUnique({
+      where: { id: req.params.id },
+      include: { league: { select: { id: true, ownerId: true } } },
+    });
+
+    if (!match) {
+      res.status(404).json({ error: 'Partida não encontrada' });
+      return;
+    }
+
+    const isOwner =
+      match.league.ownerId === req.user!.userId || req.user!.role === 'ADMIN';
+    if (!isOwner) {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    if (match.status === 'COMPLETED' || match.status === 'CANCELLED') {
+      res.status(400).json({ error: 'Não é possível remarcar partida finalizada ou cancelada.' });
+      return;
+    }
+
+    const { scheduledAt } = req.body;
+    if (!scheduledAt) {
+      res.status(400).json({ error: 'scheduledAt é obrigatório' });
+      return;
+    }
+
+    const parsed = new Date(scheduledAt);
+    if (Number.isNaN(parsed.getTime())) {
+      res.status(400).json({ error: 'Data/horário inválido' });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.match.update({
+        where: { id: req.params.id },
+        data: { scheduledAt: parsed },
+      });
+      await syncLeagueEndDate(tx, match.leagueId);
+    });
+
+    const updated = await prisma.match.findUnique({
+      where: { id: req.params.id },
+      include: {
+        team1: { select: { id: true, name: true, tag: true } },
+        team2: { select: { id: true, name: true, tag: true } },
+        winner: { select: { id: true, name: true, tag: true } },
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remarcar partida' });
   }
 });
 

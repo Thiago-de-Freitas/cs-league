@@ -143,13 +143,18 @@ function slotFromTeam(team: { id: string; name: string; tag?: string }, isWinner
 }
 
 function winnerSlot(match: BracketMatchView): BracketSlot | null {
+  let slot: BracketSlot | null = null;
   if (match.status === 'completed') {
-    if (match.teamA.isWinner) return match.teamA;
-    if (match.teamB.isWinner) return match.teamB;
+    if (match.teamA.isWinner) slot = match.teamA;
+    else if (match.teamB.isWinner) slot = match.teamB;
+  } else if (match.teamA.isBye && !match.teamB.isBye && match.teamB.teamId) {
+    slot = match.teamB;
+  } else if (match.teamB.isBye && !match.teamA.isBye && match.teamA.teamId) {
+    slot = match.teamA;
   }
-  if (match.teamA.isBye && !match.teamB.isBye && match.teamB.teamId) return match.teamB;
-  if (match.teamB.isBye && !match.teamA.isBye && match.teamA.teamId) return match.teamA;
-  return null;
+  if (!slot) return null;
+  // Avança o time, mas não marca vitória na rodada seguinte antes do jogo ocorrer
+  return { ...slot, isWinner: false };
 }
 
 function applyMatchResult(match: BracketMatchView, m: MatchInput): BracketMatchView {

@@ -84,6 +84,23 @@ export function getFirstRoundPairings(bracketSize: number): [number, number][] {
   return pairs;
 }
 
+/** Times que avançam por BYE na 1ª rodada (posição do bracket → teamId) */
+export function computeWalkoverWinners(
+  seedToTeamId: Map<number, string>,
+  bracketSize: number
+): Map<number, string> {
+  const walkoverWinners = new Map<number, string>();
+  const pairings = getFirstRoundPairings(bracketSize);
+  pairings.forEach(([seedA, seedB], position) => {
+    const pos = position + 1;
+    const teamA = seedToTeamId.get(seedA);
+    const teamB = seedToTeamId.get(seedB);
+    if (teamA && !teamB) walkoverWinners.set(pos, teamA);
+    else if (!teamA && teamB) walkoverWinners.set(pos, teamB);
+  });
+  return walkoverWinners;
+}
+
 export interface LeagueTeamForSeed {
   teamId: string;
   wins: number;

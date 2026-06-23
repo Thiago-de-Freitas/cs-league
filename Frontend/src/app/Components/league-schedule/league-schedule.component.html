@@ -1,0 +1,92 @@
+<div class="league-schedule" *ngIf="!loading">
+  <p class="schedule-hint" *ngIf="canManage && !groupPhaseGenerated">
+    Configure quando os jogos ocorrerão antes de gerar os confrontos.
+  </p>
+  <p class="schedule-hint" *ngIf="league?.endDate">
+    Previsão de término:
+    <strong>{{ league?.endDate | date:'medium' }}</strong>
+  </p>
+
+  <div class="schedule-form" *ngIf="canManage">
+    <div class="form-row">
+      <label class="form-label" for="schedule-start">Data de início</label>
+      <input id="schedule-start" type="date" class="input-field" [(ngModel)]="startDateInput" [disabled]="saving" />
+    </div>
+
+    <div class="form-row">
+      <span class="form-label">Dias da semana (padrão)</span>
+      <div class="weekday-grid">
+        <button
+          type="button"
+          class="weekday-chip"
+          *ngFor="let day of weekdayOptions"
+          [class.is-selected]="isDaySelected(day.value)"
+          (click)="toggleDay(day.value)">
+          {{ day.label }}
+        </button>
+      </div>
+    </div>
+
+    <div class="form-row form-row-inline">
+      <div>
+        <label class="form-label" for="schedule-time">Horário padrão</label>
+        <input id="schedule-time" type="time" class="input-field" [(ngModel)]="defaultMatchTime" [disabled]="saving" />
+      </div>
+      <div>
+        <label class="form-label" for="schedule-tz">Fuso horário</label>
+        <input id="schedule-tz" type="text" class="input-field" [(ngModel)]="scheduleTimezone" [disabled]="saving" />
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary" (click)="saveSchedule()" [disabled]="saving">
+      {{ saving ? 'Salvando...' : 'Salvar calendário' }}
+    </button>
+  </div>
+
+  <div class="schedule-readonly" *ngIf="!canManage && league?.scheduleConfigured">
+    <p>
+      Início: <strong>{{ league?.startDate | date:'mediumDate' }}</strong>
+      · Dias: <strong>{{ formatDays(league?.defaultMatchDays || []) }}</strong>
+      · Horário: <strong>{{ league?.defaultMatchTime }}</strong>
+    </p>
+  </div>
+
+  <div class="schedule-overrides" *ngIf="canManage">
+    <h3 class="schedule-subtitle">Semanas específicas</h3>
+    <p class="schedule-hint">Substitua os dias padrão em uma semana (segunda a domingo).</p>
+
+    <div class="override-form">
+      <label class="form-label" for="override-week">Semana (qualquer dia — ajustamos para segunda)</label>
+      <input id="override-week" type="date" class="input-field" [(ngModel)]="overrideWeekStart" [disabled]="overrideSaving" />
+      <div class="weekday-grid">
+        <button
+          type="button"
+          class="weekday-chip"
+          *ngFor="let day of weekdayOptions"
+          [class.is-selected]="isOverrideDaySelected(day.value)"
+          (click)="toggleOverrideDay(day.value)">
+          {{ day.label }}
+        </button>
+      </div>
+      <button type="button" class="btn btn-secondary" (click)="saveWeekOverride()" [disabled]="overrideSaving">
+        {{ overrideSaving ? 'Salvando...' : 'Adicionar / atualizar semana' }}
+      </button>
+    </div>
+
+    <ul class="override-list" *ngIf="weekOverrides.length > 0">
+      <li *ngFor="let w of weekOverrides" class="override-item">
+        <span>Semana de {{ formatWeekLabel(w.weekStart) }} — {{ formatDays(w.daysOfWeek) }}</span>
+        <button type="button" class="btn btn-ghost btn-small" (click)="removeWeekOverride(w.weekStart)">Remover</button>
+      </li>
+    </ul>
+  </div>
+
+  <div class="schedule-actions" *ngIf="canManage && groupPhaseGenerated">
+    <button type="button" class="btn btn-secondary" (click)="regenerateSchedule()" [disabled]="regenerating">
+      {{ regenerating ? 'Regenerando...' : 'Regenerar calendário (jogos agendados)' }}
+    </button>
+    <p class="schedule-hint">Reaplica o calendário automático apenas em jogos ainda não finalizados.</p>
+  </div>
+</div>
+
+<div *ngIf="loading" class="schedule-loading">Carregando calendário...</div>

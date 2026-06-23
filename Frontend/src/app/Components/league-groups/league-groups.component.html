@@ -42,7 +42,10 @@
       <h4 class="group-matches-title">Partidas</h4>
 
       <div class="group-round-block" *ngFor="let round of getRounds(group)">
-        <h5 class="group-round-label">Rodada {{ round }}</h5>
+        <h5 class="group-round-label">
+          Rodada {{ round }}
+          <span class="group-round-date" *ngIf="getRoundDateLabel(group, round)">— {{ getRoundDateLabel(group, round) }}</span>
+        </h5>
         <div
           class="group-match-row"
           *ngFor="let match of matchesForRound(group, round)"
@@ -50,6 +53,9 @@
           (click)="onMatchClick(match.id)">
           <span class="group-match-teams">
             {{ match.team1.tag || match.team1.name }} vs {{ match.team2.tag || match.team2.name }}
+          </span>
+          <span class="group-match-scheduled" *ngIf="formatScheduledAt(match.scheduledAt)">
+            {{ formatScheduledAt(match.scheduledAt) }}
           </span>
           <span class="group-match-status">{{ getMatchStatusLabel(match.status) }}</span>
           <span class="group-match-winner" *ngIf="match.status === 'completed' && match.winner">
@@ -63,6 +69,13 @@
               Vitória {{ match.team2.tag || match.team2.name }}
             </button>
           </ng-container>
+          <button
+            type="button"
+            class="btn btn-secondary btn-small"
+            *ngIf="canManageSchedule && match.status !== 'completed'"
+            (click)="onReschedule(match, $event)">
+            Remarcar
+          </button>
         </div>
       </div>
     </div>

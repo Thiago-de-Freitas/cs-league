@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { MatchService } from '../../Services/match.service';
+import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
 import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
@@ -33,12 +34,16 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   resultModalWinnerId = '';
   resultModalMap = '';
   resultModalLoading = false;
+  rescheduleDateTime = '';
+  rescheduleLoading = false;
+  showReschedule = false;
   cs2Maps = CS2_MAPS;
   private pollSub?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
     private matchService: MatchService,
+    private authService: AuthService,
     private demoService: DemoService,
     private notify: NotificationService
   ) {}
@@ -268,6 +273,51 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         ? this.resultModalMatch.team1
         : this.resultModalMatch.team2;
     return winner.name;
+  }
+
+  get canReschedule(): boolean {
+    if (!this.match?.league?.ownerId || this.match.status === 'completed' || this.match.status === 'cancelled') {
+      return false;
+    }
+    return this.authService.isLeagueOwner(this.match.league.ownerId);
+  }
+
+  openReschedule(): void {
+    if (!this.match) return;
+    this.rescheduleDateTime = this.toDatetimeLocalValue(this.match.scheduledAt);
+    this.showReschedule = true;
+  }
+
+  closeReschedule(): void {
+    if (this.rescheduleLoading) return;
+    this.showReschedule = false;
+    this.rescheduleDateTime = '';
+  }
+
+  confirmReschedule(): void {
+    if (!this.match || !this.rescheduleDateTime) return;
+    const iso = new Date(this.rescheduleDateTime).toISOString();
+    this.rescheduleLoading = true;
+    this.matchService.rescheduleMatch(this.match.id, iso).subscribe({
+      next: (updated) => {
+        this.match = { ...this.match!, scheduledAt: updated.scheduledAt };
+        this.rescheduleLoading = false;
+        this.closeReschedule();
+        this.notify.success('Jogo remarcado.');
+      },
+      error: (err) => {
+        this.rescheduleLoading = false;
+        this.notify.error(err?.error?.error || 'Erro ao remarcar jogo.');
+      },
+    });
+  }
+
+  private toDatetimeLocalValue(value?: string | null): string {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   getRoundLabel(round?: number): string {

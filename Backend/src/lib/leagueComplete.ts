@@ -23,7 +23,7 @@ export async function tryCompleteLeague(tx: Tx, leagueId: string): Promise<void>
       if (league.status === 'COMPLETED') {
         await tx.league.update({
           where: { id: leagueId },
-          data: { status: 'ONGOING', endDate: null },
+          data: { status: 'ONGOING' },
         });
       }
       return;
@@ -36,6 +36,6 @@ export async function tryCompleteLeague(tx: Tx, leagueId: string): Promise<void>
 
   await tx.league.update({
     where: { id: leagueId },
-    data: { status: 'COMPLETED', endDate: new Date() },
+    data: { status: 'COMPLETED' },
   });
 }

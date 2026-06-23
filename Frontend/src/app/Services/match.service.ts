@@ -16,4 +16,8 @@ export class MatchService {
   registerResult(matchId: string, winnerId: string, map?: string): Observable<Match & { groupPhaseJustCompleted?: boolean }> {
     return this.http.patch<Match & { groupPhaseJustCompleted?: boolean }>(`${this.apiUrl}/${matchId}/result`, { winnerId, map });
   }
+
+  rescheduleMatch(matchId: string, scheduledAt: string): Observable<Match> {
+    return this.http.patch<Match>(`${this.apiUrl}/${matchId}/schedule`, { scheduledAt });
+  }
 }

@@ -5,7 +5,10 @@
     <div class="league-meta">
       <span class="teams-capacity">{{ teamCapacityLabel }}</span>
       <span *ngIf="league.startDate">Início: {{ league.startDate | date:'mediumDate' }}</span>
-      <span *ngIf="league.endDate">Fim: {{ league.endDate | date:'mediumDate' }}</span>
+      <span *ngIf="league.endDate && isSingleGroupFormat">
+        Previsão de término: {{ league.endDate | date:'medium' }}
+      </span>
+      <span *ngIf="league.endDate && !isSingleGroupFormat">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
       <span *ngIf="isGroupStageFormat" class="badge badge-orange">{{ formatBadgeLabel }}</span>
       <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Inscrições abertas</span>
@@ -52,6 +55,17 @@
           {{ registeringTeam ? 'Inscrevendo...' : 'Inscrever time' }}
         </button>
       </div>
+    </div>
+
+    <div class="section-card" *ngIf="isSingleGroupFormat">
+      <h2 class="section-title">Calendário</h2>
+      <app-league-schedule
+        [leagueId]="league.id"
+        [league]="league"
+        [canManage]="canManageSchedule"
+        [groupPhaseGenerated]="hasGroupPhaseGenerated"
+        (scheduleUpdated)="onScheduleUpdated($event)">
+      </app-league-schedule>
     </div>
 
     <div class="section-card admin-panel" *ngIf="isAdmin">
@@ -143,9 +157,10 @@
           <button
             type="button"
             class="btn btn-success"
-            *ngIf="canGenerateGroups"
+            *ngIf="isAdmin && !isArchived && isGroupStageFormat && !hasGroupPhaseGenerated"
             (click)="generateGroups()"
-            [disabled]="generatingGroups || league.teams.length < minTeamsForGroupPhase">
+            [disabled]="generatingGroups || !canGenerateGroups"
+            [title]="generateGroupsDisabledReason || ''">
             {{ generatingGroups ? 'Gerando...' : (isSingleGroupFormat ? 'Gerar confrontos' : 'Gerar fase de grupos') }}
           </button>
           <button
@@ -198,7 +213,7 @@
         Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.
       </p>
       <p *ngIf="isSingleGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
-        Adicione pelo menos 3 times e clique em <strong>Gerar confrontos</strong>.
+        Configure o <strong>Calendário</strong>, adicione pelo menos 3 times e clique em <strong>Gerar confrontos</strong>.
         A prévia aparece na aba <strong>Todos contra todos</strong> em Confrontos.
       </p>
       <p *ngIf="isMultiGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
@@ -319,9 +334,11 @@
             [groups]="league.groups || []"
             [advancePerGroup]="league.advancePerGroup || 2"
             [singleGroup]="isSingleGroupFormat"
+            [canManageSchedule]="canManageSchedule"
             [canRegisterResult]="canRegisterResultForMatch.bind(this)"
             (matchClick)="goToMatch($event)"
-            (registerResult)="onGroupRegisterResult($event)">
+            (registerResult)="onGroupRegisterResult($event)"
+            (reschedule)="openRescheduleModal($event)">
           </app-league-groups>
         </div>
 
@@ -417,6 +434,39 @@
         <button type="button" class="btn btn-ghost" (click)="closeResultModal()" [disabled]="resultModalLoading">Cancelar</button>
         <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading">
           {{ resultModalLoading ? 'Salvando...' : 'Confirmar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  *ngIf="rescheduleModalMatch"
+  class="gc-modal-backdrop"
+  (click)="$event.target === $event.currentTarget && closeRescheduleModal()"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="reschedule-modal-title">
+  <div class="gc-modal">
+    <div class="gc-modal-header">
+      <div>
+        <h2 id="reschedule-modal-title" class="gc-modal-title">Remarcar jogo</h2>
+        <p class="gc-modal-subtitle">
+          {{ rescheduleModalMatch.team1.name }} vs {{ rescheduleModalMatch.team2.name }}
+        </p>
+      </div>
+      <button type="button" class="gc-modal-close" (click)="closeRescheduleModal()" [disabled]="rescheduleLoading" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="gc-modal-body">
+      <div class="form-group">
+        <label class="form-label" for="reschedule-datetime">Nova data e horário</label>
+        <input id="reschedule-datetime" type="datetime-local" class="input-field" [(ngModel)]="rescheduleDateTime" [disabled]="rescheduleLoading" />
+      </div>
+      <p class="admin-hint">Apenas este jogo será alterado. A previsão de término da liga será recalculada.</p>
+      <div class="gc-modal-footer">
+        <button type="button" class="btn btn-ghost" (click)="closeRescheduleModal()" [disabled]="rescheduleLoading">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmReschedule()" [disabled]="rescheduleLoading || !rescheduleDateTime">
+          {{ rescheduleLoading ? 'Salvando...' : 'Confirmar' }}
         </button>
       </div>
     </div>

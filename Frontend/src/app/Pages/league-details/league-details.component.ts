@@ -12,6 +12,7 @@ import { LeagueTeamsTableComponent } from './league-teams-table.component';
 import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components/league-bracket/league-bracket.component';
 import { LeagueGroupsComponent } from '../../Components/league-groups/league-groups.component';
 import { LeagueGroupsPreviewComponent } from '../../Components/league-groups-preview/league-groups-preview.component';
+import { LeagueScheduleComponent } from '../../Components/league-schedule/league-schedule.component';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { getFairBracketSize, formatTeamCapacity, MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
@@ -43,6 +44,7 @@ interface ConfirmConfig {
     LeagueBracketComponent,
     LeagueGroupsComponent,
     LeagueGroupsPreviewComponent,
+    LeagueScheduleComponent,
     ConfirmModalComponent,
   ],
   templateUrl: './league-details.component.html',
@@ -75,6 +77,9 @@ export class LeagueDetailsComponent implements OnInit {
   resultModalMap = '';
   resultModalLoading = false;
   showPlayoffReadyModal = false;
+  rescheduleModalMatch: Match | null = null;
+  rescheduleDateTime = '';
+  rescheduleLoading = false;
   cs2Maps = CS2_MAPS;
   myOwnedTeams: Pick<Team, 'id' | 'name' | 'tag' | 'ownerId'>[] = [];
   registerTeamId = '';
@@ -385,8 +390,24 @@ export class LeagueDetailsComponent implements OnInit {
       !this.isArchived &&
       this.isGroupStageFormat &&
       !this.hasGroupPhaseGenerated &&
-      (this.league?.teams.length ?? 0) >= this.minTeamsForGroupPhase
+      (this.league?.teams.length ?? 0) >= this.minTeamsForGroupPhase &&
+      (!this.isSingleGroupFormat || !!this.league?.scheduleConfigured)
     );
+  }
+
+  get generateGroupsDisabledReason(): string | null {
+    if (!this.isSingleGroupFormat || this.hasGroupPhaseGenerated) return null;
+    if (!this.league?.scheduleConfigured) {
+      return 'Configure o calendário (data de início e dias da semana) antes de gerar os confrontos.';
+    }
+    if ((this.league?.teams.length ?? 0) < this.minTeamsForGroupPhase) {
+      return `Adicione pelo menos ${this.minTeamsForGroupPhase} times.`;
+    }
+    return null;
+  }
+
+  get canManageSchedule(): boolean {
+    return this.isAdmin && !this.isArchived && this.isSingleGroupFormat;
   }
 
   get canGenerateLeaguePhase(): boolean {
@@ -502,6 +523,52 @@ export class LeagueDetailsComponent implements OnInit {
         this.apiError(err, 'Erro ao gerar fase de grupos');
       }
     });
+  }
+
+  onScheduleUpdated(league: League): void {
+    this.league = { ...this.league!, ...league };
+  }
+
+  openRescheduleModal(match: Match): void {
+    this.rescheduleModalMatch = match;
+    this.rescheduleDateTime = this.toDatetimeLocalValue(match.scheduledAt);
+    this.rescheduleLoading = false;
+  }
+
+  closeRescheduleModal(): void {
+    if (this.rescheduleLoading) return;
+    this.rescheduleModalMatch = null;
+    this.rescheduleDateTime = '';
+  }
+
+  confirmReschedule(): void {
+    if (!this.rescheduleModalMatch || !this.rescheduleDateTime || !this.leagueId) return;
+    const iso = new Date(this.rescheduleDateTime).toISOString();
+    if (Number.isNaN(new Date(iso).getTime())) {
+      this.notify.warning('Data/horário inválido.');
+      return;
+    }
+    this.rescheduleLoading = true;
+    this.matchService.rescheduleMatch(this.rescheduleModalMatch.id, iso).subscribe({
+      next: () => {
+        this.rescheduleLoading = false;
+        this.closeRescheduleModal();
+        this.fetchLeagueDetails(this.leagueId!);
+        this.notify.success('Jogo remarcado.');
+      },
+      error: (err) => {
+        this.rescheduleLoading = false;
+        this.apiError(err, 'Erro ao remarcar jogo');
+      },
+    });
+  }
+
+  private toDatetimeLocalValue(value?: string | null): string {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   onGroupRegisterResult(event: { match: Match; winnerId: string }): void {

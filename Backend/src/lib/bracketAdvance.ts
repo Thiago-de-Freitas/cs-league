@@ -1,7 +1,23 @@
 import { Prisma } from '@prisma/client';
-import { getFeederPositions } from './bracket';
+import { computeWalkoverWinners, getFeederPositions } from './bracket';
 
 type Tx = Prisma.TransactionClient;
+
+async function loadWalkoverWinners(
+  tx: Tx,
+  leagueId: string,
+  bracketSize: number
+): Promise<Map<number, string>> {
+  const leagueTeams = await tx.leagueTeam.findMany({
+    where: { leagueId, seed: { not: null } },
+    select: { teamId: true, seed: true },
+  });
+  const seedToTeamId = new Map<number, string>();
+  for (const lt of leagueTeams) {
+    if (lt.seed != null) seedToTeamId.set(lt.seed, lt.teamId);
+  }
+  return computeWalkoverWinners(seedToTeamId, bracketSize);
+}
 
 /** Avança vencedores de uma rodada quando ambos os feeders estão definidos */
 export async function advanceBracketFromRound(
@@ -18,10 +34,13 @@ export async function advanceBracketFromRound(
     where: { leagueId, round, phase: 'PLAYOFF' },
   });
 
+  const persistedWalkovers = await loadWalkoverWinners(tx, leagueId, maxTeams);
+  const mergedWalkovers = new Map<number, string>([...persistedWalkovers, ...walkoverWinners]);
+
   const winnerAt = (pos: number): string | null => {
     const m = matches.find((x) => x.bracketPosition === pos);
     if (m?.status === 'COMPLETED' && m.winnerId) return m.winnerId;
-    return walkoverWinners.get(pos) ?? null;
+    return mergedWalkovers.get(pos) ?? null;
   };
 
   const nextRound = round + 1;
