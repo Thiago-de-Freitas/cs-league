@@ -572,22 +572,6 @@
   vertical-align: middle;
 }
 
-.team-table td:nth-child(2) .team-tag-mini {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  padding: 0 0.35rem;
-  border-radius: 4px;
-  background: var(--gc-orange);
-  color: var(--gc-text-on-primary);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
 .team-table td:nth-child(3) {
   /* Estilo para o nome do time */
   font-weight: bold;

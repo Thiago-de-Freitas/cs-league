@@ -788,6 +788,22 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
   }
 }
 
+.team-tag-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  background: var(--gc-orange);
+  color: var(--gc-text-on-primary);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--gc-bg); }
