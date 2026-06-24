@@ -32,6 +32,7 @@ import {
   isScheduleConfigured,
   isValidScheduleTimezone,
   parseDefaultMatchDays,
+  parseWeekOverrideDays,
   parseMatchTime,
   parseScheduleStartDate,
   parseWeekStartParam,
@@ -388,7 +389,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const weekOverrides = weekOverrideRows.map((r) => ({
       weekStart: weekStartKey(r.weekStart, league.scheduleTimezone),
-      daysOfWeek: parseDefaultMatchDays(r.daysOfWeek) ?? [],
+      daysOfWeek: parseWeekOverrideDays(r.daysOfWeek) ?? [],
     }));
 
     res.json(formatLeague(league, matchIdsWithDemo, weekOverrides));
@@ -1033,9 +1034,11 @@ router.put('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: AuthReq
       return;
     }
 
-    const days = parseDefaultMatchDays(req.body.daysOfWeek);
-    if (!days) {
-      res.status(400).json({ error: 'Informe pelo menos um dia da semana válido (0–6).' });
+    const days = parseWeekOverrideDays(req.body.daysOfWeek);
+    if (days === null) {
+      res.status(400).json({
+        error: 'daysOfWeek deve ser um array de dias (0–6) ou [] para pausar a semana.',
+      });
       return;
     }
 
@@ -1059,7 +1062,7 @@ router.put('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: AuthReq
 
     res.json({
       weekStart: weekStartKey(row.weekStart, check.league.scheduleTimezone),
-      daysOfWeek: parseDefaultMatchDays(row.daysOfWeek) ?? [],
+      daysOfWeek: parseWeekOverrideDays(row.daysOfWeek) ?? [],
     });
   } catch (err) {
     console.error(err);

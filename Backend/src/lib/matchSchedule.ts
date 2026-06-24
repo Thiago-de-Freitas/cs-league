@@ -123,6 +123,19 @@ export function parseDefaultMatchDays(value: unknown): number[] | null {
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
+/** Override de semana: array vazio = semana pausada (sem jogos). */
+export function parseWeekOverrideDays(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  if (value.length === 0) return [];
+  const days = value.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  if (days.length === 0) return null;
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
+export function isWeekOverrideBlocked(daysOfWeek: number[]): boolean {
+  return daysOfWeek.length === 0;
+}
+
 export function isValidMatchDays(days: number[]): boolean {
   return days.length > 0 && days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6);
 }

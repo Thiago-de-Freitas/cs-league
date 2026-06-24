@@ -47,6 +47,8 @@ export class LeagueScheduleComponent implements OnChanges {
 
   overrideWeekStart = '';
   overrideDays = new Set<number>();
+  overrideMode: 'custom' | 'blocked' = 'custom';
+  editingWeekStart: string | null = null;
   weekOverrides: { weekStart: string; daysOfWeek: number[] }[] = [];
 
   constructor(
@@ -110,12 +112,58 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   toggleOverrideDay(day: number): void {
-    if (!this.canManage) return;
+    if (!this.canManage || this.overrideMode !== 'custom') return;
     if (this.overrideDays.has(day)) {
       this.overrideDays.delete(day);
     } else {
       this.overrideDays.add(day);
     }
+  }
+
+  setOverrideMode(mode: 'custom' | 'blocked'): void {
+    if (!this.canManage) return;
+    this.overrideMode = mode;
+    if (mode === 'blocked') {
+      this.overrideDays = new Set();
+    }
+  }
+
+  isWeekBlocked(override: { daysOfWeek: number[] }): boolean {
+    return override.daysOfWeek.length === 0;
+  }
+
+  formatOverrideSummary(override: { daysOfWeek: number[] }): string {
+    if (this.isWeekBlocked(override)) {
+      return 'Sem jogos nesta semana';
+    }
+    return `Dias: ${this.formatDays(override.daysOfWeek)}`;
+  }
+
+  editWeekOverride(override: { weekStart: string; daysOfWeek: number[] }): void {
+    if (!this.canManage) return;
+    this.editingWeekStart = override.weekStart;
+    this.overrideWeekStart = override.weekStart;
+    if (this.isWeekBlocked(override)) {
+      this.overrideMode = 'blocked';
+      this.overrideDays = new Set();
+    } else {
+      this.overrideMode = 'custom';
+      this.overrideDays = new Set(override.daysOfWeek);
+    }
+  }
+
+  cancelOverrideEdit(): void {
+    this.editingWeekStart = null;
+    this.overrideWeekStart = '';
+    this.overrideDays = new Set();
+    this.overrideMode = 'custom';
+  }
+
+  private resetOverrideForm(): void {
+    this.editingWeekStart = null;
+    this.overrideWeekStart = '';
+    this.overrideDays = new Set();
+    this.overrideMode = 'custom';
   }
 
   saveSchedule(): void {
@@ -162,32 +210,46 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   saveWeekOverride(): void {
-    if (!this.leagueId || !this.canManage || !this.overrideWeekStart) return;
-    if (this.overrideDays.size === 0) {
-      this.notify.warning('Selecione pelo menos um dia para a semana.');
+    if (!this.leagueId || !this.canManage || !this.overrideWeekStart) {
+      if (!this.overrideWeekStart) {
+        this.notify.warning('Selecione a semana.');
+      }
+      return;
+    }
+    if (this.overrideMode === 'custom' && this.overrideDays.size === 0) {
+      this.notify.warning('Selecione pelo menos um dia ou escolha "Sem jogos".');
       return;
     }
 
     const monday = this.normalizeToMonday(this.overrideWeekStart);
     if (!monday) {
-      this.notify.warning('A semana deve começar em uma segunda-feira.');
+      this.notify.warning('Data da semana inválida.');
       return;
     }
 
+    const days =
+      this.overrideMode === 'blocked'
+        ? []
+        : [...this.overrideDays].sort((a, b) => a - b);
+
     this.overrideSaving = true;
     this.leagueService
-      .upsertWeekOverride(this.leagueId, monday, [...this.overrideDays].sort((a, b) => a - b))
+      .upsertWeekOverride(this.leagueId, monday, days)
       .subscribe({
         next: () => {
+          const wasBlocked = this.overrideMode === 'blocked';
           this.overrideSaving = false;
-          this.overrideWeekStart = '';
-          this.overrideDays = new Set();
+          this.resetOverrideForm();
           this.loadSchedule();
-          this.notify.success('Semana personalizada salva.');
+          this.notify.success(
+            wasBlocked
+              ? 'Semana pausada. Regenerar o calendário para aplicar.'
+              : 'Exceção salva. Regenerar o calendário para aplicar.'
+          );
         },
         error: (err) => {
           this.overrideSaving = false;
-          this.notify.error(err?.error?.error || 'Erro ao salvar semana.');
+          this.notify.error(err?.error?.error || 'Erro ao salvar exceção.');
         },
       });
   }
@@ -196,10 +258,13 @@ export class LeagueScheduleComponent implements OnChanges {
     if (!this.leagueId || !this.canManage) return;
     this.leagueService.deleteWeekOverride(this.leagueId, weekStart).subscribe({
       next: () => {
+        if (this.editingWeekStart === weekStart) {
+          this.resetOverrideForm();
+        }
         this.loadSchedule();
-        this.notify.success('Override removido.');
+        this.notify.success('Exceção removida. Regenerar o calendário para voltar ao padrão.');
       },
-      error: (err) => this.notify.error(err?.error?.error || 'Erro ao remover semana.'),
+      error: (err) => this.notify.error(err?.error?.error || 'Erro ao remover exceção.'),
     });
   }
 

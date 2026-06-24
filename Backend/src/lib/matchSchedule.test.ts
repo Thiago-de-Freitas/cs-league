@@ -102,6 +102,33 @@ describe('matchSchedule', () => {
     assert.equal(p2.day, 22);
   });
 
+  it('blocked week skips scheduling and moves matches forward', () => {
+    const startDate = makeStartDate(2026, 6, 15);
+    const weekStart = startOfWeekMonday(startDate, TZ);
+    const matches = [
+      { id: 'm1', groupRound: 1, status: 'SCHEDULED' },
+      { id: 'm2', groupRound: 1, status: 'SCHEDULED' },
+    ];
+
+    const updates = buildScheduledDates(
+      matches,
+      {
+        startDate,
+        defaultMatchDays: [1, 3],
+        defaultMatchTime: '20:00',
+        scheduleTimezone: TZ,
+      },
+      [{ weekStart, daysOfWeek: [] }]
+    );
+
+    const p1 = getDatePartsInTimezone(updates[0].scheduledAt, TZ);
+    const p2 = getDatePartsInTimezone(updates[1].scheduledAt, TZ);
+    assert.equal(p1.weekday, 1);
+    assert.equal(p1.day, 22);
+    assert.equal(p2.weekday, 3);
+    assert.equal(p2.day, 24);
+  });
+
   it('recalculateLeagueEndDate returns max scheduledAt ignoring cancelled', () => {
     const d1 = new Date('2026-06-16T23:00:00.000Z');
     const d2 = new Date('2026-06-20T23:00:00.000Z');

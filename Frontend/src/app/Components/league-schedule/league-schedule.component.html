@@ -52,31 +52,96 @@
   </div>
 
   <div class="schedule-overrides" *ngIf="canManage">
-    <h3 class="schedule-subtitle">Semanas específicas</h3>
-    <p class="schedule-hint">Substitua os dias padrão em uma semana (segunda a domingo).</p>
+    <h3 class="schedule-subtitle">Exceções de semana</h3>
+    <p class="schedule-hint">
+      Altere os dias de uma semana específica ou pause a semana inteira. Os jogos afetados são remarcados para as semanas seguintes.
+    </p>
+    <p class="schedule-hint schedule-hint-action" *ngIf="groupPhaseGenerated">
+      Depois de salvar uma exceção, clique em <strong>Regenerar calendário</strong> para aplicar aos jogos ainda não finalizados.
+    </p>
 
-    <div class="override-form">
-      <label class="form-label" for="override-week">Semana (qualquer dia — ajustamos para segunda)</label>
-      <input id="override-week" type="date" class="input-field" [(ngModel)]="overrideWeekStart" [disabled]="overrideSaving" />
-      <div class="weekday-grid">
+    <div class="override-form gc-card">
+      <div class="form-row">
+        <label class="form-label" for="override-week">Semana</label>
+        <input
+          id="override-week"
+          type="date"
+          class="input-field"
+          [(ngModel)]="overrideWeekStart"
+          [disabled]="overrideSaving" />
+        <span class="field-hint">Escolha qualquer dia da semana — usamos de segunda a domingo.</span>
+      </div>
+
+      <div class="override-mode">
+        <span class="form-label">O que fazer nesta semana?</span>
+        <div class="mode-options">
+          <button
+            type="button"
+            class="mode-option"
+            [class.is-selected]="overrideMode === 'custom'"
+            [disabled]="overrideSaving"
+            (click)="setOverrideMode('custom')">
+            <span class="mode-title">Dias personalizados</span>
+            <span class="mode-desc">Substitui os dias padrão só nesta semana</span>
+          </button>
+          <button
+            type="button"
+            class="mode-option"
+            [class.is-selected]="overrideMode === 'blocked'"
+            [disabled]="overrideSaving"
+            (click)="setOverrideMode('blocked')">
+            <span class="mode-title">Sem jogos</span>
+            <span class="mode-desc">Remove todos os jogos desta semana</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-row" *ngIf="overrideMode === 'custom'">
+        <span class="form-label">Dias com jogos nesta semana</span>
+        <div class="weekday-grid">
+          <button
+            type="button"
+            class="weekday-chip"
+            *ngFor="let day of weekdayOptions"
+            [class.is-selected]="isOverrideDaySelected(day.value)"
+            [disabled]="overrideSaving"
+            (click)="toggleOverrideDay(day.value)">
+            {{ day.label }}
+          </button>
+        </div>
+      </div>
+
+      <p class="blocked-notice" *ngIf="overrideMode === 'blocked'">
+        Nenhum jogo será agendado nesta semana. Os confrontos serão empurrados para as semanas seguintes.
+      </p>
+
+      <div class="override-form-actions">
+        <button type="button" class="btn btn-primary" (click)="saveWeekOverride()" [disabled]="overrideSaving">
+          {{ overrideSaving ? 'Salvando...' : (editingWeekStart ? 'Atualizar exceção' : 'Salvar exceção') }}
+        </button>
         <button
           type="button"
-          class="weekday-chip"
-          *ngFor="let day of weekdayOptions"
-          [class.is-selected]="isOverrideDaySelected(day.value)"
-          (click)="toggleOverrideDay(day.value)">
-          {{ day.label }}
+          class="btn btn-secondary"
+          *ngIf="editingWeekStart"
+          [disabled]="overrideSaving"
+          (click)="cancelOverrideEdit()">
+          Cancelar
         </button>
       </div>
-      <button type="button" class="btn btn-secondary" (click)="saveWeekOverride()" [disabled]="overrideSaving">
-        {{ overrideSaving ? 'Salvando...' : 'Adicionar / atualizar semana' }}
-      </button>
     </div>
 
     <ul class="override-list" *ngIf="weekOverrides.length > 0">
-      <li *ngFor="let w of weekOverrides" class="override-item">
-        <span>Semana de {{ formatWeekLabel(w.weekStart) }} — {{ formatDays(w.daysOfWeek) }}</span>
-        <button type="button" class="btn btn-ghost btn-small" (click)="removeWeekOverride(w.weekStart)">Remover</button>
+      <li *ngFor="let w of weekOverrides" class="override-item" [class.is-editing]="editingWeekStart === w.weekStart">
+        <div class="override-item-main">
+          <span class="override-week">Semana de {{ formatWeekLabel(w.weekStart) }}</span>
+          <span class="override-badge" [class.is-blocked]="isWeekBlocked(w)">
+            {{ formatOverrideSummary(w) }}
+          </span>
+        </div>
+        <div class="override-item-actions">
+          <button type="button" class="btn btn-ghost btn-small" (click)="editWeekOverride(w)">Editar</button>
+          <button type="button" class="btn btn-ghost btn-small" (click)="removeWeekOverride(w.weekStart)">Excluir</button>
+        </div>
       </li>
     </ul>
   </div>

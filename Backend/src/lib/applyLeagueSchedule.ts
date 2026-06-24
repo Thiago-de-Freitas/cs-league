@@ -4,6 +4,7 @@ import {
   isScheduleConfigured,
   LeagueScheduleConfig,
   parseDefaultMatchDays,
+  parseWeekOverrideDays,
   recalculateLeagueEndDate,
   WeekOverride,
 } from './matchSchedule';
@@ -36,7 +37,7 @@ export async function loadWeekOverrides(
   });
   return rows.map((r) => ({
     weekStart: r.weekStart,
-    daysOfWeek: parseDefaultMatchDays(r.daysOfWeek) ?? [],
+    daysOfWeek: parseWeekOverrideDays(r.daysOfWeek) ?? [],
   }));
 }
 
