@@ -1,11 +1,17 @@
 {
   "name": "cs-league",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "scripts": {
+    "version:generate": "node ../scripts/generate-version.mjs",
+    "prebuild": "npm run version:generate",
     "ng": "ng",
+    "prestart": "npm run version:generate",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build --configuration production",
+    "prebuild:dev": "npm run version:generate",
     "build:dev": "ng build --configuration development",
+    "pretest": "npm run version:generate",
+    "pretest:ci": "npm run version:generate",
     "start:prod": "node serve.prod.cjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

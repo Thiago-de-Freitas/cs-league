@@ -19,6 +19,7 @@ import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
+import { formatBuildLabel, getBuildInfo } from './lib/buildInfo';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -37,7 +38,9 @@ const publicPath = path.join(__dirname, '../public');
 
 function isApiHealthPath(req: express.Request): boolean {
   const pathname = req.originalUrl.split('?')[0];
-  return pathname === '/api/health' || pathname.startsWith('/api/health/');
+  return pathname === '/api/health'
+    || pathname.startsWith('/api/health/')
+    || pathname === '/api/version';
 }
 
 function isApiInternalPath(req: express.Request): boolean {
@@ -49,7 +52,34 @@ const serveFrontend = process.env.SERVE_FRONTEND === 'true'
 
 // Liveness — Railway healthcheck; não depende de DB/Redis
 app.get('/api/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  const build = getBuildInfo();
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    build,
+    label: formatBuildLabel(build),
+  });
+});
+
+app.get('/api/version', (_req, res) => {
+  const build = getBuildInfo();
+  let frontend: Record<string, unknown> | null = null;
+  if (serveFrontend) {
+    const frontendPath = path.join(publicPath, 'build-info.json');
+    if (fs.existsSync(frontendPath)) {
+      try {
+        frontend = JSON.parse(fs.readFileSync(frontendPath, 'utf8'));
+      } catch {
+        frontend = null;
+      }
+    }
+  }
+  res.json({
+    backend: build,
+    backendLabel: formatBuildLabel(build),
+    frontend,
+    frontendLabel: frontend ? formatBuildLabel(frontend as ReturnType<typeof getBuildInfo>) : null,
+  });
 });
 
 // Diagnóstico de env (sem expor valores secretos)
@@ -298,7 +328,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const server = app.listen(PORT, HOST, () => {
+  const build = getBuildInfo();
   console.log(`API rodando em http://${HOST}:${PORT} (PORT=${PORT}, NODE_ENV=${process.env.NODE_ENV || 'development'})`);
+  console.log(`[build] ${formatBuildLabel(build)} · ${build.branch} · ${build.buildTime}`);
   if (isProduction) {
     const allErrors = getProductionEnvErrors();
     logProductionEnvErrors(allErrors);

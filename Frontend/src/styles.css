@@ -793,3 +793,24 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
 ::-webkit-scrollbar-track { background: var(--gc-bg); }
 ::-webkit-scrollbar-thumb { background: var(--gc-border-light); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gc-orange); }
+
+.gc-build-version {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 1rem 0.65rem;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  color: var(--gc-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.gc-build-version-label {
+  white-space: nowrap;
+}
+
+.gc-build-version-sep {
+  opacity: 0.6;
+}

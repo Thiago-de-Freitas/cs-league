@@ -4,3 +4,8 @@ dist/
 data/
 .env.example
 **.example
+
+# Metadados de build gerados por scripts/generate-version.mjs
+Backend/src/generated/
+Frontend/src/app/generated/
+Frontend/public/build-info.json
