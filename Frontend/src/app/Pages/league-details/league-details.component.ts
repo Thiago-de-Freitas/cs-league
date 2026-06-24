@@ -307,7 +307,10 @@ export class LeagueDetailsComponent implements OnInit {
       tag: t.tag,
       wins: t.wins,
       losses: t.losses,
+      draws: t.draws,
       points: t.points,
+      roundsWon: t.roundsWon,
+      roundsLost: t.roundsLost,
       seed: t.seed,
     }));
     return buildGroupPreviewPlans(teams, this.league.groupCount ?? 2, this.league.homeAndAway ?? false);
