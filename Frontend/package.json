@@ -2,7 +2,7 @@
   "name": "cs-league",
   "version": "1.0.0",
   "scripts": {
-    "version:generate": "node ../scripts/generate-version.mjs",
+    "version:generate": "node scripts/generate-version.mjs",
     "prebuild": "npm run version:generate",
     "ng": "ng",
     "prestart": "npm run version:generate",

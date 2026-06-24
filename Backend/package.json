@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "version:generate": "node ../scripts/generate-version.mjs",
+    "version:generate": "node scripts/generate-version.mjs",
     "prebuild": "npm run version:generate",
     "build": "tsc",
     "predev": "npm run version:generate",
