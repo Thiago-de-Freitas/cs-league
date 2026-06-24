@@ -17,6 +17,7 @@ import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from 
 import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { requireDemoQueue } from '../middleware/demoQueue';
+import { isAdmin } from '../lib/permissions';
 
 const router = Router();
 
@@ -62,7 +63,7 @@ function parseIsPersonal(value: unknown): boolean {
 
 router.get('/validate-personal', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const result = await validatePersonalDemoUpload(req.user!.userId);
+    const result = await validatePersonalDemoUpload(req.user!.userId, req.user!.role);
     if (!result.valid) {
       res.json({ valid: false, error: result.error, code: result.code });
       return;
@@ -198,7 +199,7 @@ router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), 
     }
 
     if (isPersonal) {
-      const validation = await validatePersonalDemoUpload(req.user!.userId);
+      const validation = await validatePersonalDemoUpload(req.user!.userId, req.user!.role);
       if (!validation.valid) {
         fs.unlink(req.file.path, () => {});
         res.status(400).json({ error: validation.error, code: validation.code });
@@ -526,8 +527,11 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
 
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const userIsAdmin = isAdmin(req.user!);
     const demos = await prisma.demo.findMany({
-      where: { uploadedById: req.user!.userId, isPersonal: false },
+      where: userIsAdmin
+        ? { isPersonal: false }
+        : { uploadedById: req.user!.userId, isPersonal: false },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

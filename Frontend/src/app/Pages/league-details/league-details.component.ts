@@ -205,9 +205,15 @@ export class LeagueDetailsComponent implements OnInit {
     }
     this.teamService.getTeams().subscribe({
       next: (teams) => {
-        this.myOwnedTeams = teams
-          .filter((t) => t.ownerId === userId)
-          .map((t) => ({ id: t.id, name: t.name, tag: t.tag, ownerId: t.ownerId }));
+        const eligible = this.authService.isSystemAdmin()
+          ? teams
+          : teams.filter((t) => t.ownerId === userId);
+        this.myOwnedTeams = eligible.map((t) => ({
+          id: t.id,
+          name: t.name,
+          tag: t.tag,
+          ownerId: t.ownerId,
+        }));
         if (this.registerableTeams.length === 1) {
           this.registerTeamId = this.registerableTeams[0].id;
         }

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { isAdmin } from '../lib/permissions';
 import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
@@ -116,13 +117,16 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const userIsAdmin = isAdmin(req.user!);
     const teams = await prisma.team.findMany({
-      where: {
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } },
-        ],
-      },
+      where: userIsAdmin
+        ? {}
+        : {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId } } },
+            ],
+          },
       include: {
         members: {
           select: {

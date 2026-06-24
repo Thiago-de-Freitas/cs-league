@@ -85,10 +85,13 @@ export class AuthService {
     );
   }
 
+  isSystemAdmin(): boolean {
+    return this.currentUserSubject.value?.role === 'ADMIN';
+  }
+
   isAdmin(): Observable<boolean> {
     return new Observable((observer) => {
-      const user = this.currentUserSubject.value;
-      observer.next(user?.role === 'ADMIN');
+      observer.next(this.isSystemAdmin());
       observer.complete();
     });
   }

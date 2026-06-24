@@ -49,9 +49,14 @@ export class DemoUploadModalComponent implements OnInit {
     this.uploadMode = this.allowedModes[0] || 'general';
 
     this.authService.currentUser$.subscribe((user) => {
-      this.hasSteamId = !!user?.steamId?.trim();
+      const isSystemAdmin = user?.role === 'ADMIN';
+      this.hasSteamId = isSystemAdmin || !!user?.steamId?.trim();
       if (this.isPersonalMode && this.hasSteamId) {
-        this.validatePersonalProfile();
+        if (isSystemAdmin) {
+          this.personalValidationOk = true;
+        } else {
+          this.validatePersonalProfile();
+        }
       }
     });
 
@@ -128,6 +133,10 @@ export class DemoUploadModalComponent implements OnInit {
   }
 
   validatePersonalProfile(): void {
+    if (this.authService.isSystemAdmin()) {
+      this.personalValidationOk = true;
+      return;
+    }
     if (!this.hasSteamId) {
       this.personalValidationOk = false;
       return;
@@ -195,7 +204,7 @@ export class DemoUploadModalComponent implements OnInit {
     }
 
     if (this.isPersonalMode) {
-      if (!this.hasSteamId) {
+      if (!this.authService.isSystemAdmin() && !this.hasSteamId) {
         this.errorMsg = 'Configure seu Steam ID no perfil antes de enviar uma demo pessoal.';
         return;
       }

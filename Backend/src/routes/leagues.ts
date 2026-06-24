@@ -14,6 +14,7 @@ import { tryGenerateGroupStagePlayoffs } from '../lib/generateGroupStagePlayoffs
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { canUserAccessLeague } from '../lib/leaguePermissions';
 import { canUserRegisterTeam } from '../lib/leagueRegistration';
+import { isAdmin } from '../lib/permissions';
 import {
   areAllGroupMatchesComplete,
   computeGroupStandings,
@@ -243,19 +244,22 @@ async function assertLeagueOwner(leagueId: string, userId: string, role: string)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const userIsAdmin = isAdmin(req.user!);
     const includeArchived = req.query.includeArchived === 'true';
     const leagues = await prisma.league.findMany({
-      where: {
-        AND: [
-          {
-            OR: [
-              { ownerId: userId },
-              { teams: { some: { team: { members: { some: { userId } } } } } },
+      where: userIsAdmin
+        ? (includeArchived ? {} : { status: { not: 'ARCHIVED' as const } })
+        : {
+            AND: [
+              {
+                OR: [
+                  { ownerId: userId },
+                  { teams: { some: { team: { members: { some: { userId } } } } } },
+                ],
+              },
+              ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
             ],
           },
-          ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
-        ],
-      },
       select: {
         id: true,
         name: true,
