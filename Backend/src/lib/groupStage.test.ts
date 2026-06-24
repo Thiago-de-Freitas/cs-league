@@ -16,7 +16,10 @@ describe('distributeTeamsIntoGroups', () => {
       teamId: `t${i + 1}`,
       wins: 0,
       losses: 0,
+      draws: 0,
       points: 0,
+      roundsWon: 0,
+      roundsLost: 0,
       seed: i + 1,
     }));
 
@@ -33,7 +36,10 @@ describe('distributeTeamsIntoGroups', () => {
       teamId: `t${i + 1}`,
       wins: 0,
       losses: 0,
+      draws: 0,
       points: 0,
+      roundsWon: 0,
+      roundsLost: 0,
       seed: i + 1,
     }));
 
@@ -71,6 +77,37 @@ describe('computeGroupStandings', () => {
     assert.equal(standings[0].points, 3);
     assert.equal(standings[0].rank, 1);
   });
+
+  it('contabiliza empate com rounds e saldo', () => {
+    const standings = computeGroupStandings(['a', 'b'], [
+      {
+        team1Id: 'a',
+        team2Id: 'b',
+        winnerId: null,
+        status: 'COMPLETED',
+        team1Rounds: 15,
+        team2Rounds: 15,
+      },
+      {
+        team1Id: 'a',
+        team2Id: 'b',
+        winnerId: 'a',
+        status: 'COMPLETED',
+        team1Rounds: 16,
+        team2Rounds: 10,
+      },
+    ]);
+    const teamA = standings.find((s) => s.teamId === 'a')!;
+    const teamB = standings.find((s) => s.teamId === 'b')!;
+    assert.equal(teamA.draws, 1);
+    assert.equal(teamA.points, 4);
+    assert.equal(teamA.roundsWon, 31);
+    assert.equal(teamA.roundsLost, 25);
+    assert.equal(teamA.roundDifference, 6);
+    assert.equal(teamB.draws, 1);
+    assert.equal(teamB.points, 1);
+    assert.equal(teamB.roundDifference, -6);
+  });
 });
 
 describe('getQualifiersFromGroups', () => {
@@ -81,14 +118,14 @@ describe('getQualifiersFromGroups', () => {
     ];
     const standings = new Map([
       ['A', [
-        { teamId: 'a1', wins: 2, losses: 0, points: 6, played: 2, rank: 1 },
-        { teamId: 'a2', wins: 1, losses: 1, points: 3, played: 2, rank: 2 },
-        { teamId: 'a3', wins: 0, losses: 2, points: 0, played: 2, rank: 3 },
+        { teamId: 'a1', wins: 2, losses: 0, draws: 0, points: 6, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 1 },
+        { teamId: 'a2', wins: 1, losses: 1, draws: 0, points: 3, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 2 },
+        { teamId: 'a3', wins: 0, losses: 2, draws: 0, points: 0, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 3 },
       ]],
       ['B', [
-        { teamId: 'b1', wins: 2, losses: 0, points: 6, played: 2, rank: 1 },
-        { teamId: 'b2', wins: 1, losses: 1, points: 3, played: 2, rank: 2 },
-        { teamId: 'b3', wins: 0, losses: 2, points: 0, played: 2, rank: 3 },
+        { teamId: 'b1', wins: 2, losses: 0, draws: 0, points: 6, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 1 },
+        { teamId: 'b2', wins: 1, losses: 1, draws: 0, points: 3, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 2 },
+        { teamId: 'b3', wins: 0, losses: 2, draws: 0, points: 0, roundsWon: 0, roundsLost: 0, roundDifference: 0, played: 2, rank: 3 },
       ]],
     ]);
 

@@ -13,8 +13,17 @@ export class MatchService {
     return this.http.get<Match>(`${this.apiUrl}/${id}`);
   }
 
-  registerResult(matchId: string, winnerId: string, map?: string): Observable<Match & { groupPhaseJustCompleted?: boolean }> {
-    return this.http.patch<Match & { groupPhaseJustCompleted?: boolean }>(`${this.apiUrl}/${matchId}/result`, { winnerId, map });
+  registerResult(
+    matchId: string,
+    team1Rounds: number,
+    team2Rounds: number,
+    map?: string
+  ): Observable<Match & { groupPhaseJustCompleted?: boolean }> {
+    return this.http.patch<Match & { groupPhaseJustCompleted?: boolean }>(`${this.apiUrl}/${matchId}/result`, {
+      team1Rounds,
+      team2Rounds,
+      map,
+    });
   }
 
   rescheduleMatch(matchId: string, scheduledAt: string): Observable<Match> {

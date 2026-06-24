@@ -174,10 +174,13 @@ model LeagueTeam {
   leagueId String
   teamId   String
   groupId  String?
-  wins     Int    @default(0)
-  losses   Int    @default(0)
-  points   Int    @default(0)
-  seed     Int?
+  wins       Int    @default(0)
+  losses     Int    @default(0)
+  draws      Int    @default(0)
+  points     Int    @default(0)
+  roundsWon  Int    @default(0)
+  roundsLost Int    @default(0)
+  seed       Int?
 
   league League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   team   Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -199,6 +202,8 @@ model Match {
   round           Int         @default(1)
   bracketPosition Int?
   map             String?
+  team1Rounds     Int?
+  team2Rounds     Int?
   scheduledAt     DateTime?
   playedAt        DateTime?
   createdAt DateTime    @default(now())

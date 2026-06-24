@@ -138,7 +138,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         },
         leagueTeams: {
           where: ARCHIVED_LEAGUE_TEAM_WHERE,
-          select: { wins: true, losses: true, points: true },
+          select: { wins: true, losses: true, draws: true, points: true, roundsWon: true, roundsLost: true },
         },
       },
       orderBy: { createdAt: 'desc' },

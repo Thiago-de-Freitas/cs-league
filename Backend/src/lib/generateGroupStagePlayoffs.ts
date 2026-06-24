@@ -71,6 +71,8 @@ export async function tryGenerateGroupStagePlayoffs(
           team2Id: m.team2Id,
           winnerId: m.winnerId,
           status: m.status,
+          team1Rounds: m.team1Rounds,
+          team2Rounds: m.team2Rounds,
         }))
       ),
     ])
@@ -100,6 +102,9 @@ export async function tryGenerateGroupStagePlayoffs(
         points: groupStanding?.points ?? 0,
         wins: groupStanding?.wins ?? 0,
         losses: groupStanding?.losses ?? 0,
+        draws: groupStanding?.draws ?? 0,
+        roundsWon: groupStanding?.roundsWon ?? 0,
+        roundsLost: groupStanding?.roundsLost ?? 0,
       };
     })
   );
@@ -111,7 +116,7 @@ export async function tryGenerateGroupStagePlayoffs(
   for (const [index, lt] of ranked.entries()) {
     await tx.leagueTeam.update({
       where: { id: lt.id },
-      data: { seed: index + 1, wins: 0, losses: 0, points: 0 },
+      data: { seed: index + 1, wins: 0, losses: 0, draws: 0, points: 0, roundsWon: 0, roundsLost: 0 },
     });
   }
 

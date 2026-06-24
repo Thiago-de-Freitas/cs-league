@@ -105,16 +105,22 @@ export interface LeagueTeamForSeed {
   teamId: string;
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
   seed: number | null;
 }
 
 /** Seeding justo: desempenho (jogos) > seed manual */
 export function rankTeamsForSeeding<T extends LeagueTeamForSeed>(teams: T[]): T[] {
-  const totalGames = teams.reduce((sum, t) => sum + t.wins + t.losses, 0);
+  const totalGames = teams.reduce((sum, t) => sum + t.wins + t.losses + t.draws, 0);
   return [...teams].sort((a, b) => {
     if (totalGames > 0) {
       if (b.points !== a.points) return b.points - a.points;
+      const diffA = a.roundsWon - a.roundsLost;
+      const diffB = b.roundsWon - b.roundsLost;
+      if (diffB !== diffA) return diffB - diffA;
       if (b.wins !== a.wins) return b.wins - a.wins;
       if (a.losses !== b.losses) return a.losses - b.losses;
     }

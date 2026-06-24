@@ -9,7 +9,7 @@ describe('CreateTeamModalComponent', () => {
   let fixture: ComponentFixture<CreateTeamModalComponent>;
   let teamServiceSpy: jasmine.SpyObj<TeamService>;
 
-  const mockTeam = { id: 't1', name: 'Test', tag: 'TST', players: [], wins: 0, losses: 0, points: 0 };
+  const mockTeam = { id: 't1', name: 'Test', tag: 'TST', players: [], wins: 0, losses: 0, draws: 0, points: 0, roundsWon: 0, roundsLost: 0 };
 
   beforeEach(async () => {
     teamServiceSpy = jasmine.createSpyObj('TeamService', ['createTeam', 'searchUsers', 'inviteUser']);

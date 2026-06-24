@@ -7,7 +7,7 @@
       <a routerLink="/dashboard" class="btn btn-ghost btn-small mb-4">← Voltar ao Dashboard</a>
       <h1 class="page-title">{{ getPlayerLabel() }}</h1>
       <p class="meta">Steam ID: {{ profile.steamId }}</p>
-      <p class="meta">{{ profile.demos }} demo(s) em ligas</p>
+      <p class="meta">{{ profile.matches ?? profile.demos }} jogo(s) de liga analisados</p>
 
       <div class="stats-grid mt-4">
         <div class="stat-box">

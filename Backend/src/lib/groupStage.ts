@@ -12,7 +12,10 @@ export interface TeamForGroupDistribution {
   teamId: string;
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
   seed: number | null;
 }
 
@@ -32,7 +35,11 @@ export interface GroupStanding {
   teamId: string;
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
+  roundDifference: number;
   played: number;
   rank: number;
 }
@@ -42,6 +49,8 @@ export interface GroupMatchResult {
   team2Id: string;
   winnerId: string | null;
   status: string;
+  team1Rounds?: number | null;
+  team2Rounds?: number | null;
 }
 
 export function isValidGroupCount(value: unknown): value is number {
@@ -174,14 +183,61 @@ export function computeGroupStandings(
   teamIds: string[],
   matches: GroupMatchResult[]
 ): GroupStanding[] {
-  const stats = new Map<string, { wins: number; losses: number; points: number; played: number }>();
+  const stats = new Map<
+    string,
+    { wins: number; losses: number; draws: number; points: number; roundsWon: number; roundsLost: number; played: number }
+  >();
   for (const teamId of teamIds) {
-    stats.set(teamId, { wins: 0, losses: 0, points: 0, played: 0 });
+    stats.set(teamId, { wins: 0, losses: 0, draws: 0, points: 0, roundsWon: 0, roundsLost: 0, played: 0 });
   }
 
   for (const match of matches) {
-    if (match.status !== 'COMPLETED' || !match.winnerId) continue;
+    if (match.status !== 'COMPLETED') continue;
     if (!stats.has(match.team1Id) || !stats.has(match.team2Id)) continue;
+
+    const team1 = stats.get(match.team1Id)!;
+    const team2 = stats.get(match.team2Id)!;
+
+    const hasRounds =
+      match.team1Rounds != null &&
+      match.team2Rounds != null &&
+      Number.isInteger(match.team1Rounds) &&
+      Number.isInteger(match.team2Rounds);
+
+    if (hasRounds) {
+      team1.roundsWon += match.team1Rounds!;
+      team1.roundsLost += match.team2Rounds!;
+      team2.roundsWon += match.team2Rounds!;
+      team2.roundsLost += match.team1Rounds!;
+      team1.played += 1;
+      team2.played += 1;
+
+      if (match.team1Rounds === match.team2Rounds) {
+        team1.draws += 1;
+        team1.points += 1;
+        team2.draws += 1;
+        team2.points += 1;
+      } else if (match.winnerId === match.team1Id) {
+        team1.wins += 1;
+        team1.points += 3;
+        team2.losses += 1;
+      } else if (match.winnerId === match.team2Id) {
+        team2.wins += 1;
+        team2.points += 3;
+        team1.losses += 1;
+      } else if (match.team1Rounds! > match.team2Rounds!) {
+        team1.wins += 1;
+        team1.points += 3;
+        team2.losses += 1;
+      } else {
+        team2.wins += 1;
+        team2.points += 3;
+        team1.losses += 1;
+      }
+      continue;
+    }
+
+    if (!match.winnerId) continue;
 
     const winner = stats.get(match.winnerId)!;
     const loserId = match.winnerId === match.team1Id ? match.team2Id : match.team1Id;
@@ -196,11 +252,17 @@ export function computeGroupStandings(
 
   const standings = teamIds.map((teamId) => {
     const s = stats.get(teamId)!;
-    return { teamId, ...s, rank: 0 };
+    return {
+      teamId,
+      ...s,
+      roundDifference: s.roundsWon - s.roundsLost,
+      rank: 0,
+    };
   });
 
   standings.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+    if (b.roundDifference !== a.roundDifference) return b.roundDifference - a.roundDifference;
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (a.losses !== b.losses) return a.losses - b.losses;
     return a.teamId.localeCompare(b.teamId);

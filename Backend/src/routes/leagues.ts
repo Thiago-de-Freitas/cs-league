@@ -37,6 +37,7 @@ import {
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
+import { roundDifference } from '../lib/matchResult';
 
 const router = Router();
 
@@ -112,7 +113,10 @@ function formatTeamFromLeagueTeam(lt: {
   };
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
   seed: number | null;
   groupId?: string | null;
 }) {
@@ -124,7 +128,11 @@ function formatTeamFromLeagueTeam(lt: {
     ownerId: lt.team.ownerId,
     wins: lt.wins,
     losses: lt.losses,
+    draws: lt.draws,
     points: lt.points,
+    roundsWon: lt.roundsWon,
+    roundsLost: lt.roundsLost,
+    roundDifference: roundDifference(lt.roundsWon, lt.roundsLost),
     seed: lt.seed,
     groupId: lt.groupId ?? null,
     players: lt.team.members.map((m) => ({
@@ -168,6 +176,8 @@ function formatLeague(
     round: m.round,
     bracketPosition: m.bracketPosition,
     map: m.map,
+    team1Rounds: m.team1Rounds,
+    team2Rounds: m.team2Rounds,
     scheduledAt: m.scheduledAt,
     playedAt: m.playedAt,
     hasGeneralDemo: matchIdsWithDemo.has(m.id),
@@ -183,6 +193,8 @@ function formatLeague(
         team2Id: m.team2Id,
         winnerId: m.winnerId,
         status: m.status,
+        team1Rounds: m.team1Rounds,
+        team2Rounds: m.team2Rounds,
       }))
     );
     return {
@@ -1138,7 +1150,10 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
       teamId: lt.teamId,
       wins: lt.wins,
       losses: lt.losses,
+      draws: lt.draws,
       points: lt.points,
+      roundsWon: lt.roundsWon,
+      roundsLost: lt.roundsLost,
       seed: lt.seed,
     }));
 
@@ -1166,7 +1181,7 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
     await prisma.$transaction(async (tx) => {
       await tx.leagueTeam.updateMany({
         where: { leagueId: req.params.id },
-        data: { wins: 0, losses: 0, points: 0, groupId: null },
+        data: { wins: 0, losses: 0, draws: 0, points: 0, roundsWon: 0, roundsLost: 0, groupId: null },
       });
 
       for (const dist of groupMatchPlans) {
@@ -1397,7 +1412,7 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
         round1Matches: matchCreates.length,
         walkovers,
         advancedMatches,
-        seedingBy: ranked.some((t) => t.wins + t.losses > 0) ? 'record' : 'manual',
+        seedingBy: ranked.some((t) => t.wins + t.losses + t.draws > 0) ? 'record' : 'manual',
       },
     });
   } catch (err) {

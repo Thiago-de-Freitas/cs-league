@@ -24,7 +24,11 @@
           <th>Time</th>
           <th>V</th>
           <th>D</th>
+          <th>E</th>
           <th>Pts</th>
+          <th>RF</th>
+          <th>RS</th>
+          <th>Saldo</th>
         </tr>
       </thead>
       <tbody>
@@ -33,7 +37,11 @@
           <td>{{ row.team.tag || row.team.name }}</td>
           <td>{{ row.wins }}</td>
           <td>{{ row.losses }}</td>
+          <td>{{ row.draws }}</td>
           <td>{{ row.points }}</td>
+          <td>{{ row.roundsWon }}</td>
+          <td>{{ row.roundsLost }}</td>
+          <td>{{ row.roundDifference }}</td>
         </tr>
       </tbody>
     </table>
@@ -57,16 +65,17 @@
           <span class="group-match-scheduled" *ngIf="formatScheduledAt(match.scheduledAt)">
             {{ formatScheduledAt(match.scheduledAt) }}
           </span>
+          <span class="group-match-score" *ngIf="formatMatchScore(match)">{{ formatMatchScore(match) }}</span>
           <span class="group-match-status">{{ getMatchStatusLabel(match.status) }}</span>
           <span class="group-match-winner" *ngIf="match.status === 'completed' && match.winner">
             {{ match.winner.tag || match.winner.name }}
           </span>
+          <span class="group-match-winner" *ngIf="match.status === 'completed' && !match.winner && match.team1Rounds != null">
+            Empate
+          </span>
           <ng-container *ngIf="canRegisterResult?.(match)">
-            <button type="button" class="btn btn-primary btn-small" (click)="onRegisterResult(match, match.team1.id, $event)">
-              Vitória {{ match.team1.tag || match.team1.name }}
-            </button>
-            <button type="button" class="btn btn-primary btn-small" (click)="onRegisterResult(match, match.team2.id, $event)">
-              Vitória {{ match.team2.tag || match.team2.name }}
+            <button type="button" class="btn btn-primary btn-small" (click)="onRegisterResult(match, $event)">
+              Registrar resultado
             </button>
           </ng-container>
           <button

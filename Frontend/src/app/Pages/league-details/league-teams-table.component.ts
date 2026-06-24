@@ -20,7 +20,11 @@ import { AuthService } from '../../Services/auth.service';
       <th>Nome</th>
       <th>Vitórias</th>
       <th>Derrotas</th>
+      <th>Empates</th>
       <th>Pontos</th>
+      <th>RF</th>
+      <th>RS</th>
+      <th>Saldo</th>
       <th *ngIf="showActionsColumn">Ações</th>
     </tr>
   </thead>
@@ -31,9 +35,13 @@ import { AuthService } from '../../Services/auth.service';
         <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do time" width="32" height="32">
       </td>
       <td>{{ team.name }}</td>
-      <td>{{ team.wins }}</td>
-      <td>{{ team.losses }}</td>
-      <td>{{ team.points }}</td>
+      <td>{{ team.wins ?? 0 }}</td>
+      <td>{{ team.losses ?? 0 }}</td>
+      <td>{{ team.draws ?? 0 }}</td>
+      <td>{{ team.points ?? 0 }}</td>
+      <td>{{ team.roundsWon ?? 0 }}</td>
+      <td>{{ team.roundsLost ?? 0 }}</td>
+      <td>{{ team.roundDifference ?? ((team.roundsWon ?? 0) - (team.roundsLost ?? 0)) }}</td>
       <td *ngIf="showActionsColumn" class="team-actions-cell">
         <button *ngIf="canEditTeam(team)" type="button" class="btn btn-secondary btn-small" (click)="editTeam.emit(team)">Editar</button>
         <button *ngIf="canRemoveTeams" type="button" class="btn btn-danger btn-small" (click)="removeTeam.emit(team.id)">Remover</button>

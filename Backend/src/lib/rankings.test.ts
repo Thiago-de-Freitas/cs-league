@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcRating } from './rankings';
+import { aggregatePlayerRankingsByLeagueMatches, calcRating } from './rankings';
 
 describe('calcRating', () => {
   it('returns higher rating for stronger stats', () => {
@@ -12,5 +12,26 @@ describe('calcRating', () => {
   it('handles zero deaths kd edge case via caller', () => {
     const rating = calcRating(2, 85, 75, 40);
     assert.ok(rating > 0 && rating < 5);
+  });
+});
+
+describe('aggregatePlayerRankingsByLeagueMatches', () => {
+  it('ordena por ADR médio em jogos de liga e ignora múltiplas demos do mesmo jogo', () => {
+    const ranked = aggregatePlayerRankingsByLeagueMatches(
+      [
+        { steamId: '1', playerName: 'Alpha', matchId: 'm1', kills: 20, deaths: 10, adr: 80, hsPercent: 40, kast: 70 },
+        { steamId: '1', playerName: 'Alpha', matchId: 'm1', kills: 22, deaths: 12, adr: 100, hsPercent: 50, kast: 80 },
+        { steamId: '1', playerName: 'Alpha', matchId: 'm2', kills: 18, deaths: 16, adr: 60, hsPercent: 30, kast: 60 },
+        { steamId: '2', playerName: 'Bravo', matchId: 'm3', kills: 24, deaths: 14, adr: 95, hsPercent: 45, kast: 75 },
+      ],
+      10
+    );
+
+    assert.equal(ranked[0].playerName, 'Bravo');
+    assert.equal(ranked[0].adr, 95);
+    assert.equal(ranked[0].matches, 1);
+    assert.equal(ranked[1].playerName, 'Alpha');
+    assert.equal(ranked[1].matches, 2);
+    assert.equal(ranked[1].adr, 75);
   });
 });

@@ -25,7 +25,11 @@ export interface Team {
   players: Player[];
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
+  roundDifference?: number;
   seed?: number;
   groupId?: string | null;
   invites?: TeamInvite[];
@@ -87,7 +91,11 @@ export interface GroupStanding {
   team: { id: string; name: string; tag: string };
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
+  roundDifference: number;
   played: number;
   rank: number;
 }
@@ -106,6 +114,8 @@ export interface Match {
   round?: number;
   bracketPosition?: number | null;
   map?: string | null;
+  team1Rounds?: number | null;
+  team2Rounds?: number | null;
   scheduledAt?: string | null;
   playedAt?: string | null;
   league?: { id: string; name: string; ownerId: string; maxTeams?: number | null; bracketSize?: number | null };
@@ -204,7 +214,9 @@ export interface PlayerRankingEntry {
   playerName: string;
   displayName?: string | null;
   steamId?: string | null;
+  /** Quantidade de jogos de liga (demos oficiais de partida). */
   demos: number;
+  matches?: number;
   kills: number;
   deaths: number;
   kd: number;
@@ -219,6 +231,7 @@ export interface PlayerProfileStats {
   playerName: string;
   displayName?: string | null;
   demos: number;
+  matches?: number;
   kills: number;
   deaths: number;
   kd: number;

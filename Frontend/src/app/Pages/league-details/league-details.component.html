@@ -291,11 +291,8 @@
             <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
             <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
             <ng-container *ngIf="canRegisterResultForMatch(match)">
-              <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
-                Vitória {{ match.team1.tag || match.team1.name }}
-              </button>
-              <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
-                Vitória {{ match.team2.tag || match.team2.name }}
+              <button class="btn btn-primary btn-small" (click)="registerResult(match)">
+                Registrar resultado
               </button>
             </ng-container>
           </div>
@@ -368,11 +365,8 @@
                 <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
                 <button class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Detalhes</button>
                 <ng-container *ngIf="canRegisterResultForMatch(match)">
-                  <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team1.id)">
-                    Vitória {{ match.team1.tag || match.team1.name }}
-                  </button>
-                  <button class="btn btn-primary btn-small" (click)="registerResult(match, match.team2.id)">
-                    Vitória {{ match.team2.tag || match.team2.name }}
+                  <button class="btn btn-primary btn-small" (click)="registerResult(match)">
+                    Registrar resultado
                   </button>
                 </ng-container>
               </div>
@@ -422,8 +416,30 @@
     </div>
     <div class="gc-modal-body">
       <p class="result-winner-line">
-        Vencedor: <strong>{{ resultWinnerLabel }}</strong>
+        {{ resultOutcomeLabel }}
       </p>
+      <div class="form-row form-row-inline result-score-row">
+        <div class="form-group">
+          <label class="form-label" for="result-team1-rounds">{{ resultModalMatch.team1.name }}</label>
+          <input
+            id="result-team1-rounds"
+            type="number"
+            min="0"
+            class="input-field"
+            [(ngModel)]="resultModalTeam1Rounds"
+            [disabled]="resultModalLoading" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="result-team2-rounds">{{ resultModalMatch.team2.name }}</label>
+          <input
+            id="result-team2-rounds"
+            type="number"
+            min="0"
+            class="input-field"
+            [(ngModel)]="resultModalTeam2Rounds"
+            [disabled]="resultModalLoading" />
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label" for="result-map">Mapa (opcional)</label>
         <select id="result-map" class="input-field" [(ngModel)]="resultModalMap" [disabled]="resultModalLoading">
@@ -433,7 +449,7 @@
       </div>
       <div class="gc-modal-footer">
         <button type="button" class="btn btn-ghost" (click)="closeResultModal()" [disabled]="resultModalLoading">Cancelar</button>
-        <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading">
+        <button type="button" class="btn btn-primary" (click)="confirmResultModal()" [disabled]="resultModalLoading || !canConfirmResultModal">
           {{ resultModalLoading ? 'Salvando...' : 'Confirmar' }}
         </button>
       </div>

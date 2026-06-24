@@ -76,7 +76,10 @@ export interface TeamSeedInput {
   tag?: string;
   wins: number;
   losses: number;
+  draws: number;
   points: number;
+  roundsWon: number;
+  roundsLost: number;
   seed?: number;
 }
 
@@ -91,10 +94,13 @@ export interface MatchInput {
 }
 
 export function rankTeamsForSeeding(teams: TeamSeedInput[]): TeamSeedInput[] {
-  const totalGames = teams.reduce((sum, t) => sum + t.wins + t.losses, 0);
+  const totalGames = teams.reduce((sum, t) => sum + t.wins + t.losses + (t.draws ?? 0), 0);
   return [...teams].sort((a, b) => {
     if (totalGames > 0) {
       if (b.points !== a.points) return b.points - a.points;
+      const diffA = (a.roundsWon ?? 0) - (a.roundsLost ?? 0);
+      const diffB = (b.roundsWon ?? 0) - (b.roundsLost ?? 0);
+      if (diffB !== diffA) return diffB - diffA;
       if (b.wins !== a.wins) return b.wins - a.wins;
       if (a.losses !== b.losses) return a.losses - b.losses;
     }

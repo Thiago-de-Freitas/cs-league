@@ -31,7 +31,8 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   showUploadModal = false;
   pollingDemo = false;
   resultModalMatch: Match | null = null;
-  resultModalWinnerId = '';
+  resultModalTeam1Rounds: number | null = null;
+  resultModalTeam2Rounds: number | null = null;
   resultModalMap = '';
   resultModalLoading = false;
   rescheduleDateTime = '';
@@ -233,10 +234,11 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     return !!this.match?.permissions?.canRegisterResult;
   }
 
-  registerResult(winnerId: string): void {
+  registerResult(): void {
     if (!this.match) return;
     this.resultModalMatch = this.match;
-    this.resultModalWinnerId = winnerId;
+    this.resultModalTeam1Rounds = null;
+    this.resultModalTeam2Rounds = null;
     this.resultModalMap = this.match.map || '';
     this.resultModalLoading = false;
   }
@@ -244,15 +246,28 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   closeResultModal(): void {
     if (this.resultModalLoading) return;
     this.resultModalMatch = null;
-    this.resultModalWinnerId = '';
+    this.resultModalTeam1Rounds = null;
+    this.resultModalTeam2Rounds = null;
     this.resultModalMap = '';
   }
 
+  get canConfirmResultModal(): boolean {
+    if (!this.resultModalMatch) return false;
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    if (!Number.isInteger(r1) || !Number.isInteger(r2) || r1 < 0 || r2 < 0) return false;
+    if (r1 === 0 && r2 === 0) return false;
+    if (this.resultModalMatch.phase === 'playoff' && r1 === r2) return false;
+    return true;
+  }
+
   confirmResultModal(): void {
-    if (!this.resultModalMatch || !this.resultModalWinnerId) return;
+    if (!this.resultModalMatch || !this.canConfirmResultModal) return;
     this.resultModalLoading = true;
     const map = this.resultModalMap || undefined;
-    this.matchService.registerResult(this.resultModalMatch.id, this.resultModalWinnerId, map).subscribe({
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    this.matchService.registerResult(this.resultModalMatch.id, r1, r2, map).subscribe({
       next: () => {
         this.resultModalLoading = false;
         this.closeResultModal();
@@ -266,13 +281,21 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     });
   }
 
-  get resultWinnerLabel(): string {
+  get resultOutcomeLabel(): string {
     if (!this.resultModalMatch) return '';
-    const winner =
-      this.resultModalMatch.team1.id === this.resultModalWinnerId
-        ? this.resultModalMatch.team1
-        : this.resultModalMatch.team2;
-    return winner.name;
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    if (!Number.isInteger(r1) || !Number.isInteger(r2) || r1 < 0 || r2 < 0) {
+      return 'Informe o placar de rounds dos dois times.';
+    }
+    if (r1 === 0 && r2 === 0) return 'Placar inválido.';
+    if (r1 === r2) {
+      return this.resultModalMatch.phase === 'playoff'
+        ? 'Empate não é permitido no mata-mata.'
+        : `Empate (${r1} x ${r2}) — 1 ponto para cada time.`;
+    }
+    const winner = r1 > r2 ? this.resultModalMatch.team1 : this.resultModalMatch.team2;
+    return `Vitória ${winner.name} (${Math.max(r1, r2)} x ${Math.min(r1, r2)}) — 3 pontos.`;
   }
 
   get canReschedule(): boolean {

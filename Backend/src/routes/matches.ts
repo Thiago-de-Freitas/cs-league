@@ -9,6 +9,11 @@ import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
 import { syncLeagueEndDate } from '../lib/applyLeagueSchedule';
+import {
+  getStatDeltasForTeams,
+  parseMatchRounds,
+  resolveMatchOutcome,
+} from '../lib/matchResult';
 
 const router = Router();
 
@@ -76,6 +81,8 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       round: match.round,
       bracketPosition: match.bracketPosition,
       map: match.map,
+      team1Rounds: match.team1Rounds,
+      team2Rounds: match.team2Rounds,
       scheduledAt: match.scheduledAt,
       playedAt: match.playedAt,
       demos: match.demos.map((d) => ({
@@ -119,17 +126,36 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
-    const { winnerId, map, playedAt } = req.body;
-    if (!winnerId) {
-      res.status(400).json({ error: 'winnerId é obrigatório' });
-      return;
-    }
-    if (winnerId !== match.team1Id && winnerId !== match.team2Id) {
-      res.status(400).json({ error: 'Vencedor deve ser um dos times da partida' });
+    const { winnerId: winnerIdFromBody, map, playedAt, team1Rounds, team2Rounds } = req.body;
+
+    const rounds = parseMatchRounds(team1Rounds, team2Rounds);
+    if ('error' in rounds) {
+      res.status(400).json({ error: rounds.error });
       return;
     }
 
-    const loserId = winnerId === match.team1Id ? match.team2Id : match.team1Id;
+    const outcome = resolveMatchOutcome(
+      match.team1Id,
+      match.team2Id,
+      rounds.team1Rounds,
+      rounds.team2Rounds,
+      match.phase,
+      winnerIdFromBody
+    );
+    if ('error' in outcome) {
+      res.status(400).json({ error: outcome.error });
+      return;
+    }
+
+    const winnerId = outcome.winnerId;
+    const statDeltas = getStatDeltasForTeams(
+      match.team1Id,
+      match.team2Id,
+      rounds.team1Rounds,
+      rounds.team2Rounds,
+      outcome
+    );
+
     let groupPhaseJustCompleted = false;
 
     await prisma.$transaction(async (tx) => {
@@ -137,21 +163,27 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         where: { id: req.params.id },
         data: {
           winnerId,
+          team1Rounds: rounds.team1Rounds,
+          team2Rounds: rounds.team2Rounds,
           status: 'COMPLETED',
           ...(map && { map }),
           playedAt: playedAt ? new Date(playedAt) : new Date(),
         },
       });
 
-      await tx.leagueTeam.updateMany({
-        where: { leagueId: match.leagueId, teamId: winnerId },
-        data: { wins: { increment: 1 }, points: { increment: 3 } },
-      });
-
-      await tx.leagueTeam.updateMany({
-        where: { leagueId: match.leagueId, teamId: loserId },
-        data: { losses: { increment: 1 } },
-      });
+      for (const [teamId, delta] of statDeltas) {
+        await tx.leagueTeam.updateMany({
+          where: { leagueId: match.leagueId, teamId },
+          data: {
+            wins: { increment: delta.wins },
+            losses: { increment: delta.losses },
+            draws: { increment: delta.draws },
+            points: { increment: delta.points },
+            roundsWon: { increment: delta.roundsWon },
+            roundsLost: { increment: delta.roundsLost },
+          },
+        });
+      }
 
       if (match.phase === 'GROUP') {
         const groupMatches = await tx.match.findMany({

@@ -20,7 +20,7 @@ export class LeagueGroupsComponent {
   @Input() scheduleTimezone = 'America/Sao_Paulo';
   @Input() canRegisterResult?: (match: Match) => boolean;
   @Output() matchClick = new EventEmitter<string>();
-  @Output() registerResult = new EventEmitter<{ match: Match; winnerId: string }>();
+  @Output() registerResult = new EventEmitter<Match>();
   @Output() reschedule = new EventEmitter<Match>();
 
   getMatchStatusLabel(status: string): string {
@@ -64,9 +64,14 @@ export class LeagueGroupsComponent {
     this.matchClick.emit(matchId);
   }
 
-  onRegisterResult(match: Match, winnerId: string, event: Event): void {
+  onRegisterResult(match: Match, event: Event): void {
     event.stopPropagation();
-    this.registerResult.emit({ match, winnerId });
+    this.registerResult.emit(match);
+  }
+
+  formatMatchScore(match: Match): string | null {
+    if (match.team1Rounds == null || match.team2Rounds == null) return null;
+    return `${match.team1Rounds} x ${match.team2Rounds}`;
   }
 
   onReschedule(match: Match, event: Event): void {

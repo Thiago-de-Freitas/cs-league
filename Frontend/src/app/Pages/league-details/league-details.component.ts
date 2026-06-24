@@ -73,7 +73,8 @@ export class LeagueDetailsComponent implements OnInit {
   confirmConfig: ConfirmConfig | null = null;
   confirmLoading = false;
   resultModalMatch: Match | null = null;
-  resultModalWinnerId = '';
+  resultModalTeam1Rounds: number | null = null;
+  resultModalTeam2Rounds: number | null = null;
   resultModalMap = '';
   resultModalLoading = false;
   showPlayoffReadyModal = false;
@@ -579,18 +580,16 @@ export class LeagueDetailsComponent implements OnInit {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  onGroupRegisterResult(event: { match: Match; winnerId: string }): void {
-    if (!this.leagueId) return;
-    this.matchService.registerResult(event.match.id, event.winnerId).subscribe({
-      next: (res) => {
-        this.fetchLeagueDetails(this.leagueId!);
-        this.notify.success('Resultado registrado.');
-        if (res.groupPhaseJustCompleted && this.isAdmin) {
-          this.showPlayoffReadyModal = true;
-        }
-      },
-      error: (err) => this.apiError(err, 'Erro ao registrar resultado'),
-    });
+  onGroupRegisterResult(match: Match): void {
+    this.registerResult(match);
+  }
+
+  registerResult(match: Match): void {
+    this.resultModalMatch = match;
+    this.resultModalTeam1Rounds = null;
+    this.resultModalTeam2Rounds = null;
+    this.resultModalMap = match.map || '';
+    this.resultModalLoading = false;
   }
 
   closePlayoffReadyModal(): void {
@@ -673,11 +672,65 @@ export class LeagueDetailsComponent implements OnInit {
     this.selectedTeamIds = [];
   }
 
-  registerResult(match: Match, winnerId: string): void {
-    this.resultModalMatch = match;
-    this.resultModalWinnerId = winnerId;
-    this.resultModalMap = match.map || '';
-    this.resultModalLoading = false;
+  closeResultModal(): void {
+    if (this.resultModalLoading) return;
+    this.resultModalMatch = null;
+    this.resultModalTeam1Rounds = null;
+    this.resultModalTeam2Rounds = null;
+    this.resultModalMap = '';
+  }
+
+  get canConfirmResultModal(): boolean {
+    if (!this.resultModalMatch) return false;
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    if (!Number.isInteger(r1) || !Number.isInteger(r2) || r1 < 0 || r2 < 0) return false;
+    if (r1 === 0 && r2 === 0) return false;
+    if (this.resultModalMatch.phase === 'playoff' && r1 === r2) return false;
+    return true;
+  }
+
+  confirmResultModal(): void {
+    if (!this.resultModalMatch || !this.canConfirmResultModal) return;
+    this.resultModalLoading = true;
+    const map = this.resultModalMap || undefined;
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    this.matchService.registerResult(this.resultModalMatch.id, r1, r2, map).subscribe({
+      next: (res) => {
+        this.resultModalLoading = false;
+        this.closeResultModal();
+        if (this.leagueId) {
+          this.fetchLeagueDetails(this.leagueId);
+        }
+        this.notify.success('Resultado registrado com sucesso.');
+        if (res.groupPhaseJustCompleted && this.isAdmin) {
+          this.showPlayoffReadyModal = true;
+        }
+      },
+      error: (err) => {
+        this.resultModalLoading = false;
+        this.apiError(err, 'Erro ao registrar resultado');
+      },
+    });
+  }
+
+  get resultOutcomeLabel(): string {
+    if (!this.resultModalMatch) return '';
+    const r1 = Number(this.resultModalTeam1Rounds);
+    const r2 = Number(this.resultModalTeam2Rounds);
+    if (!Number.isInteger(r1) || !Number.isInteger(r2) || r1 < 0 || r2 < 0) {
+      return 'Informe o placar de rounds dos dois times.';
+    }
+    if (r1 === 0 && r2 === 0) return 'Placar inválido.';
+    if (r1 === r2) {
+      return this.resultModalMatch.phase === 'playoff'
+        ? 'Empate não é permitido no mata-mata.'
+        : `Empate (${r1} x ${r2}) — 1 ponto para cada time.`;
+    }
+    const winner =
+      r1 > r2 ? this.resultModalMatch.team1 : this.resultModalMatch.team2;
+    return `Vitória ${winner.tag || winner.name} (${Math.max(r1, r2)} x ${Math.min(r1, r2)}) — 3 pontos.`;
   }
 
   canRegisterResultForMatch(match: Match): boolean {
@@ -691,42 +744,6 @@ export class LeagueDetailsComponent implements OnInit {
     const isCaptain = (team?: Team) =>
       team?.players?.some((p) => p.id === user.id && p.role === 'CAPTAIN') ?? false;
     return isCaptain(team1) || isCaptain(team2);
-  }
-
-  closeResultModal(): void {
-    if (this.resultModalLoading) return;
-    this.resultModalMatch = null;
-    this.resultModalWinnerId = '';
-    this.resultModalMap = '';
-  }
-
-  confirmResultModal(): void {
-    if (!this.resultModalMatch || !this.resultModalWinnerId) return;
-    this.resultModalLoading = true;
-    const map = this.resultModalMap || undefined;
-    this.matchService.registerResult(this.resultModalMatch.id, this.resultModalWinnerId, map).subscribe({
-      next: () => {
-        this.resultModalLoading = false;
-        this.closeResultModal();
-        if (this.leagueId) {
-          this.fetchLeagueDetails(this.leagueId);
-        }
-        this.notify.success('Resultado registrado com sucesso.');
-      },
-      error: (err) => {
-        this.resultModalLoading = false;
-        this.apiError(err, 'Erro ao registrar resultado');
-      }
-    });
-  }
-
-  get resultWinnerLabel(): string {
-    if (!this.resultModalMatch) return '';
-    const winner =
-      this.resultModalMatch.team1.id === this.resultModalWinnerId
-        ? this.resultModalMatch.team1
-        : this.resultModalMatch.team2;
-    return winner.tag || winner.name;
   }
 
   onTeamsReordered(teams: Team[]): void {
