@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
+import { parseOwnerAsMember } from '../lib/teamCreation';
 import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
@@ -203,7 +204,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const joinAsMember = ownerAsMember !== false && ownerAsMember !== 'false' && ownerAsMember !== '0';
+    const joinAsMember = parseOwnerAsMember(ownerAsMember);
 
     const team = await prisma.team.create({
       data: {
