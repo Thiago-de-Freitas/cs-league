@@ -37,6 +37,7 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
 | `REDIS_URL` | `${{Redis.REDIS_URL}}` |
 | `DEMO_STORAGE_PATH` | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | `/data/team-logos` |
+| `USER_AVATAR_STORAGE_PATH` | `/data/user-avatars` |
 
 > **Não** coloque `JWT_SECRET`, `DATABASE_URL` ou `CORS_ORIGIN` no cs-league-front — o proxy só precisa de `API_URL`.
 
@@ -57,7 +58,7 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
        │              ┌─────────────┐
        ├─────────────▶│    Redis    │◀──── Worker (Python)
        │              └─────────────┘
-       └──── Volume /data/demos + /data/team-logos (compartilhado com Worker)
+       └──── Volume /data (demos + team-logos + user-avatars) no cs-league-back
 ```
 
 ## Variáveis de ambiente (config as code)
@@ -125,6 +126,7 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 | `JWT_SECRET` | Sim | String longa e aleatória (ex.: `openssl rand -hex 32`) |
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
+| `USER_AVATAR_STORAGE_PATH` | Sim | `/data/user-avatars` |
 | `CORS_ORIGIN` | Sim | URL pública da API (ex.: `https://cs-league-api-production.up.railway.app`) |
 | `PORT` | Não | Railway define automaticamente |
 | `NODE_ENV` | Não | `production` (já no Dockerfile) |
@@ -133,6 +135,7 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 3. **Volume persistente** (só na API — cs-league-back):
    - Command Palette (`Ctrl+K` / `⌘K`) → **Add Volume**, ou clique direito no serviço no canvas
    - Mount path: `/data`
+   - Isso persiste demos (`.dem`), logos de times e fotos de perfil entre redeploys
    - **A Railway não permite compartilhar o mesmo volume entre dois serviços.** O worker baixa o `.dem` da API via rede privada (`BACKEND_INTERNAL_URL`).
 
 4. **Networking** → **Generate Domain** para obter a URL pública
@@ -234,6 +237,7 @@ Para o deploy passar e a aplicação funcionar, configure **todas** estas variá
 | `CORS_ORIGIN` | Sim | URL pública gerada (ex.: `https://xxx.up.railway.app`) |
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
+| `USER_AVATAR_STORAGE_PATH` | Sim | `/data/user-avatars` |
 | `NODE_ENV` | Não | `production` (já no Dockerfile) |
 | `PORT` | Não | Injetado automaticamente pela Railway |
 

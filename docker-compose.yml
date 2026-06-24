@@ -36,10 +36,12 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       DEMO_STORAGE_PATH: /data/demos
+      TEAM_LOGO_STORAGE_PATH: /data/team-logos
+      USER_AVATAR_STORAGE_PATH: /data/user-avatars
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4200}
       PORT: 3000
     volumes:
-      - demo_storage:/data/demos
+      - app_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,7 +57,7 @@ services:
       REDIS_URL: redis://redis:6379
       DEMO_STORAGE_PATH: /data/demos
     volumes:
-      - demo_storage:/data/demos
+      - app_data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,4 +68,4 @@ services:
 
 volumes:
   postgres_data:
-  demo_storage:
+  app_data:

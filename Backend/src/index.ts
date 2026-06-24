@@ -24,6 +24,7 @@ import {
   ensureUploadStorageDirectories,
   getTeamLogoStoragePath,
   getUserAvatarStoragePath,
+  getUploadStorageStatus,
 } from './lib/uploadAssets';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -175,13 +176,14 @@ app.get('/api/health/ready', async (_req, res) => {
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      warnings: [...warnings, ...redisErrors, ...demoWarnings],
+      warnings: [...warnings, ...redisErrors, ...demoWarnings, ...getUploadStorageStatus().warnings],
       demos: {
         storagePath: demoStoragePath,
         filesOnDisk: demoFilesOnDisk,
         queueLength: demoQueueLength,
         worker,
       },
+      uploads: getUploadStorageStatus(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Service unavailable';
@@ -263,6 +265,16 @@ app.use(securityHeaders);
 app.use(express.json({ limit: '1mb' }));
 
 ensureUploadStorageDirectories();
+const uploadStorageStatus = getUploadStorageStatus();
+console.log(
+  `[uploads] team-logos: ${uploadStorageStatus.teamLogos.path} (${uploadStorageStatus.teamLogos.filesOnDisk} arquivo(s))`
+);
+console.log(
+  `[uploads] user-avatars: ${uploadStorageStatus.userAvatars.path} (${uploadStorageStatus.userAvatars.filesOnDisk} arquivo(s))`
+);
+for (const warning of uploadStorageStatus.warnings) {
+  console.warn(`[uploads] ${warning}`);
+}
 
 const teamLogosPath = getTeamLogoStoragePath();
 const userAvatarsPath = getUserAvatarStoragePath();

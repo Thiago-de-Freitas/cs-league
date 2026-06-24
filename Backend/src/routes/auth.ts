@@ -13,7 +13,7 @@ import { sanitizeFileExtension } from '../lib/pathSafe';
 import {
   getUserAvatarStoragePath,
   publicUploadFilePath,
-  sanitizePublicUploadUrl,
+  publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
 
 const router = Router();
@@ -84,7 +84,7 @@ function sanitizeUser(user: {
     email: user.email,
     displayName: user.displayName,
     steamId: user.steamId,
-    avatarUrl: sanitizePublicUploadUrl(user.avatarUrl),
+    avatarUrl: publicUploadUrlForResponse(user.avatarUrl),
     role: user.role,
     createdAt: user.createdAt,
   };

@@ -68,3 +68,37 @@ export function sanitizePublicUploadUrl(publicUrl: string | null | undefined): s
   if (!normalized) return null;
   return publicUploadFileExists(normalized) ? normalized : null;
 }
+
+/** URL para respostas da API — preserva o cadastro no banco mesmo se o arquivo sumiu do disco. */
+export function publicUploadUrlForResponse(publicUrl: string | null | undefined): string | null {
+  return normalizePublicUploadUrl(publicUrl);
+}
+
+function countFilesInDir(dir: string): number {
+  if (!fs.existsSync(dir)) return 0;
+  try {
+    return fs.readdirSync(dir).filter((name) => !name.startsWith('.')).length;
+  } catch {
+    return 0;
+  }
+}
+
+export function getUploadStorageStatus() {
+  const teamLogosPath = getTeamLogoStoragePath();
+  const userAvatarsPath = getUserAvatarStoragePath();
+  const teamLogosOnDisk = countFilesInDir(teamLogosPath);
+  const userAvatarsOnDisk = countFilesInDir(userAvatarsPath);
+
+  const warnings: string[] = [];
+  if (process.env.NODE_ENV === 'production' && teamLogosOnDisk === 0 && userAvatarsOnDisk === 0) {
+    warnings.push(
+      'Nenhuma imagem no disco — monte um volume persistente em /data (team-logos e user-avatars) ou reenvie logos/fotos após redeploy'
+    );
+  }
+
+  return {
+    teamLogos: { path: teamLogosPath, filesOnDisk: teamLogosOnDisk },
+    userAvatars: { path: userAvatarsPath, filesOnDisk: userAvatarsOnDisk },
+    warnings,
+  };
+}

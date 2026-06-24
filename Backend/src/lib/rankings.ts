@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { ARCHIVED_LEAGUE_TEAM_WHERE } from './teamStats';
-import { sanitizePublicUploadUrl } from './uploadAssets';
+import { publicUploadUrlForResponse } from './uploadAssets';
 import {
   CAPTAIN_RANKING_FILTER,
   getPlayerPositionLabel,
@@ -468,7 +468,7 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
         teamId: team.id,
         name: team.name,
         tag: team.tag,
-        logoUrl: sanitizePublicUploadUrl(team.logoUrl),
+        logoUrl: publicUploadUrlForResponse(team.logoUrl),
         wins: entry.wins,
         losses: entry.losses,
         leagues: entry.leagues,

@@ -36,6 +36,8 @@ services:
       DEMO_STORAGE_PATH: /data/demos
     volumes:
       - ./Backend/data/demos:/data/demos
+      - ./Backend/data/team-logos:/data/team-logos
+      - ./Backend/data/user-avatars:/data/user-avatars
     depends_on:
       postgres:
         condition: service_healthy

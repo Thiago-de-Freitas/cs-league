@@ -6,6 +6,7 @@ import { after, before, describe, it } from 'node:test';
 import {
   normalizePublicUploadUrl,
   publicUploadFileExists,
+  publicUploadUrlForResponse,
   sanitizePublicUploadUrl,
 } from './uploadAssets';
 
@@ -35,8 +36,12 @@ describe('uploadAssets', () => {
     );
   });
 
-  it('sanitiza URL inexistente para null', () => {
+  it('publicUploadUrlForResponse preserva URL mesmo sem arquivo no disco', () => {
     assert.equal(publicUploadFileExists('/uploads/team-logos/abc.png'), true);
     assert.equal(sanitizePublicUploadUrl('/uploads/team-logos/missing.png'), null);
+    assert.equal(
+      publicUploadUrlForResponse('/uploads/team-logos/missing.png'),
+      '/uploads/team-logos/missing.png'
+    );
   });
 });

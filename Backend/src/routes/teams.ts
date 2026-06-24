@@ -13,7 +13,7 @@ import { sanitizeFileExtension } from '../lib/pathSafe';
 import {
   getTeamLogoStoragePath,
   publicUploadFilePath,
-  sanitizePublicUploadUrl,
+  publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
 
 const router = Router();
@@ -114,7 +114,7 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
     id: team.id,
     name: team.name,
     tag: team.tag,
-    logoUrl: sanitizePublicUploadUrl(team.logoUrl),
+    logoUrl: publicUploadUrlForResponse(team.logoUrl),
     ownerId: team.ownerId,
     owner: team.owner,
     wins: stats.wins,
@@ -176,7 +176,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         id: team.id,
         name: team.name,
         tag: team.tag,
-        logoUrl: sanitizePublicUploadUrl(team.logoUrl),
+        logoUrl: publicUploadUrlForResponse(team.logoUrl),
         ownerId: team.ownerId,
         players: team.members.map((m) => ({
           id: m.user.id,
