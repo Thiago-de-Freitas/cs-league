@@ -7,6 +7,8 @@ export const MAX_ADVANCE_PER_GROUP = 4;
 export const MAX_ADVANCE_SINGLE_GROUP = 32;
 export const MIN_TEAMS_SINGLE_GROUP = 3;
 export const MIN_TEAMS_MULTI_GROUP = 4;
+export const MIN_MATCHES_PER_MATCH_DAY = 1;
+export const MAX_MATCHES_PER_MATCH_DAY = 16;
 
 export interface TeamForGroupDistribution {
   teamId: string;
@@ -51,6 +53,22 @@ export interface GroupMatchResult {
   status: string;
   team1Rounds?: number | null;
   team2Rounds?: number | null;
+}
+
+export function isValidMatchesPerMatchDay(value: unknown): value is number {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 && n <= MAX_MATCHES_PER_MATCH_DAY;
+}
+
+export function parseHomeAndAway(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+export function parseMatchesPerMatchDay(value: unknown, fallback = 0): number {
+  if (value == null || value === '') return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > MAX_MATCHES_PER_MATCH_DAY) return fallback;
+  return n;
 }
 
 export function isValidGroupCount(value: unknown): value is number {
@@ -99,10 +117,11 @@ export function distributeTeamsIntoGroups<T extends TeamForGroupDistribution>(
   return groups;
 }
 
-/** Número de jogos em turno único: cada time enfrenta todos os outros exatamente uma vez */
-export function countRoundRobinMatches(teamCount: number): number {
+/** Número de jogos em turno único ou ida e volta */
+export function countRoundRobinMatches(teamCount: number, homeAndAway = false): number {
   if (teamCount < 2) return 0;
-  return (teamCount * (teamCount - 1)) / 2;
+  const single = (teamCount * (teamCount - 1)) / 2;
+  return homeAndAway ? single * 2 : single;
 }
 
 /** Lista todos os pares únicos (todos contra todos, 1 vez) */
@@ -117,25 +136,46 @@ export function getAllRoundRobinPairs(teamIds: string[]): { team1Id: string; tea
   return pairs;
 }
 
-/** Verifica se os confrontos cobrem todos os pares exatamente uma vez */
-export function isCompleteRoundRobin(teamIds: string[], matches: { team1Id: string; team2Id: string }[]): boolean {
+/** Verifica se os confrontos cobrem todos os pares (1x ou ida e volta) */
+export function isCompleteRoundRobin(
+  teamIds: string[],
+  matches: { team1Id: string; team2Id: string }[],
+  homeAndAway = false
+): boolean {
   const teams = [...new Set(teamIds)];
   if (teams.length < 2) return matches.length === 0;
-  const expected = countRoundRobinMatches(teams.length);
+  const expected = countRoundRobinMatches(teams.length, homeAndAway);
   if (matches.length !== expected) return false;
 
-  const seen = new Set<string>();
+  if (!homeAndAway) {
+    const seen = new Set<string>();
+    for (const m of matches) {
+      if (!teams.includes(m.team1Id) || !teams.includes(m.team2Id) || m.team1Id === m.team2Id) return false;
+      const key = [m.team1Id, m.team2Id].sort().join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+    }
+    return seen.size === expected;
+  }
+
+  const pairCounts = new Map<string, number>();
+  const directed = new Set<string>();
   for (const m of matches) {
     if (!teams.includes(m.team1Id) || !teams.includes(m.team2Id) || m.team1Id === m.team2Id) return false;
-    const key = [m.team1Id, m.team2Id].sort().join('|');
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const undirected = [m.team1Id, m.team2Id].sort().join('|');
+    pairCounts.set(undirected, (pairCounts.get(undirected) ?? 0) + 1);
+    directed.add(`${m.team1Id}|${m.team2Id}`);
   }
-  return seen.size === expected;
+  const expectedPairs = (teams.length * (teams.length - 1)) / 2;
+  if (pairCounts.size !== expectedPairs) return false;
+  for (const count of pairCounts.values()) {
+    if (count !== 2) return false;
+  }
+  return directed.size === expected;
 }
 
-/** Gera rodadas round-robin: cada time enfrenta todos os outros exatamente uma vez */
-export function generateRoundRobinPairings(teamIds: string[]): RoundRobinMatch[] {
+/** Gera rodadas round-robin (turno único) */
+function generateSingleRoundRobinPairings(teamIds: string[]): RoundRobinMatch[] {
   const teams = [...new Set(teamIds)];
   if (teams.length < 2) return [];
 
@@ -177,6 +217,24 @@ export function generateRoundRobinPairings(teamIds: string[]): RoundRobinMatch[]
   }
 
   return matches;
+}
+
+/** Gera confrontos todos contra todos; opcional ida e volta (mando invertido no 2º turno) */
+export function generateRoundRobinPairings(teamIds: string[], homeAndAway = false): RoundRobinMatch[] {
+  const firstLeg = generateSingleRoundRobinPairings(teamIds);
+  if (!homeAndAway) return firstLeg;
+
+  const maxRound = firstLeg.reduce((max, m) => Math.max(max, m.groupRound), 0);
+  const secondLeg = firstLeg.map((m) => ({
+    team1Id: m.team2Id,
+    team2Id: m.team1Id,
+    groupRound: m.groupRound + maxRound,
+  }));
+  const combined = [...firstLeg, ...secondLeg];
+  if (!isCompleteRoundRobin(teamIds, combined, true)) {
+    throw new Error('ROUND_ROBIN_HOME_AND_AWAY_INVALID');
+  }
+  return combined;
 }
 
 export function computeGroupStandings(

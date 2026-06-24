@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LeagueGroup, Match } from '../../Models/interfaces';
+import { GroupStanding, LeagueGroup, Match } from '../../Models/interfaces';
 import { countRoundRobinMatches } from '../../Utils/group.util';
 import { formatDateInTimezone, formatScheduledAtInTimezone } from '../../Utils/schedule-date.util';
 
@@ -96,5 +96,15 @@ export class LeagueGroupsComponent {
 
   formatScheduledAt(value?: string | null): string | null {
     return formatScheduledAtInTimezone(value, this.scheduleTimezone);
+  }
+
+  roundDifference(row: GroupStanding): number {
+    return row.roundDifference ?? (row.roundsWon ?? 0) - (row.roundsLost ?? 0);
+  }
+
+  formatRoundDifference(row: GroupStanding): string {
+    const diff = this.roundDifference(row);
+    if (diff > 0) return `+${diff}`;
+    return String(diff);
   }
 }

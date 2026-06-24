@@ -23,10 +23,14 @@
   align-self: start;
 }
 
+.sidebar-avatar-wrap {
+  margin-bottom: 1rem;
+}
+
 .sidebar-avatar {
   width: 88px;
   height: 88px;
-  background: linear-gradient(135deg, var(--gc-orange), #cc4400);
+  background: linear-gradient(135deg, var(--gc-orange), var(--gc-orange-hover));
   color: var(--gc-text-on-primary);
   font-family: var(--font-display);
   font-weight: 800;
@@ -35,7 +39,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
+}
+
+.sidebar-avatar-img {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: 2px solid var(--gc-border);
 }
 
 .sidebar-name {
@@ -356,6 +367,71 @@
 /* Demos tab */
 .demos-section, .settings-section { padding: 1.5rem; }
 
+.profile-avatar-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--gc-border);
+  flex-wrap: wrap;
+}
+
+.profile-avatar-preview {
+  flex-shrink: 0;
+}
+
+.profile-avatar-img {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: 2px solid var(--gc-border);
+}
+
+.profile-avatar-fallback {
+  width: 96px;
+  height: 96px;
+  background: linear-gradient(135deg, var(--gc-orange), var(--gc-orange-hover));
+  color: var(--gc-text-on-primary);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.5rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.avatar-upload-btn {
+  cursor: pointer;
+  margin: 0;
+}
+
+.avatar-upload-btn.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .demo-stuck-banner {
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
@@ -422,7 +498,8 @@
     gap: 1rem;
   }
 
-  .sidebar-avatar { width: 64px; height: 64px; font-size: 1.75rem; margin-bottom: 0; }
+  .sidebar-avatar, .sidebar-avatar-img { width: 64px; height: 64px; font-size: 1.75rem; }
+  .sidebar-avatar-wrap { margin-bottom: 0; }
   .sidebar-name { width: calc(100% - 80px); font-size: 1.1rem; }
   .sidebar-email, .sidebar-role { width: 100%; }
   .sidebar-steam, .sidebar-summary, .sidebar-hint { width: 100%; }

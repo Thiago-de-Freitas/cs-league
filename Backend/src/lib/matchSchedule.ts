@@ -8,6 +8,8 @@ export interface LeagueScheduleConfig {
   defaultMatchDays: number[];
   defaultMatchTime: string;
   scheduleTimezone: string;
+  /** 0 = uma rodada por semana (legado); >0 = máximo de jogos por dia de calendário */
+  matchesPerMatchDay?: number;
 }
 
 export interface WeekOverride {
@@ -188,6 +190,132 @@ function isSchedulableMatch(m: MatchForScheduling): boolean {
   return m.status === 'SCHEDULED' && !m.winnerId;
 }
 
+export function calendarDayKey(date: Date, timeZone: string): string {
+  const p = getDatePartsInTimezone(date, timeZone);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+function startOfNextCalendarDay(
+  after: Date,
+  timeZone: string,
+  hour: number,
+  minute: number
+): Date {
+  const p = getDatePartsInTimezone(after, timeZone);
+  const next = addDaysInTimezone(p.year, p.month, p.day, 1, timeZone);
+  return makeDateInTimezone(next.year, next.month, next.day, hour, minute, timeZone);
+}
+
+function sortMatchesForScheduling(matches: MatchForScheduling[]): MatchForScheduling[] {
+  return [...matches].sort((a, b) => {
+    const roundA = a.groupRound ?? 0;
+    const roundB = b.groupRound ?? 0;
+    if (roundA !== roundB) return roundA - roundB;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function buildScheduledDatesWithDailyCap(
+  matches: MatchForScheduling[],
+  config: LeagueScheduleConfig,
+  overrides: Map<string, number[]>,
+  time: { hour: number; minute: number },
+  tz: string,
+  cap: number
+): ScheduledMatchUpdate[] {
+  const flatMatches = sortMatchesForScheduling(matches);
+  const updates: ScheduledMatchUpdate[] = [];
+
+  let cursor = config.startDate!;
+  let weekStart = startOfWeekMonday(config.startDate!, tz);
+  let matchesOnCurrentDay = 0;
+  let currentDayKey: string | null = null;
+
+  for (const match of flatMatches) {
+    if (currentDayKey && matchesOnCurrentDay >= cap) {
+      cursor = startOfNextCalendarDay(cursor, tz, time.hour, time.minute);
+      weekStart = startOfWeekMonday(cursor, tz);
+      matchesOnCurrentDay = 0;
+      currentDayKey = null;
+    }
+
+    let scheduledAt: Date;
+    if (currentDayKey && matchesOnCurrentDay > 0) {
+      scheduledAt = new Date(cursor.getTime());
+    } else {
+      const slot = findNextSlot(
+        cursor,
+        weekStart,
+        config.defaultMatchDays,
+        overrides,
+        tz,
+        time.hour,
+        time.minute
+      );
+      scheduledAt = slot.scheduledAt;
+      weekStart = slot.nextWeekStart;
+    }
+
+    updates.push({ id: match.id, scheduledAt });
+
+    const dayKey = calendarDayKey(scheduledAt, tz);
+    if (dayKey === currentDayKey) {
+      matchesOnCurrentDay += 1;
+    } else {
+      currentDayKey = dayKey;
+      matchesOnCurrentDay = 1;
+    }
+
+    cursor = new Date(scheduledAt.getTime() + 60_000);
+  }
+
+  return updates;
+}
+
+function buildScheduledDatesLegacy(
+  matches: MatchForScheduling[],
+  config: LeagueScheduleConfig,
+  overrides: Map<string, number[]>,
+  time: { hour: number; minute: number },
+  tz: string
+): ScheduledMatchUpdate[] {
+  const schedulable = matches.filter(isSchedulableMatch);
+  const rounds = sortedUniqueRounds(schedulable);
+  const updates: ScheduledMatchUpdate[] = [];
+
+  let cursor = config.startDate!;
+  let weekStart = startOfWeekMonday(config.startDate!, tz);
+
+  for (const round of rounds) {
+    const roundMatches = schedulable
+      .filter((m) => m.groupRound === round)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    for (const match of roundMatches) {
+      const slot = findNextSlot(
+        cursor,
+        weekStart,
+        config.defaultMatchDays,
+        overrides,
+        tz,
+        time.hour,
+        time.minute
+      );
+      updates.push({ id: match.id, scheduledAt: slot.scheduledAt });
+      cursor = new Date(slot.scheduledAt.getTime() + 60_000);
+      weekStart = slot.nextWeekStart;
+    }
+
+    const wp = getDatePartsInTimezone(weekStart, tz);
+    const nextMonday = addDaysInTimezone(wp.year, wp.month, wp.day, 7, tz);
+    weekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 12, 0, tz);
+    const wsParts = getDatePartsInTimezone(weekStart, tz);
+    cursor = makeDateInTimezone(wsParts.year, wsParts.month, wsParts.day, time.hour, time.minute, tz);
+  }
+
+  return updates;
+}
+
 /** Próximo slot >= cursor em dias permitidos a partir de weekStart */
 function findNextSlot(
   cursor: Date,
@@ -294,40 +422,13 @@ export function buildScheduledDates(
   const overrideMap = buildOverridesMap(overrides, tz);
 
   const schedulable = matches.filter(isSchedulableMatch);
-  const rounds = sortedUniqueRounds(schedulable);
-  const updates: ScheduledMatchUpdate[] = [];
+  const cap = config.matchesPerMatchDay ?? 0;
 
-  let cursor = config.startDate;
-  let weekStart = startOfWeekMonday(config.startDate, tz);
-
-  for (const round of rounds) {
-    const roundMatches = schedulable
-      .filter((m) => m.groupRound === round)
-      .sort((a, b) => a.id.localeCompare(b.id));
-
-    for (const match of roundMatches) {
-      const slot = findNextSlot(
-        cursor,
-        weekStart,
-        config.defaultMatchDays,
-        overrideMap,
-        tz,
-        time.hour,
-        time.minute
-      );
-      updates.push({ id: match.id, scheduledAt: slot.scheduledAt });
-      cursor = new Date(slot.scheduledAt.getTime() + 60_000);
-      weekStart = slot.nextWeekStart;
-    }
-
-    const wp = getDatePartsInTimezone(weekStart, tz);
-    const nextMonday = addDaysInTimezone(wp.year, wp.month, wp.day, 7, tz);
-    weekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 12, 0, tz);
-    const wsParts = getDatePartsInTimezone(weekStart, tz);
-    cursor = makeDateInTimezone(wsParts.year, wsParts.month, wsParts.day, time.hour, time.minute, tz);
+  if (cap > 0) {
+    return buildScheduledDatesWithDailyCap(schedulable, config, overrideMap, time, tz, cap);
   }
 
-  return updates;
+  return buildScheduledDatesLegacy(schedulable, config, overrideMap, time, tz);
 }
 
 export function recalculateLeagueEndDate(

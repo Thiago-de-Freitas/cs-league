@@ -60,6 +60,7 @@ model User {
   passwordHash String
   displayName  String
   steamId      String?
+  avatarUrl    String?
   role         UserRole @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -124,6 +125,8 @@ model League {
   bracketSize       Int?
   groupCount        Int          @default(2)
   advancePerGroup   Int          @default(2)
+  homeAndAway       Boolean      @default(false)
+  matchesPerMatchDay Int         @default(0)
   registrationOpen  Boolean      @default(false)
   ownerId           String
   startDate         DateTime?

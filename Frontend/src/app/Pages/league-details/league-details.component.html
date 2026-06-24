@@ -92,7 +92,7 @@
           <span class="admin-stat-value" *ngIf="isSingleGroupFormat">Todos contra todos</span>
           <span class="admin-stat-note">
             <span *ngIf="isSingleGroupFormat">
-              {{ expectedRoundRobinMatches }} jogos · todos contra todos · top {{ league.advancePerGroup }} avançam
+              {{ expectedRoundRobinMatches }} jogos · todos contra todos ({{ roundRobinLabel }}) · {{ league.matchesPerMatchDay || 2 }} jogo(s)/dia · top {{ league.advancePerGroup }} avançam
             </span>
             <span *ngIf="isMultiGroupFormat">
               {{ multiGroupPreviewLabel }} · top {{ league.advancePerGroup }} de cada grupo avançam

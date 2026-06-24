@@ -62,4 +62,6 @@
   --gray-300: var(--gc-border-light);
   --gray-600: var(--gc-text-secondary);
   --gray-800: var(--gc-text);
+
+  color-scheme: dark;
 }

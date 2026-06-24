@@ -24,9 +24,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
   userName = '';
   email = '';
   steamId = '';
+  avatarUrl: string | null = null;
   role = '';
   successMsg = '';
   errorMsg = '';
+  uploadingAvatar = false;
   activeTab: ProfileTab = 'stats';
   statsOverview: PersonalStatsOverview | null = null;
   statsLoading = true;
@@ -67,6 +69,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.userName = user.displayName;
         this.email = user.email;
         this.steamId = user.steamId || '';
+        this.avatarUrl = user.avatarUrl || null;
         this.role = user.role;
         this.profileForm.patchValue({
           displayName: user.displayName,
@@ -240,11 +243,62 @@ export class ProfileComponent implements OnInit, OnDestroy {
       next: (user) => {
         this.userName = user.displayName;
         this.steamId = user.steamId || '';
+        this.avatarUrl = user.avatarUrl || null;
         this.successMsg = 'Perfil atualizado com sucesso!';
         this.errorMsg = '';
       },
       error: (err) => {
         this.errorMsg = err.error?.error || 'Erro ao atualizar perfil.';
+      }
+    });
+  }
+
+  onAvatarSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.notify.warning('A imagem deve ter no máximo 2 MB.', 'Arquivo grande');
+      input.value = '';
+      return;
+    }
+
+    this.uploadingAvatar = true;
+    this.authService.uploadAvatar(file).subscribe({
+      next: (user) => {
+        this.avatarUrl = user.avatarUrl || null;
+        this.uploadingAvatar = false;
+        input.value = '';
+        this.successMsg = 'Foto de perfil atualizada!';
+        this.errorMsg = '';
+        this.notify.success('Foto de perfil atualizada.', 'Perfil');
+      },
+      error: (err) => {
+        this.uploadingAvatar = false;
+        input.value = '';
+        this.errorMsg = err.error?.error || 'Erro ao enviar foto de perfil.';
+        this.notify.error(this.errorMsg);
+      }
+    });
+  }
+
+  removeAvatar(): void {
+    if (!this.avatarUrl) return;
+
+    this.uploadingAvatar = true;
+    this.authService.removeAvatar().subscribe({
+      next: (user) => {
+        this.avatarUrl = user.avatarUrl || null;
+        this.uploadingAvatar = false;
+        this.successMsg = 'Foto de perfil removida.';
+        this.errorMsg = '';
+        this.notify.success('Foto de perfil removida.', 'Perfil');
+      },
+      error: (err) => {
+        this.uploadingAvatar = false;
+        this.errorMsg = err.error?.error || 'Erro ao remover foto de perfil.';
+        this.notify.error(this.errorMsg);
       }
     });
   }

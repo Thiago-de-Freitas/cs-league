@@ -1,10 +1,15 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { promisify } from 'node:util';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
+import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
 const hashPassword = promisify(bcrypt.hash);
@@ -15,11 +20,63 @@ const MAX_EMAIL_LENGTH = 255;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 128;
 
+const avatarStoragePath = process.env.USER_AVATAR_STORAGE_PATH
+  || path.join(__dirname, '../../data/user-avatars');
+
+if (!fs.existsSync(avatarStoragePath)) {
+  fs.mkdirSync(avatarStoragePath, { recursive: true });
+}
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, avatarStoragePath),
+    filename: (_req, file, cb) => {
+      const ext = sanitizeFileExtension(file.originalname, ['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+      if (!ext) {
+        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'), '');
+        return;
+      }
+      cb(null, `${uuidv4()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'));
+    }
+  },
+});
+
+function publicAvatarUrl(fileName: string): string {
+  return `/uploads/user-avatars/${fileName}`;
+}
+
+function avatarFilePathFromUrl(avatarUrl: string | null): string | null {
+  if (!avatarUrl?.startsWith('/uploads/user-avatars/')) return null;
+  const fileName = path.basename(avatarUrl);
+  if (fileName.includes('..') || fileName.includes('\0')) return null;
+  const resolved = path.join(avatarStoragePath, fileName);
+  if (!isPathInsideBase(resolved, avatarStoragePath)) return null;
+  return resolved;
+}
+
+function deleteAvatarFile(avatarUrl: string | null): void {
+  const filePath = avatarFilePathFromUrl(avatarUrl);
+  if (filePath && fs.existsSync(filePath)) {
+    fs.unlink(filePath, () => {});
+  }
+}
+
 function sanitizeUser(user: {
   id: string;
   email: string;
   displayName: string;
   steamId: string | null;
+  avatarUrl: string | null;
   role: string;
   createdAt: Date;
 }) {
@@ -28,6 +85,7 @@ function sanitizeUser(user: {
     email: user.email,
     displayName: user.displayName,
     steamId: user.steamId,
+    avatarUrl: user.avatarUrl,
     role: user.role,
     createdAt: user.createdAt,
   };
@@ -161,6 +219,57 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao atualizar perfil' });
+  }
+});
+
+router.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Arquivo de imagem é obrigatório' });
+      return;
+    }
+
+    const current = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!current) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    const avatarUrl = publicAvatarUrl(req.file.filename);
+    deleteAvatarFile(current.avatarUrl);
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { avatarUrl },
+    });
+
+    res.json(sanitizeUser(user));
+  } catch (err) {
+    console.error(err);
+    if (req.file) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ error: 'Erro ao enviar foto de perfil' });
+  }
+});
+
+router.delete('/me/avatar', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const current = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!current) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    deleteAvatarFile(current.avatarUrl);
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { avatarUrl: null },
+    });
+
+    res.json(sanitizeUser(user));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover foto de perfil' });
   }
 });
 

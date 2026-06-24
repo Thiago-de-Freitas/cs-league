@@ -64,6 +64,31 @@ describe('generateRoundRobinPairings', () => {
       assert.equal(isCompleteRoundRobin(teams, pairings), true);
     }
   });
+
+  it('ida e volta dobra os jogos e inverte o mando', () => {
+    const teams = ['a', 'b', 'c', 'd'];
+    const pairings = generateRoundRobinPairings(teams, true);
+    assert.equal(pairings.length, countRoundRobinMatches(teams.length, true));
+    assert.equal(isCompleteRoundRobin(teams, pairings, true), true);
+
+    const firstLeg = pairings.filter((m) => m.groupRound <= 3);
+    const secondLeg = pairings.filter((m) => m.groupRound > 3);
+    assert.equal(firstLeg.length, 6);
+    assert.equal(secondLeg.length, 6);
+    for (const leg of firstLeg) {
+      const returnLeg = secondLeg.find(
+        (m) => m.team1Id === leg.team2Id && m.team2Id === leg.team1Id
+      );
+      assert.ok(returnLeg, `falta volta ${leg.team1Id} x ${leg.team2Id}`);
+    }
+  });
+
+  it('7 times ida e volta gera 42 jogos', () => {
+    const teams = Array.from({ length: 7 }, (_, i) => `t${i}`);
+    const pairings = generateRoundRobinPairings(teams, true);
+    assert.equal(pairings.length, 42);
+    assert.equal(isCompleteRoundRobin(teams, pairings, true), true);
+  });
 });
 
 describe('computeGroupStandings', () => {

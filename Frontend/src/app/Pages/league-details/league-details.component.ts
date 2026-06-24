@@ -289,10 +289,14 @@ export class LeagueDetailsComponent implements OnInit {
     return this.isSingleGroupFormat ? 'Grupo único' : 'Vários grupos';
   }
 
-  /** Jogos no turno único: cada time enfrenta todos os outros 1 vez */
+  /** Jogos no turno único ou ida e volta */
   get expectedRoundRobinMatches(): number {
     const n = this.league?.teams.length ?? 0;
-    return countRoundRobinMatches(n);
+    return countRoundRobinMatches(n, this.league?.homeAndAway ?? false);
+  }
+
+  get roundRobinLabel(): string {
+    return this.league?.homeAndAway ? 'ida e volta' : 'turno único';
   }
 
   get groupPreviewPlans() {
@@ -306,7 +310,7 @@ export class LeagueDetailsComponent implements OnInit {
       points: t.points,
       seed: t.seed,
     }));
-    return buildGroupPreviewPlans(teams, this.league.groupCount ?? 2);
+    return buildGroupPreviewPlans(teams, this.league.groupCount ?? 2, this.league.homeAndAway ?? false);
   }
 
   get showGroupPreview(): boolean {

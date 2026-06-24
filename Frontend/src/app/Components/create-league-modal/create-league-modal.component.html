@@ -42,11 +42,13 @@
           Mata-mata desde o início. Sem fase de grupos.
         </p>
         <p class="form-hint" *ngIf="isSingleGroup">
-          Todos os times se enfrentam <strong>pelo menos uma vez</strong> (todos contra todos).
-          Os melhores colocados avançam para a fase de liga (mata-mata).
+          Todos os times se enfrentam
+          <strong>{{ form.get('homeAndAway')?.value ? 'duas vezes (ida e volta)' : 'uma vez' }}</strong>
+          (todos contra todos). Os melhores colocados avançam para a fase de liga (mata-mata).
         </p>
         <p class="form-hint" *ngIf="isMultiGroup">
-          Dentro de cada grupo, todos se enfrentam <strong>pelo menos uma vez</strong>.
+          Dentro de cada grupo, todos se enfrentam
+          <strong>{{ form.get('homeAndAway')?.value ? 'duas vezes (ida e volta)' : 'uma vez' }}</strong>.
           Os melhores de cada grupo avançam para a fase de liga (mata-mata).
         </p>
       </div>
@@ -71,6 +73,30 @@
         <p class="form-hint">
           <span *ngIf="isSingleGroup">Quantos times avançam do grupo único para o mata-mata.</span>
           <span *ngIf="isMultiGroup">Quantos times de cada grupo avançam para o mata-mata.</span>
+        </p>
+      </div>
+
+      <div class="form-group" *ngIf="isGroupStage">
+        <label class="form-label checkbox-label">
+          <input type="checkbox" formControlName="homeAndAway">
+          Ida e volta (cada confronto duas vezes)
+        </label>
+        <p class="form-hint">
+          Com ida e volta, o número de jogos dobra: cada par se enfrenta em casa e fora (mando invertido no 2º jogo).
+        </p>
+      </div>
+
+      <div class="form-group" *ngIf="isGroupStage">
+        <label for="matches-per-day" class="form-label">Jogos por dia</label>
+        <input
+          id="matches-per-day"
+          type="number"
+          formControlName="matchesPerMatchDay"
+          class="input-field"
+          min="1"
+          max="16">
+        <p class="form-hint">
+          Máximo de partidas agendadas no mesmo dia de calendário (ex.: 2 jogos por sexta).
         </p>
       </div>
 

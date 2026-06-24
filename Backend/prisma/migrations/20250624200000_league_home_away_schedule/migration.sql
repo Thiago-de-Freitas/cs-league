@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "League" ADD COLUMN "homeAndAway" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "League" ADD COLUMN "matchesPerMatchDay" INTEGER NOT NULL DEFAULT 0;

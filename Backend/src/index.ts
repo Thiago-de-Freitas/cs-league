@@ -230,6 +230,9 @@ app.use(express.json({ limit: '1mb' }));
 const teamLogosPath = process.env.TEAM_LOGO_STORAGE_PATH
   || path.join(__dirname, '../data/team-logos');
 
+const userAvatarsPath = process.env.USER_AVATAR_STORAGE_PATH
+  || path.join(__dirname, '../data/user-avatars');
+
 app.use('/uploads/team-logos', (req, res, next) => {
   if (!isSafeStaticRequestPath(req.path)) {
     res.status(400).end();
@@ -237,6 +240,14 @@ app.use('/uploads/team-logos', (req, res, next) => {
   }
   next();
 }, express.static(teamLogosPath, { dotfiles: 'deny', index: false }));
+
+app.use('/uploads/user-avatars', (req, res, next) => {
+  if (!isSafeStaticRequestPath(req.path)) {
+    res.status(400).end();
+    return;
+  }
+  next();
+}, express.static(userAvatarsPath, { dotfiles: 'deny', index: false }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

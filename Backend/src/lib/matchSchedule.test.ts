@@ -117,4 +117,41 @@ describe('matchSchedule', () => {
     const monday = makeStartDate(2026, 6, 15);
     assert.equal(weekStartKey(monday, TZ), '2026-06-15');
   });
+
+  it('limits matches per calendar day when matchesPerMatchDay is set', () => {
+    const startDate = makeStartDate(2026, 6, 15);
+    const matches = [
+      { id: 'm1', groupRound: 1, status: 'SCHEDULED' },
+      { id: 'm2', groupRound: 1, status: 'SCHEDULED' },
+      { id: 'm3', groupRound: 1, status: 'SCHEDULED' },
+      { id: 'm4', groupRound: 2, status: 'SCHEDULED' },
+    ];
+
+    const updates = buildScheduledDates(
+      matches,
+      {
+        startDate,
+        defaultMatchDays: [5],
+        defaultMatchTime: '15:00',
+        scheduleTimezone: TZ,
+        matchesPerMatchDay: 2,
+      },
+      []
+    );
+
+    assert.equal(updates.length, 4);
+    const byId = Object.fromEntries(updates.map((u) => [u.id, u.scheduledAt]));
+    const p1 = getDatePartsInTimezone(byId.m1, TZ);
+    const p2 = getDatePartsInTimezone(byId.m2, TZ);
+    const p3 = getDatePartsInTimezone(byId.m3, TZ);
+    const p4 = getDatePartsInTimezone(byId.m4, TZ);
+
+    assert.equal(p1.weekday, 5);
+    assert.equal(p2.weekday, 5);
+    assert.equal(p1.day, p2.day);
+    assert.equal(p3.weekday, 5);
+    assert.notEqual(p3.day, p1.day);
+    assert.equal(p4.weekday, 5);
+    assert.equal(p4.day, p3.day);
+  });
 });

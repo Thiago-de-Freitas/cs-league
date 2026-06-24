@@ -23,6 +23,9 @@ import {
   generateRoundRobinPairings,
   isValidAdvancePerGroup,
   isValidGroupCount,
+  isValidMatchesPerMatchDay,
+  parseHomeAndAway,
+  parseMatchesPerMatchDay,
   validateGroupStageConfig,
 } from '../lib/groupStage';
 import {
@@ -212,7 +215,7 @@ function formatLeague(
         };
       }),
       matches: gMatches.map(formatMatch),
-      expectedMatches: countRoundRobinMatches(teamIds.length),
+      expectedMatches: countRoundRobinMatches(teamIds.length, league.homeAndAway),
       matchesComplete: gMatches.length > 0 && areAllGroupMatchesComplete(gMatches),
     };
   });
@@ -227,6 +230,8 @@ function formatLeague(
     bracketSize: league.bracketSize,
     groupCount: league.groupCount,
     advancePerGroup: league.advancePerGroup,
+    homeAndAway: league.homeAndAway,
+    matchesPerMatchDay: league.matchesPerMatchDay,
     effectiveBracketSize: resolveBracketSize(league.teams.length, league.bracketSize),
     registrationOpen: league.registrationOpen,
     groupPhaseGenerated: groupMatches.length > 0,
@@ -395,7 +400,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, format, groupCount, advancePerGroup } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay } = req.body;
     if (!name) {
       res.status(400).json({ error: 'Nome é obrigatório' });
       return;
@@ -417,6 +422,19 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const registrationCap = parseRegistrationCap(maxTeams);
 
+    const groupStageOptions =
+      leagueFormat === 'GROUP_STAGE'
+        ? {
+            homeAndAway: parseHomeAndAway(homeAndAway),
+            matchesPerMatchDay: isValidMatchesPerMatchDay(matchesPerMatchDay)
+              ? Number(matchesPerMatchDay)
+              : 2,
+          }
+        : {
+            homeAndAway: false,
+            matchesPerMatchDay: 0,
+          };
+
     const league = await prisma.league.create({
       data: {
         name,
@@ -426,6 +444,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         format: leagueFormat,
         groupCount: groups,
         advancePerGroup: advance,
+        homeAndAway: groupStageOptions.homeAndAway,
+        matchesPerMatchDay: groupStageOptions.matchesPerMatchDay,
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -451,7 +471,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, groupCount, advancePerGroup } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay } = req.body;
 
     const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
 
@@ -497,6 +517,10 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         res.status(400).json({ error: 'Número de classificados inválido.' });
         return;
       }
+      if (matchesPerMatchDay !== undefined && !isValidMatchesPerMatchDay(matchesPerMatchDay)) {
+        res.status(400).json({ error: 'Jogos por dia inválido. Use entre 0 e 16.' });
+        return;
+      }
     }
 
     await prisma.league.update({
@@ -511,6 +535,10 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         ...(registrationOpen !== undefined && { registrationOpen: registrationOpen === true }),
         ...(existingMatches === 0 && groupCount !== undefined && { groupCount: Number(groupCount) }),
         ...(existingMatches === 0 && advancePerGroup !== undefined && { advancePerGroup: Number(advancePerGroup) }),
+        ...(existingMatches === 0 && homeAndAway !== undefined && { homeAndAway: parseHomeAndAway(homeAndAway) }),
+        ...(existingMatches === 0 && matchesPerMatchDay !== undefined && isValidMatchesPerMatchDay(matchesPerMatchDay) && {
+          matchesPerMatchDay: Number(matchesPerMatchDay),
+        }),
       },
     });
 
@@ -1166,8 +1194,8 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
 
     let totalMatches = 0;
     const groupMatchPlans = distributions.map((dist) => {
-      const pairings = generateRoundRobinPairings(dist.teamIds);
-      const expectedMatches = countRoundRobinMatches(dist.teamIds.length);
+      const pairings = generateRoundRobinPairings(dist.teamIds, check.league.homeAndAway);
+      const expectedMatches = countRoundRobinMatches(dist.teamIds.length, check.league.homeAndAway);
       if (pairings.length !== expectedMatches) {
         throw new Error(`ROUND_ROBIN_COUNT_MISMATCH:${dist.name}:${pairings.length}:${expectedMatches}`);
       }

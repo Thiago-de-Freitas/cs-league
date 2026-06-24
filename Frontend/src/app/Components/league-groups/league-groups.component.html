@@ -1,4 +1,4 @@
-<div class="groups-grid" *ngIf="groups.length > 0; else noGroups">
+<div class="groups-grid" [class.groups-grid--single]="singleGroup" *ngIf="groups.length > 0; else noGroups">
   <div class="group-card gc-card" *ngFor="let group of groups">
     <h3 class="group-title">{{ singleGroup ? 'Classificação' : ('Grupo ' + group.name) }}</h3>
 
@@ -17,34 +17,38 @@
       </div>
     </div>
 
-    <table class="group-standings">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Time</th>
-          <th>V</th>
-          <th>D</th>
-          <th>E</th>
-          <th>Pts</th>
-          <th>RF</th>
-          <th>RS</th>
-          <th>Saldo</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let row of group.standings" [class.qualified]="row.rank <= advancePerGroup">
-          <td>{{ row.rank }}</td>
-          <td>{{ row.team.tag || row.team.name }}</td>
-          <td>{{ row.wins }}</td>
-          <td>{{ row.losses }}</td>
-          <td>{{ row.draws }}</td>
-          <td>{{ row.points }}</td>
-          <td>{{ row.roundsWon }}</td>
-          <td>{{ row.roundsLost }}</td>
-          <td>{{ row.roundDifference }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="group-standings-wrap table-container">
+      <table class="group-standings">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Time</th>
+            <th class="stat-col" title="Vitórias">V</th>
+            <th class="stat-col" title="Derrotas">D</th>
+            <th class="stat-col" title="Empates">E</th>
+            <th class="stat-col" title="Pontos">Pts</th>
+            <th class="stat-col" title="Rounds feitos">RF</th>
+            <th class="stat-col" title="Rounds sofridos">RS</th>
+            <th class="stat-col" title="Diferença (RF − RS)">Dif.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of group.standings" [class.qualified]="row.rank <= advancePerGroup">
+            <td>{{ row.rank }}</td>
+            <td>{{ row.team.tag || row.team.name }}</td>
+            <td class="stat-col">{{ row.wins }}</td>
+            <td class="stat-col">{{ row.losses }}</td>
+            <td class="stat-col">{{ row.draws }}</td>
+            <td class="stat-col">{{ row.points }}</td>
+            <td class="stat-col">{{ row.roundsWon ?? 0 }}</td>
+            <td class="stat-col">{{ row.roundsLost ?? 0 }}</td>
+            <td class="stat-col" [class.stat-positive]="roundDifference(row) > 0" [class.stat-negative]="roundDifference(row) < 0">
+              {{ formatRoundDifference(row) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div class="group-matches" *ngIf="group.matches.length > 0">
       <h4 class="group-matches-title">Partidas</h4>

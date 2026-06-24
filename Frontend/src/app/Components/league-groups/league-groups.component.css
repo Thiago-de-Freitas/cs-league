@@ -4,6 +4,10 @@
   gap: 1rem;
 }
 
+.groups-grid--single {
+  grid-template-columns: 1fr;
+}
+
 .group-card {
   padding: 1rem;
 }
@@ -27,10 +31,19 @@
   font-size: 0.8rem;
 }
 
+.group-standings-wrap {
+  margin-bottom: 1rem;
+}
+
+.group-standings-wrap.table-container {
+  border: none;
+  border-radius: 0;
+}
+
 .group-standings {
   width: 100%;
+  min-width: 32rem;
   border-collapse: collapse;
-  margin-bottom: 1rem;
   font-family: var(--font-body);
   font-size: 0.875rem;
 }
@@ -42,9 +55,23 @@
   text-align: left;
 }
 
+.group-standings th.stat-col,
+.group-standings td.stat-col {
+  text-align: center;
+  white-space: nowrap;
+}
+
 .group-standings th {
   color: var(--gc-text-label);
   font-weight: 600;
+}
+
+.group-standings td.stat-positive {
+  color: var(--gc-green);
+}
+
+.group-standings td.stat-negative {
+  color: var(--gc-red);
 }
 
 .group-standings tr.qualified td:first-child {

@@ -1,7 +1,10 @@
 <div class="page-container profile-page">
   <div class="profile-dashboard">
     <aside class="profile-sidebar gc-card">
-      <div class="sidebar-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+      <div class="sidebar-avatar-wrap">
+        <img *ngIf="avatarUrl" [src]="avatarUrl" [alt]="userName" class="sidebar-avatar-img">
+        <div *ngIf="!avatarUrl" class="sidebar-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+      </div>
       <h1 class="sidebar-name">{{ userName }}</h1>
       <p class="sidebar-email">{{ email }}</p>
       <span class="badge badge-orange sidebar-role">{{ role }}</span>
@@ -224,6 +227,33 @@
       <section *ngIf="activeTab === 'settings'" class="settings-section gc-card">
         <h2 class="section-title">Editar Perfil</h2>
         <div *ngIf="successMsg" class="success-message">{{ successMsg }}</div>
+
+        <div class="profile-avatar-section">
+          <div class="profile-avatar-preview">
+            <img *ngIf="avatarUrl" [src]="avatarUrl" [alt]="userName" class="profile-avatar-img">
+            <div *ngIf="!avatarUrl" class="profile-avatar-fallback">{{ userName.charAt(0).toUpperCase() }}</div>
+          </div>
+          <div class="profile-avatar-actions">
+            <label class="btn btn-secondary btn-small avatar-upload-btn" [class.is-disabled]="uploadingAvatar">
+              {{ uploadingAvatar ? 'Enviando...' : (avatarUrl ? 'Alterar foto' : 'Enviar foto') }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                class="sr-only"
+                (change)="onAvatarSelected($event)"
+                [disabled]="uploadingAvatar">
+            </label>
+            <button
+              *ngIf="avatarUrl"
+              type="button"
+              class="btn btn-ghost btn-small"
+              (click)="removeAvatar()"
+              [disabled]="uploadingAvatar">
+              Remover foto
+            </button>
+            <p class="form-hint">PNG, JPG, WEBP ou GIF. Máximo 2 MB.</p>
+          </div>
+        </div>
 
         <form [formGroup]="profileForm" (ngSubmit)="onUpdateProfile()" class="form-group-spacing">
           <div class="form-group">

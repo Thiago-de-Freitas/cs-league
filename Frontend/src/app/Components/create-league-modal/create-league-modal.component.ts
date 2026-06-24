@@ -32,6 +32,8 @@ export class CreateLeagueModalComponent {
       format: ['single_elimination'],
       groupCount: [2],
       advancePerGroup: [2],
+      homeAndAway: [false],
+      matchesPerMatchDay: [2],
       maxTeams: [''],
       registrationOpen: [false],
     });
@@ -74,7 +76,7 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup } = this.form.value;
+    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay } = this.form.value;
     const capRaw = String(maxTeams ?? '').trim();
     let registrationCap: number | null = null;
     if (capRaw) {
@@ -100,6 +102,19 @@ export class CreateLeagueModalComponent {
       apiAdvance = Number(advancePerGroup) || 2;
     }
 
+    let apiHomeAndAway = false;
+    let apiMatchesPerDay = 0;
+    if (apiFormat === 'group_stage') {
+      apiHomeAndAway = !!homeAndAway;
+      const perDay = Number(matchesPerMatchDay);
+      if (!Number.isInteger(perDay) || perDay < 1 || perDay > 16) {
+        this.loading = false;
+        this.errorMessage = 'Jogos por dia deve ser entre 1 e 16.';
+        return;
+      }
+      apiMatchesPerDay = perDay;
+    }
+
     this.leagueService.createLeague({
       name: leagueName,
       description,
@@ -108,6 +123,8 @@ export class CreateLeagueModalComponent {
       format: apiFormat,
       groupCount: apiGroupCount,
       advancePerGroup: apiAdvance,
+      homeAndAway: apiHomeAndAway,
+      matchesPerMatchDay: apiMatchesPerDay,
     }).subscribe({
       next: (league) => {
         this.loading = false;

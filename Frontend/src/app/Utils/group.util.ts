@@ -1,8 +1,9 @@
 import { rankTeamsForSeeding, TeamSeedInput } from './bracket.util';
 
-export function countRoundRobinMatches(teamCount: number): number {
+export function countRoundRobinMatches(teamCount: number, homeAndAway = false): number {
   if (teamCount < 2) return 0;
-  return (teamCount * (teamCount - 1)) / 2;
+  const single = (teamCount * (teamCount - 1)) / 2;
+  return homeAndAway ? single * 2 : single;
 }
 
 export interface GroupPreviewPlan {
@@ -56,7 +57,8 @@ export function getAllRoundRobinPairs(teamIds: string[]): { team1Id: string; tea
 
 export function buildGroupPreviewPlans(
   teams: TeamSeedInput[],
-  groupCount: number
+  groupCount: number,
+  homeAndAway = false
 ): GroupPreviewPlan[] {
   const distributions = distributeTeamsIntoGroups(teams, groupCount);
   const teamById = new Map(teams.map((t) => [t.id, t]));
@@ -80,7 +82,7 @@ export function buildGroupPreviewPlans(
       name: dist.name,
       order: dist.order,
       teams: groupTeams,
-      matchCount: countRoundRobinMatches(dist.teamIds.length),
+      matchCount: countRoundRobinMatches(dist.teamIds.length, homeAndAway),
       pairs,
     };
   });

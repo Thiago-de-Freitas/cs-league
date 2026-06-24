@@ -77,12 +77,28 @@ export class AuthService {
 
   updateProfile(data: { displayName?: string; steamId?: string }): Observable<User> {
     return this.http.patch<User>(`${this.apiUrl}/me`, data).pipe(
-      tap((user) => {
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-        this.currentUserSubject.next(user);
-        this.meCache = null;
-      })
+      tap((user) => this.applyUserUpdate(user))
     );
+  }
+
+  uploadAvatar(file: File): Observable<User> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return this.http.post<User>(`${this.apiUrl}/me/avatar`, formData).pipe(
+      tap((user) => this.applyUserUpdate(user))
+    );
+  }
+
+  removeAvatar(): Observable<User> {
+    return this.http.delete<User>(`${this.apiUrl}/me/avatar`).pipe(
+      tap((user) => this.applyUserUpdate(user))
+    );
+  }
+
+  private applyUserUpdate(user: User): void {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    this.currentUserSubject.next(user);
+    this.meCache = null;
   }
 
   isSystemAdmin(): boolean {

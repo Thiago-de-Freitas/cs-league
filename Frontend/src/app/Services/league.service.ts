@@ -56,11 +56,19 @@ export class LeagueService {
     format?: string;
     groupCount?: number;
     advancePerGroup?: number;
+    homeAndAway?: boolean;
+    matchesPerMatchDay?: number;
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data).pipe(this.afterLeagueMutation());
   }
 
-  updateLeague(id: string, data: Partial<League> & { maxTeams?: number | null; groupCount?: number; advancePerGroup?: number }): Observable<League> {
+  updateLeague(id: string, data: Partial<League> & {
+    maxTeams?: number | null;
+    groupCount?: number;
+    advancePerGroup?: number;
+    homeAndAway?: boolean;
+    matchesPerMatchDay?: number;
+  }): Observable<League> {
     return this.http.put<League>(`${this.apiUrl}/${id}`, data).pipe(this.afterLeagueMutation());
   }
 

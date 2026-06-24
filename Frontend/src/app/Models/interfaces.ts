@@ -3,6 +3,7 @@ export interface User {
   email: string;
   displayName: string;
   steamId?: string | null;
+  avatarUrl?: string | null;
   role: 'USER' | 'ADMIN';
   createdAt?: string;
 }
@@ -52,6 +53,8 @@ export interface League {
   effectiveBracketSize?: number;
   groupCount?: number;
   advancePerGroup?: number;
+  homeAndAway?: boolean;
+  matchesPerMatchDay?: number;
   groupPhaseGenerated?: boolean;
   groupPhaseComplete?: boolean;
   playoffGenerated?: boolean;

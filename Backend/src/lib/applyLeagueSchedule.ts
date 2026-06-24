@@ -15,12 +15,14 @@ export function leagueToScheduleConfig(league: {
   defaultMatchDays: unknown;
   defaultMatchTime: string;
   scheduleTimezone: string;
+  matchesPerMatchDay?: number;
 }): LeagueScheduleConfig {
   return {
     startDate: league.startDate,
     defaultMatchDays: parseDefaultMatchDays(league.defaultMatchDays) ?? [],
     defaultMatchTime: league.defaultMatchTime,
     scheduleTimezone: league.scheduleTimezone,
+    matchesPerMatchDay: league.matchesPerMatchDay ?? 0,
   };
 }
 
