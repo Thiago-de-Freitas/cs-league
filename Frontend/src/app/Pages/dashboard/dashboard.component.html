@@ -108,9 +108,9 @@
           </div>
         </div>
 
-        <div *ngIf="rankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+        <div *ngIf="playerRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
 
-        <div *ngIf="!rankingsLoading && playerRankings.length > 0" class="table-container">
+        <div *ngIf="!playerRankingsLoading && playerRankings.length > 0" class="table-container">
           <table class="stats-table ranking-table">
             <thead>
               <tr>
@@ -141,7 +141,7 @@
             </tbody>
           </table>
         </div>
-        <p *ngIf="!rankingsLoading && playerRankings.length === 0" class="meta">
+        <p *ngIf="!playerRankingsLoading && playerRankings.length === 0" class="meta">
           {{ rankingPosition ? 'Nenhum jogador com esta posição possui estatísticas ainda.' : 'Nenhuma estatística disponível ainda.' }}
         </p>
       </section>
@@ -152,9 +152,9 @@
           <p class="meta ranking-subtitle">Times com mais vitórias nas ligas</p>
         </div>
 
-        <div *ngIf="rankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+        <div *ngIf="teamRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
 
-        <div *ngIf="!rankingsLoading && teamRankings.length > 0" class="table-container">
+        <div *ngIf="!teamRankingsLoading && teamRankings.length > 0" class="table-container">
           <table class="stats-table ranking-table">
             <thead>
               <tr>
@@ -187,7 +187,7 @@
             </tbody>
           </table>
         </div>
-        <p *ngIf="!rankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
+        <p *ngIf="!teamRankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
       </section>
     </div>
   </div>

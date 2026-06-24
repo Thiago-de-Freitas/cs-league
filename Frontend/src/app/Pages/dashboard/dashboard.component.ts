@@ -38,7 +38,8 @@ export class DashboardComponent implements OnInit {
   pendingInvites: TeamInvite[] = [];
   playerRankings: PlayerRankingEntry[] = [];
   teamRankings: TeamRankingEntry[] = [];
-  rankingsLoading = true;
+  playerRankingsLoading = true;
+  teamRankingsLoading = true;
   rankingLeagueId = '';
   rankingPosition = '';
   readonly rankingPositionOptions = RANKING_POSITION_OPTIONS;
@@ -76,7 +77,8 @@ export class DashboardComponent implements OnInit {
 
     const leagueId = this.rankingLeagueId || undefined;
     const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
-    this.rankingsLoading = true;
+    this.playerRankingsLoading = true;
+    this.teamRankingsLoading = true;
 
     forkJoin({
       leagues: this.leagueService.getLeagues(this.showArchivedLeagues).pipe(safe('ligas', [] as League[])),
@@ -88,7 +90,8 @@ export class DashboardComponent implements OnInit {
     })
       .pipe(finalize(() => {
         this.loading = false;
-        this.rankingsLoading = false;
+        this.playerRankingsLoading = false;
+        this.teamRankingsLoading = false;
       }))
       .subscribe({
         next: ({ leagues, openLeagues, teams, invites, playerRankings, teamRankings }) => {
@@ -103,33 +106,30 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  loadRankings(): void {
-    this.rankingsLoading = true;
+  loadPlayerRankings(): void {
+    this.playerRankingsLoading = true;
     const leagueId = this.rankingLeagueId || undefined;
     const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
-    forkJoin({
-      playerRankings: this.rankingsService.getPlayerRankings({ leagueId, position }),
-      teamRankings: this.rankingsService.getTeamRankings(),
-    })
-      .pipe(finalize(() => (this.rankingsLoading = false)))
-      .subscribe({
-        next: ({ playerRankings, teamRankings }) => {
-          this.playerRankings = playerRankings;
-          this.teamRankings = teamRankings;
-        },
-        error: () => {
+    this.rankingsService
+      .getPlayerRankings({ leagueId, position })
+      .pipe(
+        finalize(() => (this.playerRankingsLoading = false)),
+        catchError(() => {
           this.playerRankings = [];
-          this.teamRankings = [];
-        },
+          return of([] as PlayerRankingEntry[]);
+        })
+      )
+      .subscribe((playerRankings) => {
+        this.playerRankings = playerRankings;
       });
   }
 
   onRankingLeagueChange(): void {
-    this.loadRankings();
+    this.loadPlayerRankings();
   }
 
   onRankingPositionChange(): void {
-    this.loadRankings();
+    this.loadPlayerRankings();
   }
 
   get rankingPlayersTitle(): string {
