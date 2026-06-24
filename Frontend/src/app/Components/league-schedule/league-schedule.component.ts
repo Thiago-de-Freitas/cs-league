@@ -6,12 +6,10 @@ import { LeagueService } from '../../Services/league.service';
 import { NotificationService } from '../../Services/notification.service';
 import {
   addWeeksToMonday,
-  buildWeekDayPreviews,
   currentWeekMonday,
   formatWeekRange,
   mondayOfWeekContaining,
   toDateInputInTimezone,
-  type WeekDayPreview,
 } from '../../Utils/schedule-date.util';
 
 interface WeekdayOption {
@@ -75,17 +73,13 @@ export class LeagueScheduleComponent implements OnChanges {
     }
     if (this.canManage && !this.selectedWeekMonday && !this.editingWeekStart) {
       this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+      this.applyEditorForSelectedWeek();
     }
   }
 
   get selectedWeekRangeLabel(): string {
     if (!this.selectedWeekMonday) return '';
     return formatWeekRange(this.selectedWeekMonday, this.scheduleTimezone) ?? this.selectedWeekMonday;
-  }
-
-  get selectedWeekDays(): WeekDayPreview[] {
-    if (!this.selectedWeekMonday) return [];
-    return buildWeekDayPreviews(this.selectedWeekMonday, this.scheduleTimezone);
   }
 
   get hasWeekOverrideForSelected(): boolean {
@@ -96,12 +90,16 @@ export class LeagueScheduleComponent implements OnChanges {
     if (!this.canManage || this.overrideSaving) return;
     const base = this.selectedWeekMonday || currentWeekMonday(this.scheduleTimezone);
     const next = addWeeksToMonday(base, deltaWeeks, this.scheduleTimezone);
-    if (next) this.selectedWeekMonday = next;
+    if (next) {
+      this.selectedWeekMonday = next;
+      this.applyEditorForSelectedWeek();
+    }
   }
 
   goToCurrentWeek(): void {
     if (!this.canManage || this.overrideSaving) return;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+    this.applyEditorForSelectedWeek();
   }
 
   openWeekDatePicker(): void {
@@ -122,9 +120,56 @@ export class LeagueScheduleComponent implements OnChanges {
     const monday = mondayOfWeekContaining(value, this.scheduleTimezone);
     if (monday) {
       this.selectedWeekMonday = monday;
+      this.applyEditorForSelectedWeek();
       return;
     }
     this.notify.warning('Data inválida.');
+  }
+
+  get defaultScheduleSummary(): string {
+    const days = this.league?.defaultMatchDays?.length
+      ? this.formatDays(this.league.defaultMatchDays)
+      : this.formatDays([...this.selectedDays]);
+    const time = this.league?.defaultMatchTime || this.defaultMatchTime;
+    return `${days} às ${time}`;
+  }
+
+  get overridePreviewText(): string {
+    const week = this.selectedWeekRangeLabel;
+    if (!week) return '';
+    if (this.overrideMode === 'blocked') {
+      return 'Nenhum jogo nesta semana — confrontos vão para as semanas seguintes.';
+    }
+    if (this.overrideDays.size === 0) {
+      return 'Selecione em quais dias haverá jogos nesta semana.';
+    }
+    return `Jogos em ${this.formatDays([...this.overrideDays].sort((a, b) => a - b))} (substitui o padrão só nesta semana).`;
+  }
+
+  get isEditingExistingOverride(): boolean {
+    return !!this.editingWeekStart && this.editingWeekStart === this.selectedWeekMonday;
+  }
+
+  private applyEditorForSelectedWeek(): void {
+    const existing = this.weekOverrides.find((w) => w.weekStart === this.selectedWeekMonday);
+    if (existing) {
+      this.editingWeekStart = existing.weekStart;
+      if (this.isWeekBlocked(existing)) {
+        this.overrideMode = 'blocked';
+        this.overrideDays = new Set();
+      } else {
+        this.overrideMode = 'custom';
+        this.overrideDays = new Set(existing.daysOfWeek);
+      }
+      return;
+    }
+
+    this.editingWeekStart = null;
+    this.overrideMode = 'custom';
+    const defaultDays = this.league?.defaultMatchDays?.length
+      ? this.league.defaultMatchDays
+      : [...this.selectedDays];
+    this.overrideDays = new Set(defaultDays);
   }
 
   private applyLeagueSchedule(league: League): void {
@@ -154,6 +199,9 @@ export class LeagueScheduleComponent implements OnChanges {
     this.scheduleTimezone = config.scheduleTimezone || 'America/Sao_Paulo';
     this.selectedDays = new Set(config.defaultMatchDays || []);
     this.weekOverrides = config.weekOverrides || [];
+    if (this.selectedWeekMonday) {
+      this.applyEditorForSelectedWeek();
+    }
   }
 
   isDaySelected(day: number): boolean {
@@ -187,6 +235,13 @@ export class LeagueScheduleComponent implements OnChanges {
     this.overrideMode = mode;
     if (mode === 'blocked') {
       this.overrideDays = new Set();
+      return;
+    }
+    if (this.overrideDays.size === 0) {
+      const defaultDays = this.league?.defaultMatchDays?.length
+        ? this.league.defaultMatchDays
+        : [...this.selectedDays];
+      this.overrideDays = new Set(defaultDays);
     }
   }
 
@@ -203,29 +258,18 @@ export class LeagueScheduleComponent implements OnChanges {
 
   editWeekOverride(override: { weekStart: string; daysOfWeek: number[] }): void {
     if (!this.canManage) return;
-    this.editingWeekStart = override.weekStart;
     this.selectedWeekMonday = override.weekStart;
-    if (this.isWeekBlocked(override)) {
-      this.overrideMode = 'blocked';
-      this.overrideDays = new Set();
-    } else {
-      this.overrideMode = 'custom';
-      this.overrideDays = new Set(override.daysOfWeek);
-    }
+    this.applyEditorForSelectedWeek();
   }
 
   cancelOverrideEdit(): void {
-    this.editingWeekStart = null;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
-    this.overrideDays = new Set();
-    this.overrideMode = 'custom';
+    this.applyEditorForSelectedWeek();
   }
 
   private resetOverrideForm(): void {
-    this.editingWeekStart = null;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
-    this.overrideDays = new Set();
-    this.overrideMode = 'custom';
+    this.applyEditorForSelectedWeek();
   }
 
   saveSchedule(): void {
