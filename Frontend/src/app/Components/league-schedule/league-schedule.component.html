@@ -74,9 +74,25 @@
             ‹
           </button>
 
-          <div class="week-picker-range">
-            <span class="week-picker-title">{{ selectedWeekRangeLabel }}</span>
-            <span class="week-picker-sub" *ngIf="hasWeekOverrideForSelected">Já possui exceção salva</span>
+          <div class="week-picker-range-wrap">
+            <button
+              type="button"
+              class="week-picker-range"
+              (click)="openWeekDatePicker()"
+              [disabled]="overrideSaving"
+              aria-label="Escolher semana no calendário">
+              <span class="week-picker-title">{{ selectedWeekRangeLabel }}</span>
+              <span class="week-picker-hint">Clique para escolher data</span>
+              <span class="week-picker-sub" *ngIf="hasWeekOverrideForSelected">Já possui exceção salva</span>
+            </button>
+            <input
+              #weekJumpInput
+              type="date"
+              class="week-picker-date-input"
+              [disabled]="overrideSaving"
+              (change)="onWeekDatePicked($event)"
+              tabindex="-1"
+              aria-hidden="true" />
           </div>
 
           <button
@@ -108,19 +124,6 @@
             Esta semana
           </button>
         </div>
-
-        <details class="week-picker-jump">
-          <summary class="week-picker-jump-summary">Ir para outra data</summary>
-          <div class="week-picker-jump-body">
-            <input
-              type="date"
-              class="input-field"
-              [(ngModel)]="overrideJumpDate"
-              [disabled]="overrideSaving"
-              (change)="applyJumpDateWeek()" />
-            <span class="field-hint">Escolha qualquer dia — selecionamos a semana inteira (seg–dom).</span>
-          </div>
-        </details>
       </div>
 
       <div class="override-mode">

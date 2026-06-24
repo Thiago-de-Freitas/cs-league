@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnChanges, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { League, LeagueScheduleConfig } from '../../Models/interfaces';
@@ -53,8 +53,9 @@ export class LeagueScheduleComponent implements OnChanges {
   scheduleTimezone = 'America/Sao_Paulo';
   selectedDays = new Set<number>();
 
+  @ViewChild('weekJumpInput') weekJumpInput?: ElementRef<HTMLInputElement>;
+
   selectedWeekMonday = '';
-  overrideJumpDate = '';
   overrideDays = new Set<number>();
   overrideMode: 'custom' | 'blocked' = 'custom';
   editingWeekStart: string | null = null;
@@ -101,17 +102,29 @@ export class LeagueScheduleComponent implements OnChanges {
   goToCurrentWeek(): void {
     if (!this.canManage || this.overrideSaving) return;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
-    this.overrideJumpDate = '';
   }
 
-  applyJumpDateWeek(): void {
-    if (!this.overrideJumpDate) return;
-    const monday = mondayOfWeekContaining(this.overrideJumpDate, this.scheduleTimezone);
+  openWeekDatePicker(): void {
+    if (!this.canManage || this.overrideSaving) return;
+    const input = this.weekJumpInput?.nativeElement;
+    if (!input) return;
+    input.value = this.selectedWeekMonday || currentWeekMonday(this.scheduleTimezone);
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+    input.click();
+  }
+
+  onWeekDatePicked(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (!value) return;
+    const monday = mondayOfWeekContaining(value, this.scheduleTimezone);
     if (monday) {
       this.selectedWeekMonday = monday;
-    } else {
-      this.notify.warning('Data inválida.');
+      return;
     }
+    this.notify.warning('Data inválida.');
   }
 
   private applyLeagueSchedule(league: League): void {
@@ -192,7 +205,6 @@ export class LeagueScheduleComponent implements OnChanges {
     if (!this.canManage) return;
     this.editingWeekStart = override.weekStart;
     this.selectedWeekMonday = override.weekStart;
-    this.overrideJumpDate = '';
     if (this.isWeekBlocked(override)) {
       this.overrideMode = 'blocked';
       this.overrideDays = new Set();
@@ -205,7 +217,6 @@ export class LeagueScheduleComponent implements OnChanges {
   cancelOverrideEdit(): void {
     this.editingWeekStart = null;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
-    this.overrideJumpDate = '';
     this.overrideDays = new Set();
     this.overrideMode = 'custom';
   }
@@ -213,7 +224,6 @@ export class LeagueScheduleComponent implements OnChanges {
   private resetOverrideForm(): void {
     this.editingWeekStart = null;
     this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
-    this.overrideJumpDate = '';
     this.overrideDays = new Set();
     this.overrideMode = 'custom';
   }
