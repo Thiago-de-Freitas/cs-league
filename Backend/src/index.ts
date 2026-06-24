@@ -19,7 +19,7 @@ import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
-import { formatBuildLabel, getBuildInfo } from './lib/buildInfo';
+import { formatBuildLabel, getBuildInfo, type BuildInfo } from './lib/buildInfo';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,12 +63,12 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/version', (_req, res) => {
   const build = getBuildInfo();
-  let frontend: Record<string, unknown> | null = null;
+  let frontend: BuildInfo | null = null;
   if (serveFrontend) {
     const frontendPath = path.join(publicPath, 'build-info.json');
     if (fs.existsSync(frontendPath)) {
       try {
-        frontend = JSON.parse(fs.readFileSync(frontendPath, 'utf8'));
+        frontend = JSON.parse(fs.readFileSync(frontendPath, 'utf8')) as BuildInfo;
       } catch {
         frontend = null;
       }
@@ -78,7 +78,7 @@ app.get('/api/version', (_req, res) => {
     backend: build,
     backendLabel: formatBuildLabel(build),
     frontend,
-    frontendLabel: frontend ? formatBuildLabel(frontend as ReturnType<typeof getBuildInfo>) : null,
+    frontendLabel: frontend ? formatBuildLabel(frontend) : null,
   });
 });
 
