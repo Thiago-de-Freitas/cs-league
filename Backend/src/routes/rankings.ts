@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { getPlayerRankings, getTeamRankings, getPlayerProfileBySteamId } from '../lib/rankings';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { parseRankingPositionFilter, RANKING_POSITION_OPTIONS } from '../lib/playerPosition';
+import { parseRankingPositionFilter, RANKING_POSITION_OPTIONS, type RankingPositionFilter } from '../lib/playerPosition';
 
 const router = Router();
 
@@ -13,10 +13,14 @@ router.get('/players', authMiddleware, async (req: AuthRequest, res: Response) =
   try {
     const leagueId = typeof req.query.leagueId === 'string' ? req.query.leagueId : undefined;
     const positionRaw = typeof req.query.position === 'string' ? req.query.position : undefined;
-    const position = positionRaw ? parseRankingPositionFilter(positionRaw) : undefined;
-    if (positionRaw && !position) {
-      res.status(400).json({ error: 'Posição inválida' });
-      return;
+    let position: RankingPositionFilter | undefined;
+    if (positionRaw) {
+      const parsed = parseRankingPositionFilter(positionRaw);
+      if (!parsed) {
+        res.status(400).json({ error: 'Posição inválida' });
+        return;
+      }
+      position = parsed;
     }
 
     const players = await getPlayerRankings(10, { leagueId, position });

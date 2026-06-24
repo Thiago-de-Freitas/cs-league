@@ -54,6 +54,7 @@ const teamWithRosterSelect = {
   members: {
     select: {
       role: true,
+      memberTag: true,
       position: true,
       user: { select: { id: true, displayName: true, steamId: true } },
     },
@@ -114,7 +115,12 @@ function formatTeamFromLeagueTeam(lt: {
     tag: string;
     logoUrl: string | null;
     ownerId: string;
-    members: { user: { id: string; displayName: string }; role: string }[];
+    members: {
+      user: { id: string; displayName: string };
+      role: string;
+      memberTag: string | null;
+      position: string | null;
+    }[];
   };
   wins: number;
   losses: number;
