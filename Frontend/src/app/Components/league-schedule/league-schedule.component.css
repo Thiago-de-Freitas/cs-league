@@ -47,6 +47,122 @@
   font-size: 0.85rem;
 }
 
+.week-picker {
+  gap: 0.65rem;
+}
+
+.week-picker-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--gc-border);
+  border-radius: 4px;
+  background: var(--gc-bg-secondary);
+}
+
+.week-picker-arrow {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--gc-border);
+  border-radius: 4px;
+  background: var(--gc-surface);
+  color: var(--gc-orange);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: var(--font-display);
+}
+
+.week-picker-arrow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.week-picker-range {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+}
+
+.week-picker-title {
+  color: var(--gc-text);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+.week-picker-sub {
+  color: var(--gc-orange);
+  font-size: 0.8rem;
+}
+
+.week-picker-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.week-picker-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid var(--gc-border);
+  border-radius: 4px;
+  background: var(--gc-surface);
+}
+
+.week-picker-day.is-today {
+  border-color: var(--gc-orange);
+  background: var(--gc-surface-elevated);
+}
+
+.week-picker-day-label {
+  color: var(--gc-text-secondary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.week-picker-day-num {
+  color: var(--gc-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.week-picker-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.week-picker-jump {
+  border-top: 1px solid var(--gc-border);
+  padding-top: 0.5rem;
+}
+
+.week-picker-jump-summary {
+  color: var(--gc-text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  list-style: none;
+}
+
+.week-picker-jump-summary::-webkit-details-marker {
+  display: none;
+}
+
+.week-picker-jump-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
 .weekday-grid {
   display: flex;
   flex-wrap: wrap;
