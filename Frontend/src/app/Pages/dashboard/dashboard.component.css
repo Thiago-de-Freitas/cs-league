@@ -22,13 +22,17 @@
 .ranking-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin-top: 0.75rem;
+  gap: 1rem 1.25rem;
+  margin-top: 1rem;
 }
 
 .ranking-filter {
   flex: 1 1 220px;
   max-width: 280px;
+}
+
+.ranking-filter .form-label {
+  margin-bottom: 0.5rem;
 }
 
 .ranking-player-link {
