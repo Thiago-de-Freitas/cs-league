@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { ARCHIVED_LEAGUE_TEAM_WHERE } from './teamStats';
 
 export type PlayerRankingEntry = {
   rank: number;
@@ -205,6 +206,7 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
 export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
   const grouped = await prisma.leagueTeam.groupBy({
     by: ['teamId'],
+    where: ARCHIVED_LEAGUE_TEAM_WHERE,
     _sum: { wins: true, losses: true },
     _count: { _all: true },
   });

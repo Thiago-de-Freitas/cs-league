@@ -33,6 +33,7 @@ import {
   weekStartKey,
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
+import { deleteLeagueCompletely } from '../lib/leagueDeletion';
 
 const router = Router();
 
@@ -514,7 +515,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       return;
     }
 
-    await prisma.league.delete({ where: { id: req.params.id } });
+    await deleteLeagueCompletely(req.params.id);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

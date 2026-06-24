@@ -35,8 +35,12 @@ export class TeamService {
     return this.http.get<Team>(`${this.apiUrl}/${id}`);
   }
 
-  createTeam(name: string, tag: string): Observable<Team> {
-    return this.http.post<Team>(this.apiUrl, { name, tag }).pipe(
+  createTeam(name: string, tag: string, options?: { ownerAsMember?: boolean }): Observable<Team> {
+    return this.http.post<Team>(this.apiUrl, {
+      name,
+      tag,
+      ownerAsMember: options?.ownerAsMember !== false,
+    }).pipe(
       tap(() => this.invalidateTeams())
     );
   }

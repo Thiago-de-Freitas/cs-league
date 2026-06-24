@@ -33,6 +33,15 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label class="form-label">Seu papel no time</label>
+        <label class="owner-member-option">
+          <input type="checkbox" formControlName="ownerAsMember">
+          <span>Entrar no elenco como capitão</span>
+        </label>
+        <p class="form-hint">Desmarque se você só vai gerenciar o time, sem jogar no roster.</p>
+      </div>
+
       <div class="invite-section">
         <h3 class="section-subtitle-small">Convidar Membros</h3>
         <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"

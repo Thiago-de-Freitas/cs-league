@@ -34,7 +34,8 @@ export class CreateTeamModalComponent {
   ) {
     this.form = this.fb.group({
       teamName: ['', Validators.required],
-      teamTag: ['', [Validators.required, Validators.maxLength(5)]]
+      teamTag: ['', [Validators.required, Validators.maxLength(5)]],
+      ownerAsMember: [true],
     });
   }
 
@@ -84,9 +85,9 @@ export class CreateTeamModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { teamName, teamTag } = this.form.value;
+    const { teamName, teamTag, ownerAsMember } = this.form.value;
 
-    this.teamService.createTeam(teamName, teamTag).subscribe({
+    this.teamService.createTeam(teamName, teamTag, { ownerAsMember: !!ownerAsMember }).subscribe({
       next: (team) => {
         if (this.invitedMembers.length === 0) {
           this.loading = false;

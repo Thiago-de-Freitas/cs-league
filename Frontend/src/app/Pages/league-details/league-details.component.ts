@@ -782,11 +782,14 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.leagueId) return;
     this.confirmConfig = {
       title: 'Excluir liga',
-      message: 'Esta ação é permanente e não pode ser desfeita.',
+      subtitle: 'Deseja realmente excluir esta liga?',
+      message: 'Todos os dados desta liga serão perdidos permanentemente.',
       highlight: this.league?.name,
       highlightLabel: 'Liga',
-      hint: 'Todos os times, partidas e chaveamentos desta liga serão excluídos.',
-      confirmLabel: 'Excluir',
+      hint:
+        'Serão removidos: partidas, chaveamentos, demos, classificações e o histórico nos times. ' +
+        'Esta ação não pode ser desfeita.',
+      confirmLabel: 'Sim, excluir tudo',
       danger: true,
       onConfirm: () => {
         this.confirmLoading = true;

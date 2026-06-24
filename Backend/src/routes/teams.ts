@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
+import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
@@ -77,15 +78,15 @@ async function getTeamWithDetails(teamId: string) {
           invitedUser: { select: { id: true, displayName: true, email: true } },
         },
       },
-      leagueTeams: true,
+      leagueTeams: {
+        where: ARCHIVED_LEAGUE_TEAM_WHERE,
+      },
     },
   });
 }
 
 function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetails>>>) {
-  const wins = team.leagueTeams.reduce((sum, lt) => sum + lt.wins, 0);
-  const losses = team.leagueTeams.reduce((sum, lt) => sum + lt.losses, 0);
-  const points = team.leagueTeams.reduce((sum, lt) => sum + lt.points, 0);
+  const stats = sumLeagueTeamStats(team.leagueTeams);
 
   return {
     id: team.id,
@@ -94,9 +95,9 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
     logoUrl: team.logoUrl,
     ownerId: team.ownerId,
     owner: team.owner,
-    wins,
-    losses,
-    points,
+    wins: stats.wins,
+    losses: stats.losses,
+    points: stats.points,
     players: team.members.map((m) => ({
       id: m.user.id,
       name: m.user.displayName,
@@ -134,13 +135,18 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
             user: { select: { id: true, displayName: true } },
           },
         },
-        leagueTeams: { select: { wins: true, losses: true, points: true } },
+        leagueTeams: {
+          where: ARCHIVED_LEAGUE_TEAM_WHERE,
+          select: { wins: true, losses: true, points: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     res.json(
-      teams.map((team) => ({
+      teams.map((team) => {
+        const stats = sumLeagueTeamStats(team.leagueTeams);
+        return {
         id: team.id,
         name: team.name,
         tag: team.tag,
@@ -152,10 +158,11 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           IGN: m.user.displayName,
           role: m.role,
         })),
-        wins: team.leagueTeams.reduce((sum, lt) => sum + lt.wins, 0),
-        losses: team.leagueTeams.reduce((sum, lt) => sum + lt.losses, 0),
-        points: team.leagueTeams.reduce((sum, lt) => sum + lt.points, 0),
-      }))
+        wins: stats.wins,
+        losses: stats.losses,
+        points: stats.points,
+      };
+      })
     );
   } catch (err) {
     console.error(err);
@@ -190,20 +197,26 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, tag } = req.body;
+    const { name, tag, ownerAsMember } = req.body;
     if (!name || !tag) {
       res.status(400).json({ error: 'Nome e tag são obrigatórios' });
       return;
     }
+
+    const joinAsMember = ownerAsMember !== false && ownerAsMember !== 'false' && ownerAsMember !== '0';
 
     const team = await prisma.team.create({
       data: {
         name,
         tag,
         ownerId: req.user!.userId,
-        members: {
-          create: { userId: req.user!.userId, role: 'CAPTAIN' },
-        },
+        ...(joinAsMember
+          ? {
+              members: {
+                create: { userId: req.user!.userId, role: 'CAPTAIN' },
+              },
+            }
+          : {}),
       },
     });
 
