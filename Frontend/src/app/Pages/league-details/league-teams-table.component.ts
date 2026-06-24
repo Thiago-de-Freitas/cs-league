@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { CdkDragDrop, CdkDropList, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Team } from '../../Models/interfaces';
 import { AuthService } from '../../Services/auth.service';
+import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
   selector: 'app-league-teams-table',
@@ -32,7 +33,14 @@ import { AuthService } from '../../Services/auth.service';
     <tr *ngFor="let team of teams; let i = index" cdkDrag [cdkDragDisabled]="!canManageLeague">
       <td>{{ team.seed ?? (i + 1) }}</td>
       <td>
-        <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do time" width="32" height="32">
+        <img
+          *ngIf="teamLogoSrc(team) as logoSrc"
+          [src]="logoSrc"
+          alt="Logo do time"
+          width="32"
+          height="32"
+          (error)="onTeamLogoError(team.id)">
+        <span *ngIf="!teamLogoSrc(team)" class="team-tag-mini">{{ team.tag }}</span>
       </td>
       <td>{{ team.name }}</td>
       <td>{{ team.wins ?? 0 }}</td>
@@ -61,7 +69,18 @@ export class LeagueTeamsTableComponent {
   @Output() editTeam = new EventEmitter<Team>();
   @Output() removeTeam = new EventEmitter<string>();
 
+  private brokenLogoIds = new Set<string>();
+
   constructor(private authService: AuthService) {}
+
+  teamLogoSrc(team: Team): string | null {
+    if (!team.logoUrl || this.brokenLogoIds.has(team.id)) return null;
+    return resolveUploadAssetUrl(team.logoUrl);
+  }
+
+  onTeamLogoError(teamId: string): void {
+    this.brokenLogoIds.add(teamId);
+  }
 
   get showActionsColumn(): boolean {
     return this.canRemoveTeams || this.canManageLeague || this.teams.some((t) => this.canEditTeam(t));

@@ -8,6 +8,7 @@ import { Team, TeamInvite, User } from '../../Models/interfaces';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { PLAYER_POSITIONS, getPlayerPositionLabel } from '../../Utils/player-positions';
+import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
   selector: 'app-team-details',
@@ -34,6 +35,7 @@ export class TeamDetailsComponent implements OnInit {
   deletingTeam = false;
   showDeleteConfirm = false;
   uploadingLogo = false;
+  teamLogoBroken = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -61,6 +63,7 @@ export class TeamDetailsComponent implements OnInit {
         this.isOwner = this.authService.isTeamOwner(team.ownerId || '');
         this.isSystemAdmin = this.authService.isSystemAdmin();
         this.syncPositionDrafts();
+        this.teamLogoBroken = false;
         this.loading = false;
       },
       error: (err) => {
@@ -105,6 +108,15 @@ export class TeamDetailsComponent implements OnInit {
 
   formatPosition(position: string | null | undefined): string {
     return getPlayerPositionLabel(position);
+  }
+
+  get teamLogoSrc(): string | null {
+    if (!this.team?.logoUrl || this.teamLogoBroken) return null;
+    return resolveUploadAssetUrl(this.team.logoUrl);
+  }
+
+  onTeamLogoError(): void {
+    this.teamLogoBroken = true;
   }
 
   isTeamCaptain(memberId: string): boolean {
@@ -255,6 +267,7 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.uploadLogo(this.teamId, file).subscribe({
       next: (team) => {
         this.team = team;
+        this.teamLogoBroken = false;
         this.uploadingLogo = false;
         input.value = '';
         this.notify.success('Logo atualizada com sucesso.', 'Logo do time');
@@ -273,6 +286,7 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.removeLogo(this.teamId).subscribe({
       next: (team) => {
         this.team = team;
+        this.teamLogoBroken = false;
         this.uploadingLogo = false;
         this.notify.success('Logo removida.', 'Logo do time');
       },

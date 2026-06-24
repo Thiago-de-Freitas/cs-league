@@ -9,6 +9,7 @@ import { NotificationService } from '../../Services/notification.service';
 import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
+import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 type ProfileTab = 'stats' | 'demos' | 'settings';
 
@@ -29,6 +30,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   successMsg = '';
   errorMsg = '';
   uploadingAvatar = false;
+  avatarBroken = false;
   activeTab: ProfileTab = 'stats';
   statsOverview: PersonalStatsOverview | null = null;
   statsLoading = true;
@@ -70,6 +72,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.email = user.email;
         this.steamId = user.steamId || '';
         this.avatarUrl = user.avatarUrl || null;
+        this.avatarBroken = false;
         this.role = user.role;
         this.profileForm.patchValue({
           displayName: user.displayName,
@@ -236,6 +239,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
     return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   }
 
+  get avatarSrc(): string | null {
+    if (!this.avatarUrl || this.avatarBroken) return null;
+    return resolveUploadAssetUrl(this.avatarUrl);
+  }
+
+  onAvatarError(): void {
+    this.avatarBroken = true;
+  }
+
   onUpdateProfile(): void {
     if (!this.profileForm.valid) return;
 
@@ -244,6 +256,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.userName = user.displayName;
         this.steamId = user.steamId || '';
         this.avatarUrl = user.avatarUrl || null;
+        this.avatarBroken = false;
         this.successMsg = 'Perfil atualizado com sucesso!';
         this.errorMsg = '';
       },
@@ -268,6 +281,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.authService.uploadAvatar(file).subscribe({
       next: (user) => {
         this.avatarUrl = user.avatarUrl || null;
+        this.avatarBroken = false;
         this.uploadingAvatar = false;
         input.value = '';
         this.successMsg = 'Foto de perfil atualizada!';
@@ -290,6 +304,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.authService.removeAvatar().subscribe({
       next: (user) => {
         this.avatarUrl = user.avatarUrl || null;
+        this.avatarBroken = false;
         this.uploadingAvatar = false;
         this.successMsg = 'Foto de perfil removida.';
         this.errorMsg = '';

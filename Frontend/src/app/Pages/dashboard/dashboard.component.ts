@@ -15,6 +15,7 @@ import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/dem
 import { Demo } from '../../Models/interfaces';
 import { formatTeamCapacity } from '../../Utils/bracket.util';
 import { RANKING_POSITION_OPTIONS, RankingPositionFilter, getPlayerPositionLabel } from '../../Utils/player-positions';
+import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -42,6 +43,7 @@ export class DashboardComponent implements OnInit {
   rankingPosition = '';
   readonly rankingPositionOptions = RANKING_POSITION_OPTIONS;
   formatTeamCapacity = formatTeamCapacity;
+  private brokenRankingLogoIds = new Set<string>();
 
   constructor(
     private leagueService: LeagueService,
@@ -155,6 +157,15 @@ export class DashboardComponent implements OnInit {
 
   getPlayerPositionBadge(player: PlayerRankingEntry): string {
     return player.positionLabel || getPlayerPositionLabel(player.position);
+  }
+
+  teamRankingLogoSrc(team: TeamRankingEntry): string | null {
+    if (!team.logoUrl || this.brokenRankingLogoIds.has(team.teamId)) return null;
+    return resolveUploadAssetUrl(team.logoUrl);
+  }
+
+  onTeamRankingLogoError(teamId: string): void {
+    this.brokenRankingLogoIds.add(teamId);
   }
 
   getKd(player: PlayerRankingEntry): string {

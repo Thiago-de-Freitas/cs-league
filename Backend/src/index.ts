@@ -19,7 +19,12 @@ import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
-import { formatBuildLabel, getBuildInfo, type BuildInfo } from './lib/buildInfo';
+import { getBuildInfo, formatBuildLabel, type BuildInfo } from './lib/buildInfo';
+import {
+  ensureUploadStorageDirectories,
+  getTeamLogoStoragePath,
+  getUserAvatarStoragePath,
+} from './lib/uploadAssets';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -257,11 +262,10 @@ app.use(securityHeaders);
 
 app.use(express.json({ limit: '1mb' }));
 
-const teamLogosPath = process.env.TEAM_LOGO_STORAGE_PATH
-  || path.join(__dirname, '../data/team-logos');
+ensureUploadStorageDirectories();
 
-const userAvatarsPath = process.env.USER_AVATAR_STORAGE_PATH
-  || path.join(__dirname, '../data/user-avatars');
+const teamLogosPath = getTeamLogoStoragePath();
+const userAvatarsPath = getUserAvatarStoragePath();
 
 app.use('/uploads/team-logos', (req, res, next) => {
   if (!isSafeStaticRequestPath(req.path)) {

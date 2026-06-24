@@ -9,12 +9,16 @@ import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
 import { parsePlayerPositionOptional, type PlayerPosition } from '../lib/playerPosition';
-import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
+import { sanitizeFileExtension } from '../lib/pathSafe';
+import {
+  getTeamLogoStoragePath,
+  publicUploadFilePath,
+  sanitizePublicUploadUrl,
+} from '../lib/uploadAssets';
 
 const router = Router();
 
-const logoStoragePath = process.env.TEAM_LOGO_STORAGE_PATH
-  || path.join(__dirname, '../../data/team-logos');
+const logoStoragePath = getTeamLogoStoragePath();
 
 if (!fs.existsSync(logoStoragePath)) {
   fs.mkdirSync(logoStoragePath, { recursive: true });
@@ -49,12 +53,7 @@ function publicLogoUrl(fileName: string): string {
 }
 
 function logoFilePathFromUrl(logoUrl: string | null): string | null {
-  if (!logoUrl?.startsWith('/uploads/team-logos/')) return null;
-  const fileName = path.basename(logoUrl);
-  if (fileName.includes('..') || fileName.includes('\0')) return null;
-  const resolved = path.join(logoStoragePath, fileName);
-  if (!isPathInsideBase(resolved, logoStoragePath)) return null;
-  return resolved;
+  return publicUploadFilePath(logoUrl);
 }
 
 function deleteLogoFile(logoUrl: string | null): void {
@@ -115,7 +114,7 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
     id: team.id,
     name: team.name,
     tag: team.tag,
-    logoUrl: team.logoUrl,
+    logoUrl: sanitizePublicUploadUrl(team.logoUrl),
     ownerId: team.ownerId,
     owner: team.owner,
     wins: stats.wins,
@@ -177,7 +176,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         id: team.id,
         name: team.name,
         tag: team.tag,
-        logoUrl: team.logoUrl,
+        logoUrl: sanitizePublicUploadUrl(team.logoUrl),
         ownerId: team.ownerId,
         players: team.members.map((m) => ({
           id: m.user.id,

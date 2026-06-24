@@ -9,8 +9,8 @@
       </p>
       <div class="team-header">
         <div class="team-logo-wrap">
-          <img *ngIf="team.logoUrl" [src]="team.logoUrl" alt="Logo do {{ team.name }}" class="team-logo-img">
-          <span *ngIf="!team.logoUrl" class="team-tag-badge team-logo-fallback">{{ team.tag }}</span>
+          <img *ngIf="teamLogoSrc as logoSrc" [src]="logoSrc" alt="Logo do {{ team.name }}" class="team-logo-img" (error)="onTeamLogoError()">
+          <span *ngIf="!teamLogoSrc" class="team-tag-badge team-logo-fallback">{{ team.tag }}</span>
         </div>
         <div class="team-header-info">
           <h1 class="page-title">{{ team.name }}</h1>

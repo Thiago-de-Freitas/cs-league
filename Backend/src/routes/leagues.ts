@@ -42,6 +42,7 @@ import {
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
 import { roundDifference } from '../lib/matchResult';
+import { sanitizePublicUploadUrl } from '../lib/uploadAssets';
 
 const router = Router();
 
@@ -135,7 +136,7 @@ function formatTeamFromLeagueTeam(lt: {
     id: lt.team.id,
     name: lt.team.name,
     tag: lt.team.tag,
-    logoUrl: lt.team.logoUrl,
+    logoUrl: sanitizePublicUploadUrl(lt.team.logoUrl),
     ownerId: lt.team.ownerId,
     wins: lt.wins,
     losses: lt.losses,

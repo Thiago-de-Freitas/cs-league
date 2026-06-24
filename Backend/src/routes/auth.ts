@@ -9,7 +9,12 @@ import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
-import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
+import { sanitizeFileExtension } from '../lib/pathSafe';
+import {
+  getUserAvatarStoragePath,
+  publicUploadFilePath,
+  sanitizePublicUploadUrl,
+} from '../lib/uploadAssets';
 
 const router = Router();
 const hashPassword = promisify(bcrypt.hash);
@@ -20,8 +25,7 @@ const MAX_EMAIL_LENGTH = 255;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 128;
 
-const avatarStoragePath = process.env.USER_AVATAR_STORAGE_PATH
-  || path.join(__dirname, '../../data/user-avatars');
+const avatarStoragePath = getUserAvatarStoragePath();
 
 if (!fs.existsSync(avatarStoragePath)) {
   fs.mkdirSync(avatarStoragePath, { recursive: true });
@@ -56,12 +60,7 @@ function publicAvatarUrl(fileName: string): string {
 }
 
 function avatarFilePathFromUrl(avatarUrl: string | null): string | null {
-  if (!avatarUrl?.startsWith('/uploads/user-avatars/')) return null;
-  const fileName = path.basename(avatarUrl);
-  if (fileName.includes('..') || fileName.includes('\0')) return null;
-  const resolved = path.join(avatarStoragePath, fileName);
-  if (!isPathInsideBase(resolved, avatarStoragePath)) return null;
-  return resolved;
+  return publicUploadFilePath(avatarUrl);
 }
 
 function deleteAvatarFile(avatarUrl: string | null): void {
@@ -85,7 +84,7 @@ function sanitizeUser(user: {
     email: user.email,
     displayName: user.displayName,
     steamId: user.steamId,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: sanitizePublicUploadUrl(user.avatarUrl),
     role: user.role,
     createdAt: user.createdAt,
   };

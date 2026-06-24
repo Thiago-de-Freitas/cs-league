@@ -2,8 +2,8 @@
   <div class="profile-dashboard">
     <aside class="profile-sidebar gc-card">
       <div class="sidebar-avatar-wrap">
-        <img *ngIf="avatarUrl" [src]="avatarUrl" [alt]="userName" class="sidebar-avatar-img">
-        <div *ngIf="!avatarUrl" class="sidebar-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+        <img *ngIf="avatarSrc as src" [src]="src" [alt]="userName" class="sidebar-avatar-img" (error)="onAvatarError()">
+        <div *ngIf="!avatarSrc" class="sidebar-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
       </div>
       <h1 class="sidebar-name">{{ userName }}</h1>
       <p class="sidebar-email">{{ email }}</p>
@@ -230,8 +230,8 @@
 
         <div class="profile-avatar-section">
           <div class="profile-avatar-preview">
-            <img *ngIf="avatarUrl" [src]="avatarUrl" [alt]="userName" class="profile-avatar-img">
-            <div *ngIf="!avatarUrl" class="profile-avatar-fallback">{{ userName.charAt(0).toUpperCase() }}</div>
+            <img *ngIf="avatarSrc as src" [src]="src" [alt]="userName" class="profile-avatar-img" (error)="onAvatarError()">
+            <div *ngIf="!avatarSrc" class="profile-avatar-fallback">{{ userName.charAt(0).toUpperCase() }}</div>
           </div>
           <div class="profile-avatar-actions">
             <label class="btn btn-secondary btn-small avatar-upload-btn" [class.is-disabled]="uploadingAvatar">

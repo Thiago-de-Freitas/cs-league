@@ -170,8 +170,13 @@
                 <td class="rank-cell" [class.rank-top]="team.rank <= 3">{{ team.rank }}</td>
                 <td>
                   <a [routerLink]="['/team-details', team.teamId]" class="ranking-team-link">
-                    <img *ngIf="team.logoUrl" [src]="team.logoUrl" [alt]="team.name" class="ranking-team-logo">
-                    <span *ngIf="!team.logoUrl" class="ranking-team-badge">{{ team.tag }}</span>
+                    <img
+                      *ngIf="teamRankingLogoSrc(team) as logoSrc"
+                      [src]="logoSrc"
+                      [alt]="team.name"
+                      class="ranking-team-logo"
+                      (error)="onTeamRankingLogoError(team.teamId)">
+                    <span *ngIf="!teamRankingLogoSrc(team)" class="ranking-team-badge">{{ team.tag }}</span>
                     <strong>{{ team.name }}</strong>
                   </a>
                 </td>
