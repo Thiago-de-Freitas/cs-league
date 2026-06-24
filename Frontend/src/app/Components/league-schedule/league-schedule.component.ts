@@ -4,7 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { League, LeagueScheduleConfig } from '../../Models/interfaces';
 import { LeagueService } from '../../Services/league.service';
 import { NotificationService } from '../../Services/notification.service';
-import { toDateInputInTimezone } from '../../Utils/schedule-date.util';
+import {
+  addWeeksToMonday,
+  buildWeekDayPreviews,
+  currentWeekMonday,
+  formatWeekRange,
+  mondayOfWeekContaining,
+  toDateInputInTimezone,
+  type WeekDayPreview,
+} from '../../Utils/schedule-date.util';
 
 interface WeekdayOption {
   value: number;
@@ -45,7 +53,8 @@ export class LeagueScheduleComponent implements OnChanges {
   scheduleTimezone = 'America/Sao_Paulo';
   selectedDays = new Set<number>();
 
-  overrideWeekStart = '';
+  selectedWeekMonday = '';
+  overrideJumpDate = '';
   overrideDays = new Set<number>();
   overrideMode: 'custom' | 'blocked' = 'custom';
   editingWeekStart: string | null = null;
@@ -62,6 +71,46 @@ export class LeagueScheduleComponent implements OnChanges {
       if (this.league.scheduleWeekOverrides) {
         this.weekOverrides = this.league.scheduleWeekOverrides;
       }
+    }
+    if (this.canManage && !this.selectedWeekMonday && !this.editingWeekStart) {
+      this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+    }
+  }
+
+  get selectedWeekRangeLabel(): string {
+    if (!this.selectedWeekMonday) return '';
+    return formatWeekRange(this.selectedWeekMonday, this.scheduleTimezone) ?? this.selectedWeekMonday;
+  }
+
+  get selectedWeekDays(): WeekDayPreview[] {
+    if (!this.selectedWeekMonday) return [];
+    return buildWeekDayPreviews(this.selectedWeekMonday, this.scheduleTimezone);
+  }
+
+  get hasWeekOverrideForSelected(): boolean {
+    return this.weekOverrides.some((w) => w.weekStart === this.selectedWeekMonday);
+  }
+
+  shiftOverrideWeek(deltaWeeks: number): void {
+    if (!this.canManage || this.overrideSaving) return;
+    const base = this.selectedWeekMonday || currentWeekMonday(this.scheduleTimezone);
+    const next = addWeeksToMonday(base, deltaWeeks, this.scheduleTimezone);
+    if (next) this.selectedWeekMonday = next;
+  }
+
+  goToCurrentWeek(): void {
+    if (!this.canManage || this.overrideSaving) return;
+    this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+    this.overrideJumpDate = '';
+  }
+
+  applyJumpDateWeek(): void {
+    if (!this.overrideJumpDate) return;
+    const monday = mondayOfWeekContaining(this.overrideJumpDate, this.scheduleTimezone);
+    if (monday) {
+      this.selectedWeekMonday = monday;
+    } else {
+      this.notify.warning('Data inválida.');
     }
   }
 
@@ -142,7 +191,8 @@ export class LeagueScheduleComponent implements OnChanges {
   editWeekOverride(override: { weekStart: string; daysOfWeek: number[] }): void {
     if (!this.canManage) return;
     this.editingWeekStart = override.weekStart;
-    this.overrideWeekStart = override.weekStart;
+    this.selectedWeekMonday = override.weekStart;
+    this.overrideJumpDate = '';
     if (this.isWeekBlocked(override)) {
       this.overrideMode = 'blocked';
       this.overrideDays = new Set();
@@ -154,14 +204,16 @@ export class LeagueScheduleComponent implements OnChanges {
 
   cancelOverrideEdit(): void {
     this.editingWeekStart = null;
-    this.overrideWeekStart = '';
+    this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+    this.overrideJumpDate = '';
     this.overrideDays = new Set();
     this.overrideMode = 'custom';
   }
 
   private resetOverrideForm(): void {
     this.editingWeekStart = null;
-    this.overrideWeekStart = '';
+    this.selectedWeekMonday = currentWeekMonday(this.scheduleTimezone);
+    this.overrideJumpDate = '';
     this.overrideDays = new Set();
     this.overrideMode = 'custom';
   }
@@ -210,8 +262,8 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   saveWeekOverride(): void {
-    if (!this.leagueId || !this.canManage || !this.overrideWeekStart) {
-      if (!this.overrideWeekStart) {
+    if (!this.leagueId || !this.canManage || !this.selectedWeekMonday) {
+      if (!this.selectedWeekMonday) {
         this.notify.warning('Selecione a semana.');
       }
       return;
@@ -221,12 +273,7 @@ export class LeagueScheduleComponent implements OnChanges {
       return;
     }
 
-    const monday = this.normalizeToMonday(this.overrideWeekStart);
-    if (!monday) {
-      this.notify.warning('Data da semana inválida.');
-      return;
-    }
-
+    const monday = this.selectedWeekMonday;
     const days =
       this.overrideMode === 'blocked'
         ? []
@@ -294,28 +341,12 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   formatWeekLabel(weekStart: string): string {
-    const d = new Date(weekStart.includes('T') ? weekStart : `${weekStart}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return weekStart;
-    return d.toLocaleDateString('pt-BR', {
-      timeZone: this.scheduleTimezone,
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatWeekRange(weekStart, this.scheduleTimezone)
+      ?? weekStart;
   }
 
   formatDays(days: number[]): string {
     const map = Object.fromEntries(this.weekdayOptions.map((o) => [o.value, o.label]));
     return days.map((d) => map[d] || d).join(', ');
-  }
-
-  private normalizeToMonday(dateStr: string): string | null {
-    const d = new Date(dateStr + 'T12:00:00');
-    if (Number.isNaN(d.getTime())) return null;
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diff);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 }
