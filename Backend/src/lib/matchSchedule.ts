@@ -57,14 +57,30 @@ export function getDatePartsInTimezone(date: Date, timeZone: string) {
     Fri: 5,
     Sat: 6,
   };
+  let hour = Number(parts.hour);
+  let day = Number(parts.day);
+  let month = Number(parts.month);
+  let year = Number(parts.year);
+  let weekday = weekdayMap[parts.weekday] ?? 0;
+
+  // Alguns runtimes retornam 24:00 em vez de 00:00 do dia seguinte.
+  if (hour === 24) {
+    hour = 0;
+    const next = addDaysInTimezone(year, month, day, 1, timeZone);
+    year = next.year;
+    month = next.month;
+    day = next.day;
+    weekday = (weekday + 1) % 7;
+  }
+
   return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour),
+    year,
+    month,
+    day,
+    hour,
     minute: Number(parts.minute),
     second: Number(parts.second),
-    weekday: weekdayMap[parts.weekday] ?? 0,
+    weekday,
   };
 }
 
@@ -115,12 +131,17 @@ export function weekStartKey(date: Date, timeZone: string): string {
   return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
 }
 
-/** Segunda-feira 00:00 no fuso da liga, como Date UTC */
+/** Offset em dias a partir da segunda (0=Seg … 6=Dom) para convenção JS (0=Dom … 6=Sab). */
+export function daysFromMondayForWeekday(dayOfWeek: number): number {
+  return (dayOfWeek + 6) % 7;
+}
+
+/** Segunda-feira ao meio-dia no fuso da liga (âncora estável para cálculo de dias). */
 export function startOfWeekMonday(date: Date, timeZone: string): Date {
   const p = getDatePartsInTimezone(date, timeZone);
-  const daysFromMonday = (p.weekday + 6) % 7;
+  const daysFromMonday = daysFromMondayForWeekday(p.weekday);
   const mondayDay = p.day - daysFromMonday;
-  return makeDateInTimezone(p.year, p.month, mondayDay, 0, 0, timeZone);
+  return makeDateInTimezone(p.year, p.month, mondayDay, 12, 0, timeZone);
 }
 
 export function addDaysInTimezone(
@@ -186,7 +207,7 @@ function findNextSlot(
     if (days.length === 0) {
       const wp = getDatePartsInTimezone(currentWeekStart, timeZone);
       const nextMonday = addDaysInTimezone(wp.year, wp.month, wp.day, 7, timeZone);
-      currentWeekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 0, 0, timeZone);
+      currentWeekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 12, 0, timeZone);
       continue;
     }
 
@@ -194,7 +215,7 @@ function findNextSlot(
     const weekParts = getDatePartsInTimezone(currentWeekStart, timeZone);
 
     for (const dayOfWeek of days) {
-      const daysFromMonday = (dayOfWeek + 6) % 7;
+      const daysFromMonday = daysFromMondayForWeekday(dayOfWeek);
       const slotDate = addDaysInTimezone(weekParts.year, weekParts.month, weekParts.day, daysFromMonday, timeZone);
       const candidate = makeDateInTimezone(slotDate.year, slotDate.month, slotDate.day, hour, minute, timeZone);
 
@@ -214,10 +235,46 @@ function findNextSlot(
 
     const wp = getDatePartsInTimezone(currentWeekStart, timeZone);
     const nextMonday = addDaysInTimezone(wp.year, wp.month, wp.day, 7, timeZone);
-    currentWeekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 0, 0, timeZone);
+    currentWeekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 12, 0, timeZone);
   }
 
   throw new Error('SCHEDULE_SLOT_NOT_FOUND');
+}
+
+export function isValidScheduleTimezone(timeZone: string): boolean {
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Interpreta data de início no calendário do fuso da liga (YYYY-MM-DD ou ISO). */
+export function parseScheduleStartDate(value: unknown, timeZone: string): Date | null {
+  if (value == null || value === '') return null;
+  const tz = isValidScheduleTimezone(timeZone) ? timeZone : DEFAULT_SCHEDULE_TIMEZONE;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const p = getDatePartsInTimezone(value, tz);
+    return makeDateInTimezone(p.year, p.month, p.day, 12, 0, tz);
+  }
+
+  const str = String(value).trim();
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    return makeDateInTimezone(year, month, day, 12, 0, tz);
+  }
+
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const p = getDatePartsInTimezone(parsed, tz);
+  return makeDateInTimezone(p.year, p.month, p.day, 12, 0, tz);
 }
 
 export function buildScheduledDates(
@@ -265,7 +322,7 @@ export function buildScheduledDates(
 
     const wp = getDatePartsInTimezone(weekStart, tz);
     const nextMonday = addDaysInTimezone(wp.year, wp.month, wp.day, 7, tz);
-    weekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 0, 0, tz);
+    weekStart = makeDateInTimezone(nextMonday.year, nextMonday.month, nextMonday.day, 12, 0, tz);
     const wsParts = getDatePartsInTimezone(weekStart, tz);
     cursor = makeDateInTimezone(wsParts.year, wsParts.month, wsParts.day, time.hour, time.minute, tz);
   }

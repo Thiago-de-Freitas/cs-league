@@ -27,10 +27,13 @@ import {
 } from '../lib/groupStage';
 import {
   isScheduleConfigured,
+  isValidScheduleTimezone,
   parseDefaultMatchDays,
   parseMatchTime,
+  parseScheduleStartDate,
   parseWeekStartParam,
   weekStartKey,
+  DEFAULT_SCHEDULE_TIMEZONE,
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
@@ -926,13 +929,34 @@ router.put('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
+    if (scheduleTimezone !== undefined && !isValidScheduleTimezone(String(scheduleTimezone))) {
+      res.status(400).json({ error: 'Fuso horário inválido. Use um identificador IANA (ex.: America/Sao_Paulo).' });
+      return;
+    }
+
+    const parsedStartDate =
+      startDate !== undefined
+        ? startDate
+          ? parseScheduleStartDate(startDate, String(scheduleTimezone ?? check.league.scheduleTimezone))
+          : null
+        : undefined;
+
+    if (startDate !== undefined && startDate && parsedStartDate === null) {
+      res.status(400).json({ error: 'Data de início inválida.' });
+      return;
+    }
+
     const updated = await prisma.league.update({
       where: { id: req.params.id },
       data: {
-        ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+        ...(parsedStartDate !== undefined && { startDate: parsedStartDate }),
         ...(days && { defaultMatchDays: days }),
         ...(defaultMatchTime !== undefined && { defaultMatchTime: String(defaultMatchTime) }),
-        ...(scheduleTimezone !== undefined && { scheduleTimezone: String(scheduleTimezone) }),
+        ...(scheduleTimezone !== undefined && {
+          scheduleTimezone: isValidScheduleTimezone(String(scheduleTimezone))
+            ? String(scheduleTimezone)
+            : DEFAULT_SCHEDULE_TIMEZONE,
+        }),
       },
     });
 
@@ -1051,7 +1075,7 @@ router.post('/:id/schedule/regenerate', authMiddleware, async (req: AuthRequest,
 
     let updatedCount = 0;
     await prisma.$transaction(async (tx) => {
-      updatedCount = await applyGroupMatchSchedule(tx, req.params.id, check.league!);
+      updatedCount = await applyGroupMatchSchedule(tx, req.params.id);
     });
 
     const full = await getLeagueWithDetails(req.params.id);
@@ -1185,7 +1209,7 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
       });
 
       if (check.league.groupCount === 1) {
-        await applyGroupMatchSchedule(tx, req.params.id, check.league);
+        await applyGroupMatchSchedule(tx, req.params.id);
       }
     });
 

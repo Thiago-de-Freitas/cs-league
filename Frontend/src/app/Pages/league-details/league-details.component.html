@@ -334,6 +334,7 @@
             [groups]="league.groups || []"
             [advancePerGroup]="league.advancePerGroup || 2"
             [singleGroup]="isSingleGroupFormat"
+            [scheduleTimezone]="league.scheduleTimezone || 'America/Sao_Paulo'"
             [canManageSchedule]="canManageSchedule"
             [canRegisterResult]="canRegisterResultForMatch.bind(this)"
             (matchClick)="goToMatch($event)"

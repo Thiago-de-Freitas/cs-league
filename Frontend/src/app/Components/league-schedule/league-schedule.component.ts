@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { League, LeagueScheduleConfig } from '../../Models/interfaces';
 import { LeagueService } from '../../Services/league.service';
 import { NotificationService } from '../../Services/notification.service';
+import { toDateInputInTimezone } from '../../Utils/schedule-date.util';
 
 interface WeekdayOption {
   value: number;
@@ -66,7 +67,7 @@ export class LeagueScheduleComponent implements OnChanges {
     this.defaultMatchTime = league.defaultMatchTime || '20:00';
     this.scheduleTimezone = league.scheduleTimezone || 'America/Sao_Paulo';
     this.selectedDays = new Set(league.defaultMatchDays || []);
-    this.startDateInput = this.toDateInputValue(league.startDate);
+    this.startDateInput = toDateInputInTimezone(league.startDate, this.scheduleTimezone);
   }
 
   loadSchedule(): void {
@@ -84,7 +85,7 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   private applyConfig(config: LeagueScheduleConfig): void {
-    this.startDateInput = this.toDateInputValue(config.startDate);
+    this.startDateInput = toDateInputInTimezone(config.startDate, this.scheduleTimezone);
     this.defaultMatchTime = config.defaultMatchTime || '20:00';
     this.scheduleTimezone = config.scheduleTimezone || 'America/Sao_Paulo';
     this.selectedDays = new Set(config.defaultMatchDays || []);
@@ -131,7 +132,7 @@ export class LeagueScheduleComponent implements OnChanges {
     this.saving = true;
     this.leagueService
       .updateSchedule(this.leagueId, {
-        startDate: new Date(this.startDateInput + 'T12:00:00').toISOString(),
+        startDate: this.startDateInput,
         defaultMatchDays: [...this.selectedDays].sort((a, b) => a - b),
         defaultMatchTime: this.defaultMatchTime,
         scheduleTimezone: this.scheduleTimezone,
@@ -228,21 +229,19 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   formatWeekLabel(weekStart: string): string {
-    const d = new Date(weekStart + 'T12:00:00');
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const d = new Date(weekStart.includes('T') ? weekStart : `${weekStart}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return weekStart;
+    return d.toLocaleDateString('pt-BR', {
+      timeZone: this.scheduleTimezone,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   }
 
   formatDays(days: number[]): string {
     const map = Object.fromEntries(this.weekdayOptions.map((o) => [o.value, o.label]));
     return days.map((d) => map[d] || d).join(', ');
-  }
-
-  private toDateInputValue(value?: Date | string | null): string {
-    if (!value) return '';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   private normalizeToMonday(dateStr: string): string | null {

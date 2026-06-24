@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LeagueGroup, Match } from '../../Models/interfaces';
 import { countRoundRobinMatches } from '../../Utils/group.util';
+import { formatDateInTimezone, formatScheduledAtInTimezone } from '../../Utils/schedule-date.util';
 
 @Component({
   selector: 'app-league-groups',
@@ -16,6 +17,7 @@ export class LeagueGroupsComponent {
   @Input() singleGroup = false;
   @Input() canManage = false;
   @Input() canManageSchedule = false;
+  @Input() scheduleTimezone = 'America/Sao_Paulo';
   @Input() canRegisterResult?: (match: Match) => boolean;
   @Output() matchClick = new EventEmitter<string>();
   @Output() registerResult = new EventEmitter<{ match: Match; winnerId: string }>();
@@ -82,15 +84,12 @@ export class LeagueGroupsComponent {
     if (dates.length === 0) return null;
     const first = new Date(dates[0]);
     const last = new Date(dates[dates.length - 1]);
-    const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    const fmt = (d: Date) => formatDateInTimezone(d, this.scheduleTimezone) ?? '';
     if (fmt(first) === fmt(last)) return fmt(first);
     return `${fmt(first)} – ${fmt(last)}`;
   }
 
   formatScheduledAt(value?: string | null): string | null {
-    if (!value) return null;
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    return formatScheduledAtInTimezone(value, this.scheduleTimezone);
   }
 }

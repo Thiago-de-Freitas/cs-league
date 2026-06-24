@@ -40,14 +40,11 @@ export async function loadWeekOverrides(
 
 export async function applyGroupMatchSchedule(
   tx: Tx,
-  leagueId: string,
-  league: {
-    startDate: Date | null;
-    defaultMatchDays: unknown;
-    defaultMatchTime: string;
-    scheduleTimezone: string;
-  }
+  leagueId: string
 ): Promise<number> {
+  const league = await tx.league.findUnique({ where: { id: leagueId } });
+  if (!league) throw new Error('LEAGUE_NOT_FOUND');
+
   const config = leagueToScheduleConfig(league);
   if (!isScheduleConfigured(config)) {
     throw new Error('SCHEDULE_NOT_CONFIGURED');
