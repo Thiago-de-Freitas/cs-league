@@ -8,7 +8,6 @@ import {
   recalculateLeagueEndDate,
   startOfWeekMonday,
   weekStartKey,
-  buildOverridesMap,
   DEFAULT_SCHEDULE_TIMEZONE,
 } from './matchSchedule';
 
@@ -16,6 +15,12 @@ const TZ = DEFAULT_SCHEDULE_TIMEZONE;
 
 function makeStartDate(year: number, month: number, day: number): Date {
   return makeDateInTimezone(year, month, day, 0, 0, TZ);
+}
+
+function addWeeksMonday(weekStart: Date, weeks: number): Date {
+  const p = getDatePartsInTimezone(weekStart, TZ);
+  const next = makeDateInTimezone(p.year, p.month, p.day + weeks * 7, 12, 0, TZ);
+  return startOfWeekMonday(next, TZ);
 }
 
 describe('matchSchedule', () => {
@@ -29,12 +34,26 @@ describe('matchSchedule', () => {
 
   it('getEffectiveDaysForWeek uses override when present', () => {
     const weekStart = makeStartDate(2026, 6, 16);
-    const overrides = buildOverridesMap(
-      [{ weekStart, daysOfWeek: [2, 4] }],
-      TZ
-    );
-    const days = getEffectiveDaysForWeek(weekStart, [1, 3], overrides, TZ);
+    const days = getEffectiveDaysForWeek(weekStart, [1, 3], [{ weekStart, daysOfWeek: [2, 4] }], TZ);
     assert.deepEqual(days, [2, 4]);
+  });
+
+  it('getEffectiveDaysForWeek applies custom override from week forward', () => {
+    const week1 = makeStartDate(2026, 6, 15);
+    const week2 = addWeeksMonday(week1, 1);
+    const overrides = [{ weekStart: week1, daysOfWeek: [5] }];
+
+    assert.deepEqual(getEffectiveDaysForWeek(week1, [1, 3], overrides, TZ), [5]);
+    assert.deepEqual(getEffectiveDaysForWeek(week2, [1, 3], overrides, TZ), [5]);
+  });
+
+  it('blocked override affects only the exact week', () => {
+    const week1 = makeStartDate(2026, 6, 15);
+    const week2 = addWeeksMonday(week1, 1);
+    const overrides = [{ weekStart: week1, daysOfWeek: [] }];
+
+    assert.deepEqual(getEffectiveDaysForWeek(week1, [1, 3], overrides, TZ), []);
+    assert.deepEqual(getEffectiveDaysForWeek(week2, [1, 3], overrides, TZ), [1, 3]);
   });
 
   it('distributes 4-team round-robin on Mon+Wed across weeks', () => {
@@ -75,7 +94,7 @@ describe('matchSchedule', () => {
     assert.equal(p3.day, 22);
   });
 
-  it('override changes days for a specific week', () => {
+  it('override changes days from that week forward', () => {
     const startDate = makeStartDate(2026, 6, 15);
     const weekStart = startOfWeekMonday(startDate, TZ);
     const matches = [
@@ -98,8 +117,8 @@ describe('matchSchedule', () => {
     const p2 = getDatePartsInTimezone(updates[1].scheduledAt, TZ);
     assert.equal(p1.weekday, 5);
     assert.equal(p1.day, 19);
-    assert.equal(p2.weekday, 1);
-    assert.equal(p2.day, 22);
+    assert.equal(p2.weekday, 5);
+    assert.equal(p2.day, 26);
   });
 
   it('blocked week skips scheduling and moves matches forward', () => {

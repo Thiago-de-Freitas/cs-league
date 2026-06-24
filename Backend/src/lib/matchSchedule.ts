@@ -181,14 +181,45 @@ export function buildOverridesMap(overrides: WeekOverride[], timeZone: string): 
   return map;
 }
 
+function sortOverridesByWeekStart(overrides: WeekOverride[], timeZone: string): WeekOverride[] {
+  return [...overrides].sort(
+    (a, b) => weekStartKey(a.weekStart, timeZone).localeCompare(weekStartKey(b.weekStart, timeZone))
+  );
+}
+
+/**
+ * Exceção com dias personalizados vale da semana salva em diante até outra exceção substituir.
+ * Pausa de semana (daysOfWeek vazio) afeta somente a semana exata.
+ */
 export function getEffectiveDaysForWeek(
   weekStart: Date,
   defaultDays: number[],
-  overrides: Map<string, number[]>,
+  overrides: WeekOverride[] | Map<string, number[]>,
   timeZone: string
 ): number[] {
-  const key = weekStartKey(weekStart, timeZone);
-  return overrides.get(key) ?? defaultDays;
+  const currentKey = weekStartKey(weekStart, timeZone);
+
+  if (overrides instanceof Map) {
+    return overrides.get(currentKey) ?? defaultDays;
+  }
+
+  for (const override of sortOverridesByWeekStart(overrides, timeZone)) {
+    const key = weekStartKey(override.weekStart, timeZone);
+    if (key === currentKey && isWeekOverrideBlocked(override.daysOfWeek)) {
+      return [];
+    }
+  }
+
+  let effective = defaultDays;
+  for (const override of sortOverridesByWeekStart(overrides, timeZone)) {
+    if (isWeekOverrideBlocked(override.daysOfWeek)) continue;
+    const key = weekStartKey(override.weekStart, timeZone);
+    if (key <= currentKey) {
+      effective = [...new Set(override.daysOfWeek)].sort((a, b) => a - b);
+    }
+  }
+
+  return effective;
 }
 
 function sortedUniqueRounds(matches: MatchForScheduling[]): number[] {
@@ -231,7 +262,7 @@ function sortMatchesForScheduling(matches: MatchForScheduling[]): MatchForSchedu
 function buildScheduledDatesWithDailyCap(
   matches: MatchForScheduling[],
   config: LeagueScheduleConfig,
-  overrides: Map<string, number[]>,
+  overrides: WeekOverride[],
   time: { hour: number; minute: number },
   tz: string,
   cap: number
@@ -288,7 +319,7 @@ function buildScheduledDatesWithDailyCap(
 function buildScheduledDatesLegacy(
   matches: MatchForScheduling[],
   config: LeagueScheduleConfig,
-  overrides: Map<string, number[]>,
+  overrides: WeekOverride[],
   time: { hour: number; minute: number },
   tz: string
 ): ScheduledMatchUpdate[] {
@@ -334,7 +365,7 @@ function findNextSlot(
   cursor: Date,
   weekStart: Date,
   defaultDays: number[],
-  overrides: Map<string, number[]>,
+  overrides: WeekOverride[],
   timeZone: string,
   hour: number,
   minute: number
@@ -432,16 +463,15 @@ export function buildScheduledDates(
 
   const time = parseMatchTime(config.defaultMatchTime) ?? parseMatchTime(DEFAULT_MATCH_TIME)!;
   const tz = config.scheduleTimezone || DEFAULT_SCHEDULE_TIMEZONE;
-  const overrideMap = buildOverridesMap(overrides, tz);
 
   const schedulable = matches.filter(isSchedulableMatch);
   const cap = config.matchesPerMatchDay ?? 0;
 
   if (cap > 0) {
-    return buildScheduledDatesWithDailyCap(schedulable, config, overrideMap, time, tz, cap);
+    return buildScheduledDatesWithDailyCap(schedulable, config, overrides, time, tz, cap);
   }
 
-  return buildScheduledDatesLegacy(schedulable, config, overrideMap, time, tz);
+  return buildScheduledDatesLegacy(schedulable, config, overrides, time, tz);
 }
 
 export function recalculateLeagueEndDate(

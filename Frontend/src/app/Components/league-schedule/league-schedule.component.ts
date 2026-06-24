@@ -11,6 +11,13 @@ import {
   mondayOfWeekContaining,
   toDateInputInTimezone,
 } from '../../Utils/schedule-date.util';
+import {
+  findActiveForwardOverride,
+  findOverrideStartingAt,
+  getEffectiveDaysForWeekKey,
+  isWeekAffectedByOverrides,
+  isWeekOverrideBlocked,
+} from '../../Utils/week-override.util';
 
 interface WeekdayOption {
   value: number;
@@ -83,7 +90,33 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   get hasWeekOverrideForSelected(): boolean {
-    return this.weekOverrides.some((w) => w.weekStart === this.selectedWeekMonday);
+    if (!this.selectedWeekMonday) return false;
+    const defaultDays = this.league?.defaultMatchDays?.length
+      ? this.league.defaultMatchDays
+      : [...this.selectedDays];
+    return isWeekAffectedByOverrides(this.selectedWeekMonday, defaultDays, this.weekOverrides);
+  }
+
+  get selectedWeekStatusLabel(): string {
+    if (!this.selectedWeekMonday) return 'Padrão da liga';
+    const defaultDays = this.league?.defaultMatchDays?.length
+      ? this.league.defaultMatchDays
+      : [...this.selectedDays];
+    const exact = findOverrideStartingAt(this.selectedWeekMonday, this.weekOverrides);
+    if (exact && isWeekOverrideBlocked(exact.daysOfWeek)) {
+      return 'Semana pausada';
+    }
+    if (exact && !isWeekOverrideBlocked(exact.daysOfWeek)) {
+      return 'Exceção a partir desta semana';
+    }
+    const active = findActiveForwardOverride(this.selectedWeekMonday, this.weekOverrides);
+    if (active) {
+      return 'Segue exceção anterior';
+    }
+    if (!this.hasWeekOverrideForSelected) {
+      return 'Padrão da liga';
+    }
+    return 'Calendário alterado';
   }
 
   shiftOverrideWeek(deltaWeeks: number): void {
@@ -141,9 +174,9 @@ export class LeagueScheduleComponent implements OnChanges {
       return 'Nenhum jogo nesta semana — confrontos vão para as semanas seguintes.';
     }
     if (this.overrideDays.size === 0) {
-      return 'Selecione em quais dias haverá jogos nesta semana.';
+      return 'Selecione em quais dias haverá jogos a partir desta semana.';
     }
-    return `Jogos em ${this.formatDays([...this.overrideDays].sort((a, b) => a - b))} (substitui o padrão só nesta semana).`;
+    return `Jogos em ${this.formatDays([...this.overrideDays].sort((a, b) => a - b))} a partir desta semana (substitui o padrão daqui para frente).`;
   }
 
   get isEditingExistingOverride(): boolean {
@@ -151,7 +184,7 @@ export class LeagueScheduleComponent implements OnChanges {
   }
 
   private applyEditorForSelectedWeek(): void {
-    const existing = this.weekOverrides.find((w) => w.weekStart === this.selectedWeekMonday);
+    const existing = findOverrideStartingAt(this.selectedWeekMonday, this.weekOverrides);
     if (existing) {
       this.editingWeekStart = existing.weekStart;
       if (this.isWeekBlocked(existing)) {
@@ -165,10 +198,22 @@ export class LeagueScheduleComponent implements OnChanges {
     }
 
     this.editingWeekStart = null;
-    this.overrideMode = 'custom';
     const defaultDays = this.league?.defaultMatchDays?.length
       ? this.league.defaultMatchDays
       : [...this.selectedDays];
+    const effectiveDays = getEffectiveDaysForWeekKey(
+      this.selectedWeekMonday,
+      defaultDays,
+      this.weekOverrides
+    );
+    const activeForward = findActiveForwardOverride(this.selectedWeekMonday, this.weekOverrides);
+    if (activeForward && !isWeekOverrideBlocked(activeForward.daysOfWeek)) {
+      this.overrideMode = 'custom';
+      this.overrideDays = new Set(effectiveDays);
+      return;
+    }
+
+    this.overrideMode = 'custom';
     this.overrideDays = new Set(defaultDays);
   }
 
@@ -253,7 +298,7 @@ export class LeagueScheduleComponent implements OnChanges {
     if (this.isWeekBlocked(override)) {
       return 'Sem jogos nesta semana';
     }
-    return `Dias: ${this.formatDays(override.daysOfWeek)}`;
+    return `A partir desta semana: ${this.formatDays(override.daysOfWeek)}`;
   }
 
   editWeekOverride(override: { weekStart: string; daysOfWeek: number[] }): void {

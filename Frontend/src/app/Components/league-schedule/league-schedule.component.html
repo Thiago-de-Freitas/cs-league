@@ -54,7 +54,7 @@
   <div class="schedule-overrides" *ngIf="canManage">
     <header class="overrides-header">
       <h3 class="schedule-subtitle">Exceções de semana</h3>
-      <p class="overrides-lead">Pause ou altere dias em semanas específicas. Salve e regenere o calendário para aplicar.</p>
+      <p class="overrides-lead">Pause uma semana específica ou altere os dias a partir de uma semana em diante. Salve e regenere o calendário para aplicar.</p>
     </header>
 
     <section class="overrides-saved gc-card" *ngIf="weekOverrides.length > 0">
@@ -99,8 +99,8 @@
               [disabled]="overrideSaving">
               <span class="week-bar-range">{{ selectedWeekRangeLabel }}</span>
               <span class="week-bar-meta">
-                <span *ngIf="hasWeekOverrideForSelected" class="week-bar-tag">Com exceção</span>
-                <span *ngIf="!hasWeekOverrideForSelected" class="week-bar-tag is-neutral">Padrão da liga</span>
+                <span *ngIf="hasWeekOverrideForSelected" class="week-bar-tag">{{ selectedWeekStatusLabel }}</span>
+                <span *ngIf="!hasWeekOverrideForSelected" class="week-bar-tag is-neutral">{{ selectedWeekStatusLabel }}</span>
               </span>
             </button>
             <input
@@ -154,6 +154,9 @@
 
         <p class="editor-context" *ngIf="overrideMode === 'custom'">
           Padrão da liga: <strong>{{ defaultScheduleSummary }}</strong>
+        </p>
+        <p class="editor-context" *ngIf="overrideMode === 'blocked'">
+          A pausa vale somente para a semana selecionada.
         </p>
 
         <div class="weekday-grid" *ngIf="overrideMode === 'custom'">
