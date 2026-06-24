@@ -716,12 +716,12 @@
   color: var(--gc-orange-hover);
 }
 
-.admin-settings {
-  margin-bottom: 1.25rem;
-  padding: 1rem 1.1rem;
-  background: var(--gc-bg-secondary);
+.admin-inline-panel .admin-setting-row {
+  margin-top: 0.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--gc-surface);
   border: 1px solid var(--gc-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
 }
 
 .admin-setting-row {
@@ -751,63 +751,6 @@
   font-size: 0.85rem;
   color: var(--gc-text-secondary);
   line-height: 1.45;
-}
-
-.gc-toggle {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.gc-toggle.is-loading {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.gc-toggle-input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.gc-toggle-track {
-  position: relative;
-  display: block;
-  width: 44px;
-  height: 24px;
-  background: var(--gc-surface-elevated);
-  border: 1px solid var(--gc-border);
-  border-radius: 999px;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.gc-toggle-track::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  background: var(--gc-text-secondary);
-  border-radius: 50%;
-  transition: transform 0.2s, background 0.2s;
-}
-
-.gc-toggle-input:checked + .gc-toggle-track {
-  background: var(--gc-orange-dim);
-  border-color: var(--gc-orange);
-}
-
-.gc-toggle-input:checked + .gc-toggle-track::after {
-  transform: translateX(20px);
-  background: var(--gc-orange);
-}
-
-.gc-toggle-input:focus-visible + .gc-toggle-track {
-  outline: 2px solid var(--gc-orange);
-  outline-offset: 2px;
 }
 
 .admin-toolbar {

@@ -62,6 +62,7 @@ export class LeagueDetailsComponent implements OnInit {
   availableTeams: Pick<Team, 'id' | 'name' | 'tag'>[] = [];
   bracketSizes = [] as number[];
   editMaxTeams = false;
+  editRegistrationVisibility = false;
   newMaxTeams: number | null = null;
   minTeams = MIN_LEAGUE_TEAMS;
   maxTeamsLimit = MAX_LEAGUE_TEAMS;
@@ -241,21 +242,44 @@ export class LeagueDetailsComponent implements OnInit {
     });
   }
 
-  toggleRegistrationOpen(event: Event): void {
-    if (!this.leagueId || !this.league || this.hasTournamentStarted) return;
-    const next = (event.target as HTMLInputElement).checked;
+  get canEditRegistrationVisibility(): boolean {
+    return !this.isArchived && !this.hasTournamentStarted;
+  }
+
+  get registrationVisibilityLabel(): string {
+    return this.league?.registrationOpen ? 'Pública' : 'Privada';
+  }
+
+  openMaxTeamsEditor(): void {
+    this.editRegistrationVisibility = false;
+    this.editMaxTeams = !this.editMaxTeams;
+  }
+
+  openRegistrationVisibilityEditor(): void {
+    this.editMaxTeams = false;
+    this.editRegistrationVisibility = !this.editRegistrationVisibility;
+  }
+
+  setRegistrationVisibility(isPublic: boolean): void {
+    if (!this.leagueId || !this.league || !this.canEditRegistrationVisibility) return;
+    if (!!this.league.registrationOpen === isPublic) return;
     this.togglingRegistration = true;
-    this.leagueService.updateLeague(this.leagueId, { registrationOpen: next }).subscribe({
+    this.leagueService.updateLeague(this.leagueId, { registrationOpen: isPublic }).subscribe({
       next: (league) => {
         this.league = league;
         this.togglingRegistration = false;
-        this.notify.success(next ? 'Inscrições abertas para outros jogadores.' : 'Inscrições fechadas.');
+        this.notify.success(isPublic ? 'Liga definida como pública.' : 'Liga definida como privada.');
       },
       error: (err) => {
         this.togglingRegistration = false;
-        this.apiError(err, 'Erro ao atualizar inscrições');
+        this.apiError(err, 'Erro ao atualizar visibilidade da liga');
       },
     });
+  }
+
+  toggleRegistrationOpen(event: Event): void {
+    const next = (event.target as HTMLInputElement).checked;
+    this.setRegistrationVisibility(next);
   }
 
   private apiError(err: unknown, fallback: string): void {

@@ -122,9 +122,9 @@
       <div class="form-group">
         <label class="form-label checkbox-label">
           <input type="checkbox" formControlName="registrationOpen">
-          Permitir que outros jogadores inscrevam seus times
+          Liga pública (outros jogadores podem inscrever times)
         </label>
-        <p class="form-hint">Com inscrições abertas, a liga aparece no dashboard de todos os jogadores.</p>
+        <p class="form-hint">Ligas públicas aparecem no dashboard. Desmarque para criar uma liga privada.</p>
       </div>
 
       <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>

@@ -11,7 +11,7 @@
       <span *ngIf="league.endDate && !isSingleGroupFormat">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
       <span *ngIf="isGroupStageFormat" class="badge badge-orange">{{ formatBadgeLabel }}</span>
-      <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Inscrições abertas</span>
+      <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Pública</span>
     </div>
     <p *ngIf="isArchived" class="archived-notice">Esta liga está arquivada e não aparece na página inicial.</p>
     <p *ngIf="isAdmin && league.status === 'completed' && !isArchived" class="completed-notice">
@@ -75,7 +75,7 @@
         <div class="admin-stat">
           <span class="admin-stat-label">Times inscritos</span>
           <span class="admin-stat-value">{{ teamCapacityLabel }}</span>
-          <button type="button" class="admin-stat-link" *ngIf="!isArchived" (click)="editMaxTeams = !editMaxTeams">
+          <button type="button" class="admin-stat-link" *ngIf="!isArchived" (click)="openMaxTeamsEditor()">
             {{ editMaxTeams ? 'Fechar' : 'Alterar limite' }}
           </button>
         </div>
@@ -100,10 +100,20 @@
           </span>
         </div>
 
-        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived">
-          <span class="admin-stat-label">Inscrições públicas</span>
+        <div class="admin-stat" *ngIf="!isArchived">
+          <span class="admin-stat-label">Visibilidade</span>
           <span class="admin-stat-value" [class.is-open]="league.registrationOpen">
-            {{ league.registrationOpen ? 'Abertas' : 'Fechadas' }}
+            {{ registrationVisibilityLabel }}
+          </span>
+          <button
+            type="button"
+            class="admin-stat-link"
+            *ngIf="canEditRegistrationVisibility"
+            (click)="openRegistrationVisibilityEditor()">
+            {{ editRegistrationVisibility ? 'Fechar' : 'Alterar' }}
+          </button>
+          <span class="admin-stat-note" *ngIf="!canEditRegistrationVisibility && hasTournamentStarted">
+            Não pode ser alterada após o início do torneio.
           </span>
         </div>
       </div>
@@ -130,11 +140,18 @@
         </div>
       </div>
 
-      <div class="admin-settings" *ngIf="!hasTournamentStarted && !isArchived">
+      <div *ngIf="editRegistrationVisibility && canEditRegistrationVisibility" class="admin-inline-panel">
+        <h3 class="admin-panel-title">Visibilidade da liga</h3>
+        <p class="admin-panel-desc">
+          Liga <strong>pública</strong> aparece no dashboard e permite que donos de time se inscrevam.
+          Liga <strong>privada</strong> fica visível só para você adicionar times manualmente.
+        </p>
         <div class="admin-setting-row">
           <div class="admin-setting-copy">
-            <span class="admin-setting-title">Inscrições abertas para outros jogadores</span>
-            <p class="admin-setting-desc">Jogadores verão esta liga no dashboard e poderão inscrever times dos quais são donos.</p>
+            <span class="admin-setting-title">{{ registrationVisibilityLabel }}</span>
+            <p class="admin-setting-desc">
+              {{ league.registrationOpen ? 'Outros jogadores podem inscrever times.' : 'Somente o administrador adiciona times.' }}
+            </p>
           </div>
           <label class="gc-toggle" [class.is-loading]="togglingRegistration">
             <input
@@ -144,7 +161,7 @@
               [disabled]="togglingRegistration"
               (change)="toggleRegistrationOpen($event)">
             <span class="gc-toggle-track" aria-hidden="true"></span>
-            <span class="sr-only">Inscrições abertas para outros jogadores</span>
+            <span class="sr-only">Alternar entre liga pública e privada</span>
           </label>
         </div>
       </div>
