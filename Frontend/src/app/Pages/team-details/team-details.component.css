@@ -65,6 +65,68 @@
   letter-spacing: 0.05em;
 }
 .member-name { font-weight: 600; }
+
+.admin-roster-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--gc-border);
+  border-radius: 4px;
+  background: var(--gc-bg-secondary);
+  color: var(--gc-orange);
+  font-size: 0.9rem;
+}
+
+.roster-list .roster-item {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.roster-item-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.roster-item-tag {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.roster-tag-label {
+  margin-bottom: 0.35rem;
+}
+
+.roster-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.roster-tag-input {
+  flex: 1;
+  min-width: 10rem;
+  max-width: 14rem;
+}
+
+.member-tag-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.roster-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.roster-remove {
+  color: var(--gc-red);
+}
+
 .mt-4 { margin-top: 1.5rem; }
 .mb-4 { margin-bottom: 1rem; }
 .danger-zone { padding-top: 1rem; border-top: 1px solid var(--gc-border); }

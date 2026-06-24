@@ -8,6 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
+import { parsePlayerPositionOptional, type PlayerPosition } from '../lib/playerPosition';
 import { sanitizeFileExtension, isPathInsideBase } from '../lib/pathSafe';
 
 const router = Router();
@@ -86,6 +87,27 @@ async function getTeamWithDetails(teamId: string) {
   });
 }
 
+function canManageTeamRoster(user: { userId: string; role: string }, team: { ownerId: string }): boolean {
+  return team.ownerId === user.userId || isAdmin(user);
+}
+
+function parseMemberRole(value: unknown): 'CAPTAIN' | 'MEMBER' | null {
+  if (value === 'CAPTAIN' || value === 'MEMBER') return value;
+  return null;
+}
+
+const MEMBER_TAG_MAX_LENGTH = 12;
+
+function parseMemberTag(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MEMBER_TAG_MAX_LENGTH) return undefined;
+  return trimmed;
+}
+
 function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetails>>>) {
   const stats = sumLeagueTeamStats(team.leagueTeams);
 
@@ -104,6 +126,8 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
       name: m.user.displayName,
       IGN: m.user.displayName,
       role: m.role,
+      memberTag: m.memberTag,
+      position: m.position,
       email: m.user.email,
       steamId: m.user.steamId,
     })),
@@ -133,6 +157,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         members: {
           select: {
             role: true,
+            memberTag: true,
+            position: true,
             user: { select: { id: true, displayName: true } },
           },
         },
@@ -158,6 +184,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           name: m.user.displayName,
           IGN: m.user.displayName,
           role: m.role,
+          memberTag: m.memberTag,
+          position: m.position,
         })),
         wins: stats.wins,
         losses: stats.losses,
@@ -372,7 +400,7 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
       res.status(404).json({ error: 'Time não encontrado' });
       return;
     }
-    if (team.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    if (!canManageTeamRoster(req.user!, team)) {
       res.status(403).json({ error: 'Sem permissão' });
       return;
     }
@@ -475,6 +503,172 @@ router.get('/invites/pending', authMiddleware, async (req: AuthRequest, res: Res
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar convites' });
+  }
+});
+
+router.post('/:id/members', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+    if (!canManageTeamRoster(req.user!, team)) {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    const { userId } = req.body;
+    if (!userId || typeof userId !== 'string') {
+      res.status(400).json({ error: 'userId é obrigatório' });
+      return;
+    }
+
+    const role = parseMemberRole(req.body.role) ?? 'MEMBER';
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    const existingMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: req.params.id, userId } },
+    });
+    if (existingMember) {
+      res.status(409).json({ error: 'Usuário já é membro do time' });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (role === 'CAPTAIN') {
+        await tx.teamMember.updateMany({
+          where: { teamId: req.params.id, role: 'CAPTAIN' },
+          data: { role: 'MEMBER' },
+        });
+      }
+      await tx.teamMember.create({
+        data: { teamId: req.params.id, userId, role },
+      });
+      await tx.teamInvite.updateMany({
+        where: { teamId: req.params.id, invitedUserId: userId, status: 'PENDING' },
+        data: { status: 'ACCEPTED' },
+      });
+    });
+
+    const full = await getTeamWithDetails(req.params.id);
+    res.status(201).json(formatTeam(full!));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao adicionar jogador' });
+  }
+});
+
+router.patch('/:id/members/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+    if (!canManageTeamRoster(req.user!, team)) {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    const roleProvided = Object.prototype.hasOwnProperty.call(req.body, 'role');
+    const memberTagProvided = Object.prototype.hasOwnProperty.call(req.body, 'memberTag');
+    const positionProvided = Object.prototype.hasOwnProperty.call(req.body, 'position');
+    if (!roleProvided && !memberTagProvided && !positionProvided) {
+      res.status(400).json({ error: 'Informe role, memberTag e/ou position' });
+      return;
+    }
+
+    const role = roleProvided ? parseMemberRole(req.body.role) : undefined;
+    if (roleProvided && !role) {
+      res.status(400).json({ error: 'role deve ser CAPTAIN ou MEMBER' });
+      return;
+    }
+
+    const memberTag = memberTagProvided ? parseMemberTag(req.body.memberTag) : undefined;
+    if (memberTagProvided && memberTag === undefined) {
+      res.status(400).json({ error: `memberTag deve ser texto de até ${MEMBER_TAG_MAX_LENGTH} caracteres ou null` });
+      return;
+    }
+
+    const position = positionProvided ? parsePlayerPositionOptional(req.body.position) : undefined;
+    if (positionProvided && position === undefined) {
+      res.status(400).json({ error: 'position inválida' });
+      return;
+    }
+
+    const member = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: req.params.id, userId: req.params.userId } },
+    });
+    if (!member) {
+      res.status(404).json({ error: 'Jogador não encontrado no time' });
+      return;
+    }
+
+    const updateData: {
+      role?: 'CAPTAIN' | 'MEMBER';
+      memberTag?: string | null;
+      position?: PlayerPosition | null;
+    } = {};
+    if (role) updateData.role = role;
+    if (memberTagProvided) updateData.memberTag = memberTag ?? null;
+    if (positionProvided) updateData.position = position ?? null;
+
+    await prisma.$transaction(async (tx) => {
+      if (role === 'CAPTAIN') {
+        await tx.teamMember.updateMany({
+          where: { teamId: req.params.id, role: 'CAPTAIN', userId: { not: req.params.userId } },
+          data: { role: 'MEMBER' },
+        });
+      }
+      await tx.teamMember.update({
+        where: { teamId_userId: { teamId: req.params.id, userId: req.params.userId } },
+        data: updateData,
+      });
+    });
+
+    const full = await getTeamWithDetails(req.params.id);
+    res.json(formatTeam(full!));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar jogador' });
+  }
+});
+
+router.delete('/:id/members/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      res.status(404).json({ error: 'Time não encontrado' });
+      return;
+    }
+    if (!canManageTeamRoster(req.user!, team)) {
+      res.status(403).json({ error: 'Sem permissão' });
+      return;
+    }
+
+    const member = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: req.params.id, userId: req.params.userId } },
+    });
+    if (!member) {
+      res.status(404).json({ error: 'Jogador não encontrado no time' });
+      return;
+    }
+
+    await prisma.teamMember.delete({
+      where: { teamId_userId: { teamId: req.params.id, userId: req.params.userId } },
+    });
+
+    const full = await getTeamWithDetails(req.params.id);
+    res.json(formatTeam(full!));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover jogador' });
   }
 });
 

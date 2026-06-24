@@ -19,8 +19,15 @@
   line-height: 1.4;
 }
 
-.ranking-filter {
+.ranking-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
   margin-top: 0.75rem;
+}
+
+.ranking-filter {
+  flex: 1 1 220px;
   max-width: 280px;
 }
 
@@ -75,6 +82,11 @@
   display: block;
   font-size: 0.75rem;
   margin-top: 0.15rem;
+}
+
+.ranking-position-badge {
+  margin-left: 0.35rem;
+  vertical-align: middle;
 }
 
 .ranking-team-link {

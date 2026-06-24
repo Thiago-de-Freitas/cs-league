@@ -13,6 +13,8 @@ export interface Player {
   name: string;
   IGN: string;
   role: string;
+  memberTag?: string | null;
+  position?: string | null;
   email?: string;
   steamId?: string | null;
 }
@@ -217,6 +219,8 @@ export interface PlayerRankingEntry {
   playerName: string;
   displayName?: string | null;
   steamId?: string | null;
+  position?: string | null;
+  positionLabel?: string | null;
   /** Quantidade de jogos de liga (demos oficiais de partida). */
   demos: number;
   matches?: number;

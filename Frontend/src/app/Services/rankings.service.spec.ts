@@ -29,11 +29,20 @@ describe('RankingsService', () => {
   });
 
   it('getPlayerRankings can filter by league', (done) => {
-    service.getPlayerRankings('league-1').subscribe((rows) => {
+    service.getPlayerRankings({ leagueId: 'league-1' }).subscribe((rows) => {
       expect(rows).toEqual([]);
       done();
     });
     const req = httpMock.expectOne('/api/rankings/players?leagueId=league-1');
+    req.flush([]);
+  });
+
+  it('getPlayerRankings can filter by position', (done) => {
+    service.getPlayerRankings({ position: 'AWP' }).subscribe((rows) => {
+      expect(rows).toEqual([]);
+      done();
+    });
+    const req = httpMock.expectOne('/api/rankings/players?position=AWP');
     req.flush([]);
   });
 

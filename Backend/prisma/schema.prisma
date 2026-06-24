@@ -17,6 +17,16 @@ enum TeamMemberRole {
   MEMBER
 }
 
+enum PlayerPosition {
+  AWP
+  RIFLER
+  ENTRY
+  LURKER
+  IGL
+  SUPPORT
+  FLEX
+}
+
 enum InviteStatus {
   PENDING
   ACCEPTED
@@ -91,10 +101,12 @@ model Team {
 }
 
 model TeamMember {
-  id     String         @id @default(cuid())
-  teamId String
-  userId String
-  role   TeamMemberRole @default(MEMBER)
+  id         String          @id @default(cuid())
+  teamId     String
+  userId     String
+  role       TeamMemberRole  @default(MEMBER)
+  memberTag  String?
+  position   PlayerPosition?
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

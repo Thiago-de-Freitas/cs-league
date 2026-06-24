@@ -94,6 +94,32 @@ export class TeamService {
     return this.invitesCache;
   }
 
+  addMember(teamId: string, userId: string, role: 'CAPTAIN' | 'MEMBER' = 'MEMBER'): Observable<Team> {
+    return this.http.post<Team>(`${this.apiUrl}/${teamId}/members`, { userId, role }).pipe(
+      tap(() => this.invalidateTeams())
+    );
+  }
+
+  updateMember(
+    teamId: string,
+    userId: string,
+    data: { role?: 'CAPTAIN' | 'MEMBER'; memberTag?: string | null; position?: string | null }
+  ): Observable<Team> {
+    return this.http.patch<Team>(`${this.apiUrl}/${teamId}/members/${userId}`, data).pipe(
+      tap(() => this.invalidateTeams())
+    );
+  }
+
+  updateMemberRole(teamId: string, userId: string, role: 'CAPTAIN' | 'MEMBER'): Observable<Team> {
+    return this.updateMember(teamId, userId, { role });
+  }
+
+  removeMember(teamId: string, userId: string): Observable<Team> {
+    return this.http.delete<Team>(`${this.apiUrl}/${teamId}/members/${userId}`).pipe(
+      tap(() => this.invalidateTeams())
+    );
+  }
+
   searchUsers(query: string): Observable<User[]> {
     return this.http.get<User[]>(`/api/users/search?q=${encodeURIComponent(query)}`);
   }

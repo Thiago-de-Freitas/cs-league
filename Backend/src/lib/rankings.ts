@@ -1,11 +1,19 @@
 import { prisma } from './prisma';
 import { ARCHIVED_LEAGUE_TEAM_WHERE } from './teamStats';
+import {
+  CAPTAIN_RANKING_FILTER,
+  getPlayerPositionLabel,
+  type PlayerPosition,
+  type RankingPositionFilter,
+} from './playerPosition';
 
 export type PlayerRankingEntry = {
   rank: number;
   playerName: string;
   displayName: string | null;
   steamId: string | null;
+  position: PlayerPosition | null;
+  positionLabel: string | null;
   /** Jogos de liga com demo analisada (não inclui uploads pessoais). */
   demos: number;
   matches: number;
@@ -22,6 +30,8 @@ export type LeaguePlayerStatRow = {
   steamId: string | null;
   playerName: string;
   matchId: string;
+  team1Id: string;
+  team2Id: string;
   kills: number;
   deaths: number;
   adr: number;
@@ -29,10 +39,56 @@ export type LeaguePlayerStatRow = {
   kast: number;
 };
 
-export type AggregatedPlayerRanking = Omit<PlayerRankingEntry, 'rank' | 'displayName'>;
+export type AggregatedPlayerRanking = Omit<PlayerRankingEntry, 'rank' | 'displayName' | 'positionLabel'>;
+
+export type TeamMembershipContext = {
+  position: PlayerPosition | null;
+  role: 'CAPTAIN' | 'MEMBER';
+};
 
 export function playerStatKey(steamId: string | null | undefined, playerName: string): string {
   return (steamId?.trim() || playerName).toLowerCase();
+}
+
+export function membershipKey(steamId: string, teamId: string): string {
+  return `${steamId}|${teamId}`;
+}
+
+export function resolvePlayerTeamId(
+  steamId: string | null,
+  team1Id: string,
+  team2Id: string,
+  memberships: Map<string, TeamMembershipContext>
+): string | null {
+  if (!steamId?.trim()) return null;
+  const inTeam1 = memberships.has(membershipKey(steamId, team1Id));
+  const inTeam2 = memberships.has(membershipKey(steamId, team2Id));
+  if (inTeam1 && !inTeam2) return team1Id;
+  if (inTeam2 && !inTeam1) return team2Id;
+  if (inTeam1) return team1Id;
+  return null;
+}
+
+export function statRowMatchesPositionFilter(
+  row: LeaguePlayerStatRow,
+  filter: RankingPositionFilter,
+  memberships: Map<string, TeamMembershipContext>
+): boolean {
+  const teamId = resolvePlayerTeamId(row.steamId, row.team1Id, row.team2Id, memberships);
+  if (!teamId || !row.steamId?.trim()) return false;
+  const membership = memberships.get(membershipKey(row.steamId, teamId));
+  if (!membership) return false;
+  if (filter === CAPTAIN_RANKING_FILTER) return membership.role === 'CAPTAIN';
+  return membership.position === filter;
+}
+
+export function filterStatsByPosition(
+  rows: LeaguePlayerStatRow[],
+  filter: RankingPositionFilter | undefined,
+  memberships: Map<string, TeamMembershipContext>
+): LeaguePlayerStatRow[] {
+  if (!filter) return rows;
+  return rows.filter((row) => statRowMatchesPositionFilter(row, filter, memberships));
 }
 
 /** ADR e stats derivados da média por jogo de liga; ignora demos pessoais no caller. */
@@ -137,6 +193,7 @@ export function aggregatePlayerRankingsByLeagueMatches(
       return {
         playerName: p.playerName,
         steamId: p.steamId,
+        position: null,
         demos: p.matches,
         matches: p.matches,
         kills,
@@ -176,7 +233,58 @@ export function calcRating(kd: number, adr: number, kast: number, hsPercent: num
   return Math.round(((kd / 1.2) * 0.35 + (adr / 85) * 0.35 + (kast / 75) * 0.2 + (hsPercent / 50) * 0.1) * 100) / 100;
 }
 
-export async function getPlayerRankings(limit = 10, leagueId?: string): Promise<PlayerRankingEntry[]> {
+async function loadMembershipsForStats(
+  rows: Array<{ team1Id: string; team2Id: string }>
+): Promise<Map<string, TeamMembershipContext>> {
+  const teamIds = new Set<string>();
+  for (const row of rows) {
+    teamIds.add(row.team1Id);
+    teamIds.add(row.team2Id);
+  }
+  if (teamIds.size === 0) return new Map();
+
+  const members = await prisma.teamMember.findMany({
+    where: { teamId: { in: [...teamIds] } },
+    select: {
+      teamId: true,
+      role: true,
+      position: true,
+      user: { select: { steamId: true } },
+    },
+  });
+
+  const memberships = new Map<string, TeamMembershipContext>();
+  for (const member of members) {
+    const steamId = member.user.steamId?.trim();
+    if (!steamId) continue;
+    memberships.set(membershipKey(steamId, member.teamId), {
+      position: member.position,
+      role: member.role,
+    });
+  }
+  return memberships;
+}
+
+function resolveCurrentPosition(
+  steamId: string | null,
+  memberships: Map<string, TeamMembershipContext>
+): PlayerPosition | null {
+  if (!steamId?.trim()) return null;
+  for (const [key, membership] of memberships) {
+    if (!key.startsWith(`${steamId}|`)) continue;
+    if (membership.position) return membership.position;
+  }
+  return null;
+}
+
+export type PlayerRankingOptions = {
+  leagueId?: string;
+  position?: RankingPositionFilter;
+};
+
+export async function getPlayerRankings(limit = 10, options: PlayerRankingOptions = {}): Promise<PlayerRankingEntry[]> {
+  const { leagueId, position } = options;
+
   const stats = await prisma.matchPlayerStat.findMany({
     where: {
       demo: leagueDemoStatsWhere(leagueId),
@@ -189,23 +297,34 @@ export async function getPlayerRankings(limit = 10, leagueId?: string): Promise<
       adr: true,
       hsPercent: true,
       kast: true,
-      demo: { select: { matchId: true } },
+      demo: {
+        select: {
+          matchId: true,
+          match: { select: { team1Id: true, team2Id: true } },
+        },
+      },
     },
     orderBy: { id: 'desc' },
     take: 8000,
   });
 
-  const rows: LeaguePlayerStatRow[] = stats
+  const rawRows: LeaguePlayerStatRow[] = stats
+    .filter((stat) => stat.demo.matchId && stat.demo.match)
     .map((stat) => ({
       steamId: stat.steamId,
       playerName: stat.playerName,
       matchId: stat.demo.matchId!,
+      team1Id: stat.demo.match!.team1Id,
+      team2Id: stat.demo.match!.team2Id,
       kills: stat.kills,
       deaths: stat.deaths,
       adr: stat.adr,
       hsPercent: stat.hsPercent,
       kast: stat.kast,
     }));
+
+  const memberships = await loadMembershipsForStats(rawRows);
+  const rows = filterStatsByPosition(rawRows, position, memberships);
 
   const steamIds = [...new Set(rows.map((r) => r.steamId).filter((id): id is string => !!id?.trim()))];
 
@@ -218,11 +337,16 @@ export async function getPlayerRankings(limit = 10, leagueId?: string): Promise<
 
   const displayBySteam = new Map(users.map((u) => [u.steamId!, u.displayName]));
 
-  const ranked = aggregatePlayerRankingsByLeagueMatches(rows, limit).map((entry, index) => ({
-    rank: index + 1,
-    ...entry,
-    displayName: entry.steamId ? displayBySteam.get(entry.steamId) || null : null,
-  }));
+  const ranked = aggregatePlayerRankingsByLeagueMatches(rows, limit).map((entry, index) => {
+    const currentPosition = resolveCurrentPosition(entry.steamId, memberships);
+    return {
+      rank: index + 1,
+      ...entry,
+      position: currentPosition,
+      positionLabel: currentPosition ? getPlayerPositionLabel(currentPosition) : null,
+      displayName: entry.steamId ? displayBySteam.get(entry.steamId) || null : null,
+    };
+  });
 
   return ranked;
 }
@@ -258,18 +382,25 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
       adr: true,
       hsPercent: true,
       kast: true,
-      demo: { select: { matchId: true } },
+      demo: {
+        select: {
+          matchId: true,
+          match: { select: { team1Id: true, team2Id: true } },
+        },
+      },
     },
   });
 
   if (stats.length === 0) return null;
 
   const rows: LeaguePlayerStatRow[] = stats
-    .filter((s) => s.demo.matchId)
+    .filter((s) => s.demo.matchId && s.demo.match)
     .map((s) => ({
       steamId: normalized,
       playerName: s.playerName,
       matchId: s.demo.matchId!,
+      team1Id: s.demo.match!.team1Id,
+      team2Id: s.demo.match!.team2Id,
       kills: s.kills,
       deaths: s.deaths,
       adr: s.adr,

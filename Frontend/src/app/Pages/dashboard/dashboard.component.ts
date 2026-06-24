@@ -14,6 +14,7 @@ import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/cre
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { Demo } from '../../Models/interfaces';
 import { formatTeamCapacity } from '../../Utils/bracket.util';
+import { RANKING_POSITION_OPTIONS, RankingPositionFilter, getPlayerPositionLabel } from '../../Utils/player-positions';
 
 @Component({
   selector: 'app-dashboard',
@@ -38,6 +39,8 @@ export class DashboardComponent implements OnInit {
   teamRankings: TeamRankingEntry[] = [];
   rankingsLoading = true;
   rankingLeagueId = '';
+  rankingPosition = '';
+  readonly rankingPositionOptions = RANKING_POSITION_OPTIONS;
   formatTeamCapacity = formatTeamCapacity;
 
   constructor(
@@ -70,6 +73,7 @@ export class DashboardComponent implements OnInit {
         );
 
     const leagueId = this.rankingLeagueId || undefined;
+    const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
     this.rankingsLoading = true;
 
     forkJoin({
@@ -77,7 +81,7 @@ export class DashboardComponent implements OnInit {
       openLeagues: this.leagueService.getOpenLeagues().pipe(safe('ligas abertas', [] as League[])),
       teams: this.teamService.getTeams().pipe(safe('times', [] as Team[])),
       invites: this.teamService.getPendingInvites().pipe(safe('convites', [] as TeamInvite[])),
-      playerRankings: this.rankingsService.getPlayerRankings(leagueId).pipe(safe('ranking de jogadores', [] as PlayerRankingEntry[])),
+      playerRankings: this.rankingsService.getPlayerRankings({ leagueId, position }).pipe(safe('ranking de jogadores', [] as PlayerRankingEntry[])),
       teamRankings: this.rankingsService.getTeamRankings().pipe(safe('ranking de times', [] as TeamRankingEntry[])),
     })
       .pipe(finalize(() => {
@@ -100,8 +104,9 @@ export class DashboardComponent implements OnInit {
   loadRankings(): void {
     this.rankingsLoading = true;
     const leagueId = this.rankingLeagueId || undefined;
+    const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
     forkJoin({
-      playerRankings: this.rankingsService.getPlayerRankings(leagueId),
+      playerRankings: this.rankingsService.getPlayerRankings({ leagueId, position }),
       teamRankings: this.rankingsService.getTeamRankings(),
     })
       .pipe(finalize(() => (this.rankingsLoading = false)))
@@ -121,6 +126,24 @@ export class DashboardComponent implements OnInit {
     this.loadRankings();
   }
 
+  onRankingPositionChange(): void {
+    this.loadRankings();
+  }
+
+  get rankingPlayersTitle(): string {
+    if (!this.rankingPosition) return 'Top Jogadores';
+    const option = this.rankingPositionOptions.find((item) => item.id === this.rankingPosition);
+    return `Top ${option?.label ?? 'Jogadores'}`;
+  }
+
+  get rankingPlayersSubtitle(): string {
+    if (!this.rankingPosition) {
+      return 'ADR médio em jogos de ligas (demos oficiais das partidas)';
+    }
+    const option = this.rankingPositionOptions.find((item) => item.id === this.rankingPosition);
+    return `Ranking de ${option?.label ?? 'posição'} com base no ADR médio em jogos de ligas`;
+  }
+
   getPlayerProfileLink(player: PlayerRankingEntry): string[] | null {
     if (!player.steamId?.trim()) return null;
     return ['/player', player.steamId];
@@ -128,6 +151,10 @@ export class DashboardComponent implements OnInit {
 
   getPlayerLabel(player: PlayerRankingEntry): string {
     return player.displayName || player.playerName;
+  }
+
+  getPlayerPositionBadge(player: PlayerRankingEntry): string {
+    return player.positionLabel || getPlayerPositionLabel(player.position);
   }
 
   getKd(player: PlayerRankingEntry): string {

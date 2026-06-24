@@ -88,14 +88,23 @@
     <div class="dashboard-rankings">
       <section class="dashboard-card gc-card ranking-card">
         <div class="ranking-card-header">
-          <h2 class="gc-card-title">Top Jogadores</h2>
-          <p class="meta ranking-subtitle">ADR médio em jogos de ligas (demos oficiais das partidas)</p>
-          <div class="ranking-filter" *ngIf="leagues.length > 0">
-            <label class="form-label" for="ranking-league">Filtrar por liga</label>
-            <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
-              <option value="">Todas as ligas</option>
-              <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
-            </select>
+          <h2 class="gc-card-title">{{ rankingPlayersTitle }}</h2>
+          <p class="meta ranking-subtitle">{{ rankingPlayersSubtitle }}</p>
+          <div class="ranking-filters">
+            <div class="ranking-filter" *ngIf="leagues.length > 0">
+              <label class="form-label" for="ranking-league">Filtrar por liga</label>
+              <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
+                <option value="">Todas as ligas</option>
+                <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
+              </select>
+            </div>
+            <div class="ranking-filter">
+              <label class="form-label" for="ranking-position">Filtrar por posição</label>
+              <select id="ranking-position" class="input-field" [(ngModel)]="rankingPosition" (ngModelChange)="onRankingPositionChange()">
+                <option value="">Todas as posições</option>
+                <option *ngFor="let option of rankingPositionOptions" [value]="option.id">{{ option.label }}</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -120,6 +129,9 @@
                     <strong>{{ getPlayerLabel(player) }}</strong>
                   </a>
                   <strong *ngIf="!getPlayerProfileLink(player)">{{ getPlayerLabel(player) }}</strong>
+                  <span *ngIf="getPlayerPositionBadge(player)" class="badge badge-gray ranking-position-badge">
+                    {{ getPlayerPositionBadge(player) }}
+                  </span>
                   <span class="meta ranking-demos">{{ player.matches ?? player.demos }} jogo(s)</span>
                 </td>
                 <td class="stat-highlight">{{ player.adr }}</td>
@@ -129,7 +141,9 @@
             </tbody>
           </table>
         </div>
-        <p *ngIf="!rankingsLoading && playerRankings.length === 0" class="meta">Nenhuma estatística disponível ainda.</p>
+        <p *ngIf="!rankingsLoading && playerRankings.length === 0" class="meta">
+          {{ rankingPosition ? 'Nenhum jogador com esta posição possui estatísticas ainda.' : 'Nenhuma estatística disponível ainda.' }}
+        </p>
       </section>
 
       <section class="dashboard-card gc-card ranking-card ranking-card-wide">
