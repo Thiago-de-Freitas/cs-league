@@ -17,6 +17,8 @@ export interface Player {
   position?: string | null;
   email?: string;
   steamId?: string | null;
+  adr?: number | null;
+  matches?: number;
 }
 
 export interface Team {
@@ -127,9 +129,35 @@ export interface Match {
   demos?: Demo[];
   aggregatedStats?: MatchPlayerStat[];
   hasGeneralDemo?: boolean;
+  hasFileDemo?: boolean;
+  manualDemoId?: string | null;
+  roster?: {
+    team1: MatchRosterPlayer[];
+    team2: MatchRosterPlayer[];
+  };
   permissions?: {
     canRegisterResult?: boolean;
+    canEditManualStats?: boolean;
   };
+}
+
+export interface MatchRosterPlayer {
+  userId: string;
+  playerName: string;
+  steamId?: string | null;
+  teamId: string;
+}
+
+export interface ManualPlayerStatInput {
+  userId?: string | null;
+  steamId?: string | null;
+  playerName: string;
+  teamId: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  hsPercent: number;
+  damage: number;
 }
 
 export interface LeagueScheduleConfig {
@@ -154,6 +182,7 @@ export interface Demo {
   errorMessage?: string | null;
   matchId?: string | null;
   isPersonal?: boolean;
+  isManual?: boolean;
   match?: Match | null;
   stats?: MatchPlayerStat[];
   createdAt?: string;
@@ -200,10 +229,13 @@ export interface PersonalDemoValidation {
 export interface MatchPlayerStat {
   id: string;
   demoId: string;
+  teamId?: string | null;
   steamId?: string | null;
   playerName: string;
   kills: number;
   deaths: number;
+  assists?: number;
+  damage?: number;
   adr: number;
   hsPercent: number;
   kast: number;

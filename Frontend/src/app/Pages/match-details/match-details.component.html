@@ -24,7 +24,10 @@
       <div class="match-actions">
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
         <button class="btn btn-secondary btn-small" (click)="openReschedule()" *ngIf="canReschedule">Remarcar</button>
-        <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="match.status !== 'completed'">Enviar Demo</button>
+        <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="match.status !== 'completed' && !match.hasFileDemo && !match.manualDemoId">Enviar Demo</button>
+        <button class="btn btn-secondary btn-small" (click)="openManualStatsForm()" *ngIf="canEditManualStats">
+          {{ match.manualDemoId ? 'Editar stats manuais' : 'Inserir stats manuais' }}
+        </button>
         <ng-container *ngIf="canRegisterResult">
           <button class="btn btn-primary btn-small" (click)="registerResult()">
             Registrar resultado
@@ -41,6 +44,7 @@
           <div class="demo-info">
             <span class="demo-name">{{ demo.fileName }}</span>
             <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
+            <span class="badge badge-orange" *ngIf="demo.isManual">Manual</span>
             <app-demo-status-loader *ngIf="isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
             <span *ngIf="!isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getDemoStatusLabel(demo.status) }}</span>
           </div>
@@ -90,6 +94,88 @@
       <p *ngIf="demo.errorMessage && !pollingDemo" class="error-message">{{ demo.errorMessage }}</p>
     </div>
 
+    <div *ngIf="showManualStatsForm && match && !loading" class="gc-card mt-4 manual-stats-card">
+      <h2 class="section-title">Estatísticas manuais</h2>
+      <p class="meta manual-stats-intro">
+        Preencha os dados do placar do jogo. O ADR é calculado automaticamente: dano ÷ total de rounds.
+      </p>
+
+      <div class="manual-rounds-row" *ngIf="!matchTotalRounds">
+        <label class="form-label" for="manual-total-rounds">Total de rounds da partida</label>
+        <input
+          id="manual-total-rounds"
+          type="number"
+          min="1"
+          class="input-field manual-rounds-input"
+          [(ngModel)]="manualTotalRounds"
+          [disabled]="manualStatsSaving"
+          placeholder="Ex.: 21" />
+      </div>
+      <p class="meta manual-rounds-note" *ngIf="matchTotalRounds">
+        Total de rounds: <strong>{{ matchTotalRounds }}</strong> ({{ match.team1Rounds }} + {{ match.team2Rounds }})
+      </p>
+
+      <div class="manual-team-block" *ngFor="let team of [match.team1, match.team2]">
+        <h3 class="manual-team-title">{{ team.name }}</h3>
+        <div class="table-container">
+          <table class="stats-table manual-stats-table">
+            <thead>
+              <tr>
+                <th>Jogador</th>
+                <th>Vítimas</th>
+                <th>Mortes</th>
+                <th>Assist.</th>
+                <th>%HS</th>
+                <th>Dano</th>
+                <th>ADR</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of teamManualDrafts(team.id)">
+                <td>
+                  <input
+                    *ngIf="row.isCustom"
+                    type="text"
+                    class="input-field manual-player-input"
+                    [(ngModel)]="row.playerName"
+                    [disabled]="manualStatsSaving"
+                    placeholder="Nome do jogador" />
+                  <strong *ngIf="!row.isCustom">{{ row.playerName }}</strong>
+                </td>
+                <td><input type="number" min="0" class="input-field manual-stat-input" [(ngModel)]="row.kills" [disabled]="manualStatsSaving" /></td>
+                <td><input type="number" min="0" class="input-field manual-stat-input" [(ngModel)]="row.deaths" [disabled]="manualStatsSaving" /></td>
+                <td><input type="number" min="0" class="input-field manual-stat-input" [(ngModel)]="row.assists" [disabled]="manualStatsSaving" /></td>
+                <td><input type="number" min="0" max="100" class="input-field manual-stat-input" [(ngModel)]="row.hsPercent" [disabled]="manualStatsSaving" /></td>
+                <td><input type="number" min="0" class="input-field manual-stat-input" [(ngModel)]="row.damage" [disabled]="manualStatsSaving" /></td>
+                <td class="stat-highlight">{{ calcManualAdr(row) }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-small manual-remove-btn"
+                    *ngIf="row.isCustom"
+                    (click)="removeCustomPlayer(row.key)"
+                    [disabled]="manualStatsSaving">
+                    Remover
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-ghost btn-small" (click)="addCustomPlayer(team.id)" [disabled]="manualStatsSaving">
+          + Adicionar jogador
+        </button>
+      </div>
+
+      <div class="manual-stats-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeManualStatsForm()" [disabled]="manualStatsSaving">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveManualStats()" [disabled]="!canSaveManualStats">
+          {{ manualStatsSaving ? 'Salvando...' : 'Salvar estatísticas' }}
+        </button>
+      </div>
+    </div>
+
     <div *ngIf="stats.length > 0 && !loading" class="gc-card mt-4">
       <h2 class="section-title">Performance dos Jogadores</h2>
       <p class="meta mb-2" *ngIf="match?.demos && match!.demos!.length > 1">Stats consolidadas de {{ match!.demos!.length }} demos</p>
@@ -100,7 +186,9 @@
               <th>Jogador</th>
               <th>K</th>
               <th>D</th>
+              <th>A</th>
               <th>K/D</th>
+              <th>Dano</th>
               <th>ADR</th>
               <th>HS%</th>
               <th>KAST</th>
@@ -111,7 +199,9 @@
               <td><strong>{{ stat.playerName }}</strong></td>
               <td>{{ stat.kills }}</td>
               <td>{{ stat.deaths }}</td>
+              <td>{{ stat.assists ?? 0 }}</td>
               <td class="stat-highlight">{{ getKd(stat) }}</td>
+              <td>{{ stat.damage ?? '—' }}</td>
               <td>{{ stat.adr }}</td>
               <td>{{ stat.hsPercent }}%</td>
               <td>{{ stat.kast }}%</td>
@@ -126,9 +216,12 @@
       <p *ngIf="demo.status !== 'failed'">Aguardando processamento da demo.</p>
     </div>
 
-    <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView" class="not-found-message">
-      <p>Nenhuma demo associada. Envie um arquivo .dem para ver as estatísticas.</p>
-      <button class="btn btn-primary mt-4" (click)="openUploadModal()">Enviar Demo</button>
+    <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView && !showManualStatsForm" class="not-found-message">
+      <p>Nenhuma demo associada. Envie um arquivo .dem ou insira as estatísticas manualmente.</p>
+      <div class="empty-stats-actions">
+        <button class="btn btn-primary" (click)="openUploadModal()" *ngIf="!match?.hasFileDemo && !match?.manualDemoId">Enviar Demo</button>
+        <button class="btn btn-secondary" (click)="openManualStatsForm()" *ngIf="canEditManualStats">Inserir stats manuais</button>
+      </div>
     </div>
   </div>
 </div>

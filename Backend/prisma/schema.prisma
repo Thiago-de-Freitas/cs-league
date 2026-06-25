@@ -240,10 +240,11 @@ model Demo {
   id           String     @id @default(cuid())
   matchId      String?
   uploadedById String
-  filePath     String
-  fileName     String
+  filePath     String?
+  fileName     String?
   status       DemoStatus @default(PENDING)
   isPersonal   Boolean    @default(false)
+  isManual     Boolean    @default(false)
   errorMessage String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -260,10 +261,13 @@ model Demo {
 model MatchPlayerStat {
   id         String  @id @default(cuid())
   demoId     String
+  teamId     String?
   steamId    String?
   playerName String
   kills      Int     @default(0)
   deaths     Int     @default(0)
+  assists    Int     @default(0)
+  damage     Int     @default(0)
   adr        Float   @default(0)
   hsPercent  Float   @default(0)
   kast       Float   @default(0)

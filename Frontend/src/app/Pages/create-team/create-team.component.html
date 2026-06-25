@@ -1,5 +1,5 @@
 <div class="page-container">
-  <div class="page-inner max-width-narrow">
+  <div class="page-inner teams-page-inner">
     <div class="gc-card-header list-page-header">
       <div>
         <h1 class="page-title">Times</h1>
@@ -17,21 +17,61 @@
 
     <div *ngIf="loading" class="loading">Carregando...</div>
 
-    <div class="gc-card" *ngIf="!loading">
-      <h2 class="section-title">Times Existentes</h2>
-      <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
-        <li *ngFor="let team of teams" class="gc-list-item team-list-item">
-          <div class="team-info">
-            <span class="team-name">{{ team.name }}</span>
-            <span class="badge badge-orange">{{ team.tag }}</span>
-            <span class="meta">{{ team.players.length || 0 }} membros</span>
+    <div *ngIf="!loading && teams.length > 0" class="teams-grid">
+      <article *ngFor="let team of teams" class="team-card gc-card">
+        <div class="team-card-header">
+          <div class="team-card-brand">
+            <div class="team-logo-wrap">
+              <img
+                *ngIf="getTeamLogoUrl(team) as logoUrl"
+                [src]="logoUrl"
+                [alt]="'Logo ' + team.name"
+                class="team-logo-img"
+                (error)="onTeamLogoError(team.id)" />
+              <span *ngIf="!getTeamLogoUrl(team)" class="team-tag-mini team-logo-fallback">{{ team.tag }}</span>
+            </div>
+            <div class="team-card-title-block">
+              <h2 class="team-card-name">{{ team.name }}</h2>
+              <div class="team-card-meta">
+                <span class="badge badge-orange">{{ team.tag }}</span>
+                <span class="meta">{{ team.players.length || 0 }} membros</span>
+                <span class="meta" *ngIf="team.wins || team.losses">{{ team.wins }}V · {{ team.losses }}D</span>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-secondary btn-small" (click)="goToTeamDetailsById(team.id)">Ver</button>
-        </li>
-      </ul>
-      <ng-template #noTeams>
-        <p class="meta">Nenhum time cadastrado. Clique em <strong>+ Novo Time</strong> para começar.</p>
-      </ng-template>
+          <button type="button" class="btn btn-secondary btn-small" (click)="goToTeamDetailsById(team.id)">Ver</button>
+        </div>
+
+        <div class="team-roster" *ngIf="team.players.length > 0; else emptyRoster">
+          <div class="roster-head">
+            <span>Jogador</span>
+            <span>Função</span>
+            <span>ADR</span>
+          </div>
+          <div class="roster-row" *ngFor="let player of team.players">
+            <div class="roster-player">
+              <strong>{{ player.name }}</strong>
+              <span class="badge badge-orange" *ngIf="player.role === 'CAPTAIN'">Capitão</span>
+              <span class="badge badge-gray" *ngIf="player.memberTag">{{ player.memberTag }}</span>
+            </div>
+            <div class="roster-role">
+              <span class="badge badge-gray" *ngIf="player.position">{{ formatPosition(player.position) }}</span>
+              <span class="meta roster-role-empty" *ngIf="!player.position">—</span>
+            </div>
+            <div class="roster-adr" [class.has-adr]="hasAdr(player)">
+              <strong>{{ formatAdr(player) }}</strong>
+              <span class="meta" *ngIf="hasAdr(player)">{{ player.matches }} jogo(s)</span>
+            </div>
+          </div>
+        </div>
+        <ng-template #emptyRoster>
+          <p class="meta team-roster-empty">Nenhum jogador no elenco.</p>
+        </ng-template>
+      </article>
+    </div>
+
+    <div class="gc-card" *ngIf="!loading && teams.length === 0">
+      <p class="meta">Nenhum time cadastrado. Clique em <strong>+ Novo Time</strong> para começar.</p>
     </div>
   </div>
 </div>

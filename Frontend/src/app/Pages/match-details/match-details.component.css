@@ -30,6 +30,41 @@
 .result-winner-line { margin: 0 0 1rem; color: var(--gc-text-secondary); }
 .result-winner-line strong { color: var(--gc-text); }
 .mt-4 { margin-top: 1rem; }
+.manual-stats-intro { margin: 0 0 1rem; }
+.manual-rounds-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 220px;
+  margin-bottom: 1rem;
+}
+.manual-rounds-note { margin: 0 0 1rem; }
+.manual-team-block { margin-bottom: 1.5rem; }
+.manual-team-title {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gc-orange);
+}
+.manual-stats-table { min-width: 760px; }
+.manual-stat-input,
+.manual-player-input {
+  min-width: 4.5rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.9rem;
+}
+.manual-player-input { min-width: 10rem; }
+.manual-stats-actions,
+.empty-stats-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.manual-remove-btn { color: var(--gc-red); }
 
 @media (max-width: 768px) {
   .demo-name {

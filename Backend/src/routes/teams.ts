@@ -9,6 +9,7 @@ import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
 import { parsePlayerPositionOptional, type PlayerPosition } from '../lib/playerPosition';
+import { getAverageAdrBySteamIds } from '../lib/teamMemberStats';
 import { sanitizeFileExtension } from '../lib/pathSafe';
 import {
   getTeamLogoStoragePath,
@@ -158,7 +159,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
             role: true,
             memberTag: true,
             position: true,
-            user: { select: { id: true, displayName: true } },
+            user: { select: { id: true, displayName: true, steamId: true } },
           },
         },
         leagueTeams: {
@@ -169,6 +170,11 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    const steamIds = teams.flatMap((team) =>
+      team.members.map((member) => member.user.steamId).filter((id): id is string => !!id?.trim())
+    );
+    const adrBySteam = await getAverageAdrBySteamIds(steamIds);
+
     res.json(
       teams.map((team) => {
         const stats = sumLeagueTeamStats(team.leagueTeams);
@@ -178,14 +184,21 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         tag: team.tag,
         logoUrl: publicUploadUrlForResponse(team.logoUrl),
         ownerId: team.ownerId,
-        players: team.members.map((m) => ({
+        players: team.members.map((m) => {
+          const steamKey = m.user.steamId?.trim().toLowerCase() ?? '';
+          const adrSummary = steamKey ? adrBySteam.get(steamKey) : undefined;
+          return {
           id: m.user.id,
           name: m.user.displayName,
           IGN: m.user.displayName,
           role: m.role,
           memberTag: m.memberTag,
           position: m.position,
-        })),
+          steamId: m.user.steamId,
+          adr: adrSummary?.adr ?? null,
+          matches: adrSummary?.matches ?? 0,
+        };
+        }),
         wins: stats.wins,
         losses: stats.losses,
         points: stats.points,

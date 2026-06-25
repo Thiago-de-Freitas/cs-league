@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Match } from '../Models/interfaces';
+import { Match, ManualPlayerStatInput } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class MatchService {
@@ -28,5 +28,16 @@ export class MatchService {
 
   rescheduleMatch(matchId: string, scheduledAt: string): Observable<Match> {
     return this.http.patch<Match>(`${this.apiUrl}/${matchId}/schedule`, { scheduledAt });
+  }
+
+  saveManualStats(
+    matchId: string,
+    players: ManualPlayerStatInput[],
+    totalRounds?: number | null
+  ): Observable<Match> {
+    return this.http.put<Match>(`${this.apiUrl}/${matchId}/manual-stats`, {
+      players,
+      totalRounds: totalRounds ?? undefined,
+    });
   }
 }

@@ -7,11 +7,25 @@ import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
+import { Demo, Match, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { CS2_MAPS } from '../../Utils/maps';
 import { resolveBracketSize } from '../../Utils/bracket.util';
+
+interface ManualStatDraft {
+  key: string;
+  userId?: string | null;
+  steamId?: string | null;
+  playerName: string;
+  teamId: string;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  hsPercent: number | null;
+  damage: number | null;
+  isCustom?: boolean;
+}
 
 @Component({
   selector: 'app-match-details',
@@ -38,6 +52,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   rescheduleDateTime = '';
   rescheduleLoading = false;
   showReschedule = false;
+  showManualStatsForm = false;
+  manualStatDrafts: ManualStatDraft[] = [];
+  manualTotalRounds: number | null = null;
+  manualStatsSaving = false;
   cs2Maps = CS2_MAPS;
   private pollSub?: Subscription;
 
@@ -232,6 +250,178 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
 
   get canRegisterResult(): boolean {
     return !!this.match?.permissions?.canRegisterResult;
+  }
+
+  get canEditManualStats(): boolean {
+    return !!this.match?.permissions?.canEditManualStats && !this.match?.hasFileDemo;
+  }
+
+  get matchTotalRounds(): number | null {
+    if (!this.match) return null;
+    const r1 = this.match.team1Rounds;
+    const r2 = this.match.team2Rounds;
+    if (r1 == null || r2 == null) return null;
+    return r1 + r2;
+  }
+
+  get manualStatsTotalRounds(): number | null {
+    return this.matchTotalRounds ?? this.manualTotalRounds;
+  }
+
+  get canSaveManualStats(): boolean {
+    if (!this.canEditManualStats || this.manualStatsSaving) return false;
+    if (!this.manualStatsTotalRounds || this.manualStatsTotalRounds <= 0) return false;
+    return this.manualStatDrafts.some((row) => this.hasManualRowData(row));
+  }
+
+  openManualStatsForm(): void {
+    if (!this.match) return;
+    this.initManualStatsForm();
+    this.showManualStatsForm = true;
+  }
+
+  closeManualStatsForm(): void {
+    if (this.manualStatsSaving) return;
+    this.showManualStatsForm = false;
+  }
+
+  initManualStatsForm(): void {
+    if (!this.match?.roster) {
+      this.manualStatDrafts = [];
+      return;
+    }
+
+    const existingStats = this.getManualDemoStats();
+    const byKey = new Map<string, MatchPlayerStat>();
+    for (const stat of existingStats) {
+      const key = `${stat.teamId || ''}:${stat.steamId || stat.playerName.toLowerCase()}`;
+      byKey.set(key, stat);
+    }
+
+    const buildRows = (players: MatchRosterPlayer[]) =>
+      players.map((player) => {
+        const key = `${player.teamId}:${player.steamId || player.playerName.toLowerCase()}`;
+        const existing = byKey.get(key);
+        return {
+          key,
+          userId: player.userId,
+          steamId: player.steamId,
+          playerName: player.playerName,
+          teamId: player.teamId,
+          kills: existing?.kills ?? null,
+          deaths: existing?.deaths ?? null,
+          assists: existing?.assists ?? null,
+          hsPercent: existing?.hsPercent ?? null,
+          damage: existing?.damage ?? null,
+        } satisfies ManualStatDraft;
+      });
+
+    const rosterRows = [
+      ...buildRows(this.match.roster.team1),
+      ...buildRows(this.match.roster.team2),
+    ];
+    const rosterKeys = new Set(rosterRows.map((row) => row.key));
+
+    const customRows = existingStats
+      .filter((stat) => {
+        const key = `${stat.teamId || ''}:${stat.steamId || stat.playerName.toLowerCase()}`;
+        return !rosterKeys.has(key);
+      })
+      .map((stat) => ({
+        key: `custom:${stat.id}`,
+        userId: null,
+        steamId: stat.steamId,
+        playerName: stat.playerName,
+        teamId: stat.teamId || this.match!.team1.id,
+        kills: stat.kills,
+        deaths: stat.deaths,
+        assists: stat.assists ?? null,
+        hsPercent: stat.hsPercent,
+        damage: stat.damage ?? null,
+        isCustom: true,
+      }));
+
+    this.manualStatDrafts = [...rosterRows, ...customRows];
+    this.manualTotalRounds = this.matchTotalRounds;
+  }
+
+  getManualDemoStats(): MatchPlayerStat[] {
+    const manualDemo = this.match?.demos?.find((demo) => demo.isManual && demo.status === 'completed');
+    return manualDemo?.stats || [];
+  }
+
+  teamManualDrafts(teamId: string): ManualStatDraft[] {
+    return this.manualStatDrafts.filter((row) => row.teamId === teamId);
+  }
+
+  addCustomPlayer(teamId: string): void {
+    const key = `new:${teamId}:${Date.now()}`;
+    this.manualStatDrafts = [
+      ...this.manualStatDrafts,
+      {
+        key,
+        userId: null,
+        steamId: null,
+        playerName: '',
+        teamId,
+        kills: null,
+        deaths: null,
+        assists: null,
+        hsPercent: null,
+        damage: null,
+        isCustom: true,
+      },
+    ];
+  }
+
+  removeCustomPlayer(key: string): void {
+    this.manualStatDrafts = this.manualStatDrafts.filter((row) => row.key !== key);
+  }
+
+  hasManualRowData(row: ManualStatDraft): boolean {
+    return [row.kills, row.deaths, row.assists, row.damage].some((value) => Number(value) > 0);
+  }
+
+  calcManualAdr(row: ManualStatDraft): string {
+    const damage = Number(row.damage);
+    const rounds = this.manualStatsTotalRounds;
+    if (!rounds || rounds <= 0 || !Number.isFinite(damage) || damage <= 0) return '—';
+    return (Math.round((damage / rounds) * 10) / 10).toFixed(1);
+  }
+
+  saveManualStats(): void {
+    if (!this.matchId || !this.canSaveManualStats) return;
+
+    const players: ManualPlayerStatInput[] = this.manualStatDrafts
+      .filter((row) => this.hasManualRowData(row) && row.playerName.trim())
+      .map((row) => ({
+        userId: row.userId,
+        steamId: row.steamId,
+        playerName: row.playerName.trim(),
+        teamId: row.teamId,
+        kills: Number(row.kills) || 0,
+        deaths: Number(row.deaths) || 0,
+        assists: Number(row.assists) || 0,
+        hsPercent: Number(row.hsPercent) || 0,
+        damage: Number(row.damage) || 0,
+      }));
+
+    this.manualStatsSaving = true;
+    this.matchService
+      .saveManualStats(this.matchId, players, this.matchTotalRounds ? null : this.manualTotalRounds)
+      .subscribe({
+        next: (match) => {
+          this.match = match;
+          this.stats = match.aggregatedStats || this.buildAggregatedStats(match.demos || []);
+          this.manualStatsSaving = false;
+          this.showManualStatsForm = false;
+          this.notify.success('Estatísticas manuais salvas com sucesso.');
+        },
+        error: (err) => {
+          this.manualStatsSaving = false;
+          this.notify.error(err.error?.error || 'Erro ao salvar estatísticas manuais');
+        },
+      });
   }
 
   registerResult(): void {

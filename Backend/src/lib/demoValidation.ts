@@ -67,12 +67,15 @@ export async function validateGeneralDemoUpload(matchId: string): Promise<Person
       isPersonal: false,
       status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
     },
+    select: { id: true, isManual: true },
   });
 
   if (existing) {
     return {
       valid: false,
-      error: 'Já existe uma demo geral associada a esta partida.',
+      error: existing.isManual
+        ? 'Já existem estatísticas manuais para esta partida. Edite-as em vez de enviar uma demo.'
+        : 'Já existe uma demo geral associada a esta partida.',
       code: 'MATCH_HAS_DEMO',
     };
   }
