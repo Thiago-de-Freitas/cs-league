@@ -51,12 +51,32 @@
         </div>
       </div>
       <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
-        <li *ngFor="let league of leagues" class="gc-list-item">
+        <li *ngFor="let league of paginatedLeagues" class="gc-list-item">
           <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
           <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
           <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
         </li>
       </ul>
+      <nav
+        *ngIf="showLeaguesPagination"
+        class="gc-pagination"
+        aria-label="Paginação de minhas ligas">
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="leaguesPage === 0"
+          (click)="goToLeaguesPage(leaguesPage - 1)">
+          Anterior
+        </button>
+        <span class="gc-pagination-meta">{{ leaguesPageLabel }}</span>
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="leaguesPage >= leaguesTotalPages - 1"
+          (click)="goToLeaguesPage(leaguesPage + 1)">
+          Próxima
+        </button>
+      </nav>
       <ng-template #noLeagues>
         <p class="meta">Nenhuma liga ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateLeagueModal()">Criar liga</button></p>
       </ng-template>
@@ -68,12 +88,32 @@
         <button type="button" class="btn btn-primary btn-small" (click)="openCreateTeamModal()">+ Novo</button>
       </div>
       <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
-        <li *ngFor="let team of teams" class="gc-list-item">
+        <li *ngFor="let team of paginatedTeams" class="gc-list-item">
           <a [routerLink]="['/team-details', team.id]">{{ team.name }}</a>
           <span class="badge badge-orange">{{ team.tag }}</span>
           <span class="meta">{{ team.players.length || 0 }} jogadores</span>
         </li>
       </ul>
+      <nav
+        *ngIf="showTeamsPagination"
+        class="gc-pagination"
+        aria-label="Paginação de meus times">
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="teamsPage === 0"
+          (click)="goToTeamsPage(teamsPage - 1)">
+          Anterior
+        </button>
+        <span class="gc-pagination-meta">{{ teamsPageLabel }}</span>
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="teamsPage >= teamsTotalPages - 1"
+          (click)="goToTeamsPage(teamsPage + 1)">
+          Próxima
+        </button>
+      </nav>
       <ng-template #noTeams>
         <p class="meta">Nenhum time ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateTeamModal()">Criar time</button></p>
       </ng-template>

@@ -412,6 +412,27 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
 .cdk-drag-animating { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
 .cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
 
+/* ===== Paginação ===== */
+.gc-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gc-border);
+}
+
+.gc-pagination .btn { margin: 0; }
+
+.gc-pagination-meta {
+  font-size: 0.85rem;
+  color: var(--gc-text-secondary);
+  font-family: var(--font-body);
+  min-width: 5rem;
+  text-align: center;
+}
+
 /* ===== Dashboard ===== */
 .dashboard-container { padding: 0; }
 .dashboard-hero {

@@ -25,6 +25,9 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
   styleUrls: ['./dashboard.component.css']
 })
 export class DashboardComponent implements OnInit {
+  readonly pageSize = 10;
+  leaguesPage = 0;
+  teamsPage = 0;
   leagues: League[] = [];
   openLeagues: League[] = [];
   teams: Team[] = [];
@@ -96,9 +99,11 @@ export class DashboardComponent implements OnInit {
       .subscribe({
         next: ({ leagues, openLeagues, teams, invites, playerRankings, teamRankings }) => {
           this.leagues = leagues;
+          this.clampLeaguesPage();
           const myIds = new Set(leagues.map((l) => l.id));
           this.openLeagues = openLeagues.filter((l) => !myIds.has(l.id));
           this.teams = teams;
+          this.clampTeamsPage();
           this.pendingInvites = invites;
           this.playerRankings = playerRankings;
           this.teamRankings = teamRankings;
@@ -178,7 +183,10 @@ export class DashboardComponent implements OnInit {
       next: () => {
         this.pendingInvites = this.pendingInvites.filter((i) => i.id !== invite.id);
         this.teamService.getTeams().subscribe({
-          next: (teams) => (this.teams = teams)
+          next: (teams) => {
+            this.teams = teams;
+            this.clampTeamsPage();
+          },
         });
       }
     });
@@ -195,9 +203,65 @@ export class DashboardComponent implements OnInit {
 
   toggleArchivedLeagues(): void {
     this.showArchivedLeagues = !this.showArchivedLeagues;
+    this.leaguesPage = 0;
     this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
-      next: (leagues) => (this.leagues = leagues)
+      next: (leagues) => {
+        this.leagues = leagues;
+        this.clampLeaguesPage();
+      },
     });
+  }
+
+  get paginatedLeagues(): League[] {
+    const start = this.leaguesPage * this.pageSize;
+    return this.leagues.slice(start, start + this.pageSize);
+  }
+
+  get paginatedTeams(): Team[] {
+    const start = this.teamsPage * this.pageSize;
+    return this.teams.slice(start, start + this.pageSize);
+  }
+
+  get leaguesTotalPages(): number {
+    return Math.max(1, Math.ceil(this.leagues.length / this.pageSize));
+  }
+
+  get teamsTotalPages(): number {
+    return Math.max(1, Math.ceil(this.teams.length / this.pageSize));
+  }
+
+  get showLeaguesPagination(): boolean {
+    return this.leagues.length > this.pageSize;
+  }
+
+  get showTeamsPagination(): boolean {
+    return this.teams.length > this.pageSize;
+  }
+
+  get leaguesPageLabel(): string {
+    return `${this.leaguesPage + 1} de ${this.leaguesTotalPages}`;
+  }
+
+  get teamsPageLabel(): string {
+    return `${this.teamsPage + 1} de ${this.teamsTotalPages}`;
+  }
+
+  goToLeaguesPage(page: number): void {
+    this.leaguesPage = Math.min(Math.max(0, page), this.leaguesTotalPages - 1);
+  }
+
+  goToTeamsPage(page: number): void {
+    this.teamsPage = Math.min(Math.max(0, page), this.teamsTotalPages - 1);
+  }
+
+  private clampLeaguesPage(): void {
+    const maxPage = Math.max(0, this.leaguesTotalPages - 1);
+    if (this.leaguesPage > maxPage) this.leaguesPage = maxPage;
+  }
+
+  private clampTeamsPage(): void {
+    const maxPage = Math.max(0, this.teamsTotalPages - 1);
+    if (this.teamsPage > maxPage) this.teamsPage = maxPage;
   }
 
   openUploadModal(): void {
@@ -231,8 +295,12 @@ export class DashboardComponent implements OnInit {
 
   onLeagueCreated(league: League): void {
     this.showCreateLeagueModal = false;
+    this.leaguesPage = 0;
     this.leagueService.getLeagues(this.showArchivedLeagues).subscribe({
-      next: (leagues) => (this.leagues = leagues)
+      next: (leagues) => {
+        this.leagues = leagues;
+        this.clampLeaguesPage();
+      },
     });
     this.router.navigate(['/league-details', league.id]);
   }
@@ -247,8 +315,12 @@ export class DashboardComponent implements OnInit {
 
   onTeamCreated(event: TeamCreatedEvent): void {
     this.showCreateTeamModal = false;
+    this.teamsPage = 0;
     this.teamService.getTeams().subscribe({
-      next: (teams) => (this.teams = teams)
+      next: (teams) => {
+        this.teams = teams;
+        this.clampTeamsPage();
+      },
     });
     this.router.navigate(['/team-details', event.team.id]);
   }
