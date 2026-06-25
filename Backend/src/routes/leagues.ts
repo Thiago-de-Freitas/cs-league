@@ -44,8 +44,11 @@ import { deleteLeagueCompletely } from '../lib/leagueDeletion';
 import { roundDifference } from '../lib/matchResult';
 import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
+import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { audit, setAuditContext } from '../lib/audit';
 
 const router = Router();
+router.use(auditResponseMiddleware);
 
 const teamWithRosterSelect = {
   id: true,
@@ -512,6 +515,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     });
 
     const full = await getLeagueWithDetails(league.id);
+    setAuditContext(req, audit.of('league.create', 'League', league.id, {
+      after: { name: league.name, format: league.format },
+    }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
     console.error(err);
@@ -599,6 +605,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.update', 'League', req.params.id));
     res.json(formatLeague(full!));
   } catch (err) {
     console.error(err);
@@ -615,6 +622,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     }
 
     await deleteLeagueCompletely(req.params.id);
+    setAuditContext(req, audit.of('league.delete', 'League', req.params.id, {
+      before: { name: check.league.name },
+    }));
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -657,6 +667,9 @@ router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
+    setAuditContext(req, audit.of('league.archive', 'League', league.id, {
+      after: { status: league.status },
+    }));
     res.json({
       id: league.id,
       status: league.status.toLowerCase(),
@@ -700,6 +713,9 @@ router.post('/:id/unarchive', authMiddleware, async (req: AuthRequest, res: Resp
       return;
     }
 
+    setAuditContext(req, audit.of('league.unarchive', 'League', league.id, {
+      after: { status: league.status },
+    }));
     res.json({
       id: league.id,
       status: league.status.toLowerCase(),
@@ -781,6 +797,9 @@ router.post('/:id/register', authMiddleware, async (req: AuthRequest, res: Respo
     }
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('league.team.register', 'LeagueTeam', teamId, 'League', req.params.id, {
+      after: { teamId, seed: count + 1 },
+    }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
     console.error('POST /api/leagues/:id/register', err);
@@ -818,6 +837,9 @@ router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Res
     }
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.team.bulk_add', 'League', req.params.id, {
+      metadata: { teamIds: uniqueIds, added: count },
+    }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
     console.error(err);
@@ -858,6 +880,9 @@ router.post('/:id/teams', authMiddleware, async (req: AuthRequest, res: Response
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('league.team.add', 'LeagueTeam', teamId, 'League', req.params.id, {
+      after: { teamId, seed: seed ?? count + 1 },
+    }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
     console.error(err);
@@ -907,6 +932,7 @@ router.delete('/:id/teams/:teamId', authMiddleware, async (req: AuthRequest, res
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('league.team.remove', 'LeagueTeam', req.params.teamId, 'League', req.params.id));
     res.json(formatLeague(full!));
   } catch (err) {
     if (err instanceof Error && err.message === 'TEAM_NOT_IN_LEAGUE') {
@@ -1058,6 +1084,7 @@ router.put('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Respon
 
     const overrides = await loadWeekOverrides(prisma, req.params.id);
 
+    setAuditContext(req, audit.of('league.schedule.save', 'League', req.params.id));
     res.json({
       startDate: updated.startDate,
       endDate: updated.endDate,
@@ -1115,6 +1142,11 @@ router.put('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: AuthReq
       update: { daysOfWeek: days },
     });
 
+    setAuditContext(req, audit.of('league.schedule.week.override', 'LeagueScheduleWeek', row.id, {
+      parentType: 'League',
+      parentId: req.params.id,
+      after: { weekStart: weekStartKey(row.weekStart, check.league.scheduleTimezone), daysOfWeek: days },
+    }));
     res.json({
       weekStart: weekStartKey(row.weekStart, check.league.scheduleTimezone),
       daysOfWeek: parseWeekOverrideDays(row.daysOfWeek) ?? [],
@@ -1143,6 +1175,9 @@ router.delete('/:id/schedule/weeks/:weekStart', authMiddleware, async (req: Auth
       where: { leagueId: req.params.id, weekStart },
     });
 
+    setAuditContext(req, audit.of('league.schedule.week.remove', 'League', req.params.id, {
+      metadata: { weekStart: req.params.weekStart },
+    }));
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -1177,6 +1212,9 @@ router.post('/:id/schedule/regenerate', authMiddleware, async (req: AuthRequest,
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.schedule.regenerate', 'League', req.params.id, {
+      metadata: { updatedCount },
+    }));
     res.json({
       updatedCount,
       league: formatLeague(full!),
@@ -1315,6 +1353,9 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.groups.generate', 'League', req.params.id, {
+      metadata: { totalMatches, groupCount: check.league.groupCount },
+    }));
     res.json({
       ...formatLeague(full!),
       groupInfo: {
@@ -1392,6 +1433,9 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
       }
 
       const full = await getLeagueWithDetails(req.params.id);
+      setAuditContext(req, audit.of('league.bracket.generate', 'League', req.params.id, {
+        metadata: { bracketSize: result.bracketSize, round1Matches: result.round1Matches },
+      }));
       res.json({
         ...formatLeague(full!),
         bracketInfo: {
@@ -1491,6 +1535,9 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
     });
 
     const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.bracket.generate', 'League', req.params.id, {
+      metadata: { bracketSize, round1Matches: matchCreates.length, walkovers },
+    }));
     res.json({
       ...formatLeague(full!),
       bracketInfo: {
@@ -1561,6 +1608,9 @@ router.post('/:id/matches', authMiddleware, async (req: AuthRequest, res: Respon
       },
     });
 
+    setAuditContext(req, audit.withParent('league.match.create', 'Match', match.id, 'League', req.params.id, {
+      after: { team1Id, team2Id, round: match.round },
+    }));
     res.status(201).json({
       id: match.id,
       leagueId: match.leagueId,
@@ -1620,6 +1670,9 @@ router.put('/:id/teams/order', authMiddleware, async (req: AuthRequest, res: Res
       )
     );
 
+    setAuditContext(req, audit.of('league.team.reorder', 'League', req.params.id, {
+      metadata: { teams },
+    }));
     res.json({ success: true });
   } catch (err) {
     console.error(err);

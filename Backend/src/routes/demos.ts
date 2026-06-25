@@ -18,8 +18,11 @@ import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { requireDemoQueue } from '../middleware/demoQueue';
 import { isAdmin } from '../lib/permissions';
+import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { audit, setAuditContext } from '../lib/audit';
 
 const router = Router();
+router.use(auditResponseMiddleware);
 
 const storagePath = getDemoStoragePath();
 
@@ -165,6 +168,9 @@ router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async
       requeued++;
     }
 
+    setAuditContext(req, audit.of('demo.requeue_pending', 'Demo', null, {
+      metadata: { requeued, skipped: skipped.length, total: demos.length },
+    }));
     res.json({ requeued, skipped, total: demos.length });
   } catch (err) {
     console.error(err);
@@ -248,6 +254,13 @@ router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), 
       throw enqueueErr;
     }
 
+    setAuditContext(req, demo.matchId
+      ? audit.withParent('match.demo.link', 'Demo', demo.id, 'Match', demo.matchId, {
+          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
+        })
+      : audit.of('demo.upload', 'Demo', demo.id, {
+          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
+        }));
     res.status(201).json({
       id: demo.id,
       fileName: demo.fileName,
@@ -383,6 +396,9 @@ router.post('/:id/reprocess', authMiddleware, requireDemoQueue, async (req: Auth
 
     await enqueueDemoJob(demo.id, absolutePath);
 
+    setAuditContext(req, audit.of('demo.reprocess', 'Demo', demo.id, {
+      metadata: { matchId: demo.matchId },
+    }));
     res.json({
       id: demo.id,
       fileName: demo.fileName,
@@ -427,6 +443,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     await prisma.demo.delete({ where: { id: demo.id } });
 
+    setAuditContext(req, audit.of('demo.delete', 'Demo', demo.id, {
+      before: { fileName: demo.fileName, matchId: demo.matchId },
+    }));
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -470,6 +489,9 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
         include: { stats: true },
       });
 
+      setAuditContext(req, audit.withParent('match.demo.link', 'Demo', updated.id, 'Match', demo.matchId, {
+        after: { matchId: null },
+      }));
       res.json({
         id: updated.id,
         fileName: updated.fileName,
@@ -515,6 +537,9 @@ router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Respons
       include: { stats: true },
     });
 
+    setAuditContext(req, audit.withParent('match.demo.link', 'Demo', updated.id, 'Match', matchId, {
+      after: { matchId },
+    }));
     res.json({
       id: updated.id,
       fileName: updated.fileName,

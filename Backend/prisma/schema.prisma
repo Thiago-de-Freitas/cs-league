@@ -64,6 +64,13 @@ enum DemoStatus {
   FAILED
 }
 
+enum AuditActorType {
+  USER
+  SYSTEM
+  WORKER
+  ANONYMOUS
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -80,6 +87,7 @@ model User {
   invites      TeamInvite[] @relation("InvitedUser")
   ownedLeagues League[]     @relation("LeagueOwner")
   demos        Demo[]
+  auditEvents  AuditEvent[] @relation("AuditActor")
 }
 
 model Team {
@@ -273,4 +281,35 @@ model MatchPlayerStat {
   kast       Float   @default(0)
 
   demo Demo @relation(fields: [demoId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id            String         @id @default(cuid())
+  occurredAt    DateTime       @default(now())
+  actorType     AuditActorType
+  actorUserId   String?
+  actorLabel    String?
+  action        String
+  entityType    String
+  entityId      String?
+  parentType    String?
+  parentId      String?
+  requestMethod String?
+  requestPath   String?
+  ipAddress     String?
+  userAgent     String?
+  correlationId String?
+  before        Json?
+  after         Json?
+  metadata      Json?
+  success       Boolean        @default(true)
+  errorCode     String?
+
+  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([parentType, parentId])
+  @@index([actorUserId])
+  @@index([action])
 }

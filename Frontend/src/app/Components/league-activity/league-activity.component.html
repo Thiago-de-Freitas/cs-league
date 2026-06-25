@@ -1,0 +1,36 @@
+<div class="league-activity">
+  <div *ngIf="loading" class="meta">Carregando atividade...</div>
+
+  <ul class="gc-list" *ngIf="!loading && events.length > 0">
+    <li *ngFor="let event of events" class="gc-list-item activity-item" [class.is-failure]="!event.success">
+      <div class="activity-main">
+        <div class="activity-head">
+          <strong class="activity-action">{{ formatAction(event.action) }}</strong>
+          <span class="badge" [class.badge-gray]="event.success" [class.badge-red]="!event.success">
+            {{ event.success ? 'OK' : 'Falha' }}
+          </span>
+        </div>
+        <div class="activity-meta">
+          <span>{{ formatActor(event) }}</span>
+          <span>{{ formatDate(event.occurredAt) }}</span>
+          <span *ngIf="event.entityType">{{ event.entityType }}<span *ngIf="event.entityId"> · {{ event.entityId }}</span></span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-small activity-details-btn" (click)="toggleDetails(event.id)">
+          {{ isExpanded(event.id) ? 'Ocultar detalhes' : 'Ver detalhes' }}
+        </button>
+        <pre class="activity-json" *ngIf="isExpanded(event.id)">{{ formatJson({ before: event.before, after: event.after, metadata: event.metadata, correlationId: event.correlationId }) }}</pre>
+      </div>
+    </li>
+  </ul>
+
+  <p class="meta" *ngIf="!loading && events.length === 0">Nenhuma atividade registrada nesta liga.</p>
+
+  <button
+    *ngIf="!loading && nextCursor"
+    type="button"
+    class="btn btn-secondary btn-small activity-load-more"
+    [disabled]="loadingMore"
+    (click)="loadMore()">
+    {{ loadingMore ? 'Carregando...' : 'Carregar mais' }}
+  </button>
+</div>

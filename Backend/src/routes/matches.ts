@@ -20,8 +20,11 @@ import {
   parseMatchRounds,
   resolveMatchOutcome,
 } from '../lib/matchResult';
+import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { audit, recordAuditInTransaction, setAuditContext, skipAudit } from '../lib/audit';
 
 const router = Router();
+router.use(auditResponseMiddleware);
 
 type Tx = Prisma.TransactionClient;
 
@@ -330,6 +333,9 @@ router.put('/:id/manual-stats', authMiddleware, async (req: AuthRequest, res: Re
       : undefined;
     const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
 
+    setAuditContext(req, audit.withParent('match.manual_stats.save', 'Match', match.id, 'League', match.leagueId, {
+      metadata: { playerCount: parsedPlayers.players.length, totalRounds },
+    }));
     res.json(
       formatMatchResponse(
         updated,
@@ -451,6 +457,19 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       );
 
       await tryCompleteLeague(tx, match.leagueId);
+
+      await recordAuditInTransaction(
+        tx,
+        audit.withParent('match.result.register', 'Match', req.params.id, 'League', match.leagueId, {
+          after: {
+            winnerId,
+            team1Rounds: rounds.team1Rounds,
+            team2Rounds: rounds.team2Rounds,
+            status: 'COMPLETED',
+          },
+        }),
+        { req }
+      );
     });
 
     const updated = await prisma.match.findUnique({
@@ -462,6 +481,7 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
       },
     });
 
+    skipAudit(req);
     res.json({ ...updated, groupPhaseJustCompleted });
   } catch (err) {
     console.error(err);
@@ -522,6 +542,9 @@ router.patch('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Resp
       },
     });
 
+    setAuditContext(req, audit.withParent('match.schedule.update', 'Match', req.params.id, 'League', match.leagueId, {
+      after: { scheduledAt: parsed },
+    }));
     res.json(updated);
   } catch (err) {
     console.error(err);

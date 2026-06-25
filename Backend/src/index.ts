@@ -10,11 +10,13 @@ import leagueRoutes from './routes/leagues';
 import matchRoutes from './routes/matches';
 import demoRoutes from './routes/demos';
 import rankingsRoutes from './routes/rankings';
+import auditRoutes from './routes/audit';
 import { prisma } from './lib/prisma';
 import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
 import { getDemoStoragePath } from './lib/demoStorage';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
+import { requestContextMiddleware } from './middleware/requestContext';
 import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
@@ -26,6 +28,7 @@ import {
   getUserAvatarStoragePath,
   getUploadStorageStatus,
 } from './lib/uploadAssets';
+import { recordWorkerAudit, skipAudit } from './lib/audit';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -228,6 +231,35 @@ app.get('/api/internal/demos/:id/file', internalServiceAuth, async (req, res) =>
   }
 });
 
+app.post('/api/internal/audit', internalServiceAuth, async (req, res) => {
+  try {
+    const { action, entityType, entityId, parentType, parentId, before, after, metadata, success, errorCode } = req.body ?? {};
+    if (!action || !entityType) {
+      res.status(400).json({ error: 'action e entityType são obrigatórios' });
+      return;
+    }
+
+    skipAudit(req);
+    await recordWorkerAudit({
+      action: String(action),
+      entityType: String(entityType),
+      entityId: entityId ? String(entityId) : null,
+      parentType: parentType ? String(parentType) : null,
+      parentId: parentId ? String(parentId) : null,
+      before,
+      after,
+      metadata,
+      success: success !== false,
+      errorCode: errorCode ? String(errorCode) : null,
+    });
+
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('[internal/audit]', err);
+    res.status(500).json({ error: 'Erro ao registrar auditoria' });
+  }
+});
+
 // CORS antes de qualquer bloqueio — upload direto front→back exige preflight com Authorization
 const corsOptions = cors({
   origin(origin, callback) {
@@ -267,6 +299,7 @@ app.use('/api', (req, res, next) => {
 });
 
 app.use(securityHeaders);
+app.use(requestContextMiddleware);
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -302,6 +335,7 @@ app.use('/api/leagues', leagueRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/rankings', rankingsRoutes);
+app.use('/api/audit', auditRoutes);
 
 if (serveFrontend) {
   app.use(express.static(publicPath, { dotfiles: 'deny', index: false }));

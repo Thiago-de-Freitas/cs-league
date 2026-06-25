@@ -1,0 +1,53 @@
+<div class="page-container">
+  <div class="page-inner admin-audit-inner">
+    <div class="gc-card-header list-page-header">
+      <div>
+        <h1 class="page-title">Auditoria</h1>
+        <p class="page-subtitle list-page-subtitle">Histórico completo de ações no sistema</p>
+      </div>
+    </div>
+
+    <div class="gc-card filters-card">
+      <div class="filters-row">
+        <div class="form-group">
+          <label class="form-label" for="action-filter">Ação</label>
+          <input id="action-filter" class="input-field" [(ngModel)]="actionFilter" placeholder="ex: match.result" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="entity-filter">Entidade</label>
+          <input id="entity-filter" class="input-field" [(ngModel)]="entityTypeFilter" placeholder="ex: Match" />
+        </div>
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">Filtrar</button>
+      </div>
+    </div>
+
+    <div class="gc-card">
+      <h2 class="section-title">Eventos</h2>
+      <div *ngIf="loading" class="meta">Carregando...</div>
+      <ul class="gc-list" *ngIf="!loading && events.length > 0">
+        <li *ngFor="let event of events" class="gc-list-item audit-row" [class.is-failure]="!event.success">
+          <div>
+            <strong>{{ formatAction(event.action) }}</strong>
+            <div class="meta audit-meta">
+              <span>{{ formatActor(event) }}</span>
+              <span>{{ formatDate(event.occurredAt) }}</span>
+              <span>{{ event.entityType }}<span *ngIf="event.entityId"> · {{ event.entityId }}</span></span>
+            </div>
+          </div>
+          <span class="badge" [class.badge-gray]="event.success" [class.badge-red]="!event.success">
+            {{ event.success ? 'OK' : 'Falha' }}
+          </span>
+        </li>
+      </ul>
+      <p class="meta" *ngIf="!loading && events.length === 0">Nenhum evento encontrado.</p>
+      <button
+        *ngIf="!loading && nextCursor"
+        type="button"
+        class="btn btn-secondary btn-small"
+        [disabled]="loadingMore"
+        (click)="loadMore()">
+        {{ loadingMore ? 'Carregando...' : 'Carregar mais' }}
+      </button>
+    </div>
+  </div>
+</div>

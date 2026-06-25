@@ -43,13 +43,13 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
         <span *ngIf="!teamLogoSrc(team)" class="team-tag-mini">{{ team.tag }}</span>
       </td>
       <td>{{ team.name }}</td>
-      <td>{{ team.wins ?? 0 }}</td>
-      <td>{{ team.losses ?? 0 }}</td>
-      <td>{{ team.draws ?? 0 }}</td>
-      <td>{{ team.points ?? 0 }}</td>
-      <td>{{ team.roundsWon ?? 0 }}</td>
-      <td>{{ team.roundsLost ?? 0 }}</td>
-      <td>{{ team.roundDifference ?? ((team.roundsWon ?? 0) - (team.roundsLost ?? 0)) }}</td>
+      <td>{{ team.wins }}</td>
+      <td>{{ team.losses }}</td>
+      <td>{{ team.draws }}</td>
+      <td>{{ team.points }}</td>
+      <td>{{ team.roundsWon }}</td>
+      <td>{{ team.roundsLost }}</td>
+      <td>{{ team.roundDifference ?? team.roundsWon - team.roundsLost }}</td>
       <td *ngIf="showActionsColumn" class="team-actions-cell">
         <button *ngIf="canEditTeam(team)" type="button" class="btn btn-secondary btn-small" (click)="editTeam.emit(team)">Editar</button>
         <button *ngIf="canRemoveTeams" type="button" class="btn btn-danger btn-small" (click)="removeTeam.emit(team.id)">Remover</button>
@@ -59,7 +59,6 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
   </tbody>
 </table>
   `,
-  styleUrls: ['./league-details.component.css']
 })
 export class LeagueTeamsTableComponent {
   @Input() teams: Team[] = [];

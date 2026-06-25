@@ -291,3 +291,25 @@ export interface TeamRankingEntry {
   losses: number;
   leagues: number;
 }
+
+export interface AuditEvent {
+  id: string;
+  occurredAt: string;
+  actorType: 'user' | 'system' | 'worker' | 'anonymous' | string;
+  actorUserId?: string | null;
+  actorLabel?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  parentType?: string | null;
+  parentId?: string | null;
+  requestMethod?: string | null;
+  requestPath?: string | null;
+  correlationId?: string | null;
+  before?: unknown;
+  after?: unknown;
+  metadata?: unknown;
+  success: boolean;
+  errorCode?: string | null;
+}

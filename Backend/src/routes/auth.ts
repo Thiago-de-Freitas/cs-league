@@ -12,8 +12,11 @@ import {
   encodeUploadedImageToDataUrl,
   publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
+import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { audit, setAuditContext } from '../lib/audit';
 
 const router = Router();
+router.use(auditResponseMiddleware);
 const hashPassword = promisify(bcrypt.hash);
 const comparePassword = promisify(bcrypt.compare);
 const BCRYPT_ROUNDS = 12;
@@ -97,6 +100,9 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
     });
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    setAuditContext(req, audit.of('auth.register', 'User', user.id, {
+      after: { email: user.email, displayName: user.displayName, role: user.role },
+    }));
     res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     console.error(err);
@@ -118,17 +124,30 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (!user) {
+      setAuditContext(req, audit.of('auth.login.failed', 'User', null, {
+        metadata: { email: email.trim().toLowerCase() },
+        success: false,
+        errorCode: 'INVALID_CREDENTIALS',
+      }));
       res.status(401).json({ error: 'Credenciais inválidas' });
       return;
     }
 
     const valid = await comparePassword(password, user.passwordHash);
     if (!valid) {
+      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
+        metadata: { email: user.email },
+        success: false,
+        errorCode: 'INVALID_CREDENTIALS',
+      }));
       res.status(401).json({ error: 'Credenciais inválidas' });
       return;
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    setAuditContext(req, audit.of('auth.login.success', 'User', user.id, {
+      after: { email: user.email, role: user.role },
+    }));
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
     console.error(err);
@@ -180,6 +199,9 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       where: { id: req.user!.userId },
       data,
     });
+    setAuditContext(req, audit.of('user.profile.update', 'User', user.id, {
+      after: { displayName: user.displayName, steamId: user.steamId },
+    }));
     res.json(sanitizeUser(user));
   } catch (err) {
     console.error(err);
@@ -208,6 +230,9 @@ router.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), async (
       data: { avatarUrl },
     });
 
+    setAuditContext(req, audit.of('user.avatar.upload', 'User', user.id, {
+      metadata: { fileName: req.file.originalname, size: req.file.size },
+    }));
     res.json(sanitizeUser(user));
   } catch (err) {
     console.error(err);
@@ -230,6 +255,7 @@ router.delete('/me/avatar', authMiddleware, async (req: AuthRequest, res: Respon
       data: { avatarUrl: null },
     });
 
+    setAuditContext(req, audit.of('user.avatar.delete', 'User', user.id));
     res.json(sanitizeUser(user));
   } catch (err) {
     console.error(err);

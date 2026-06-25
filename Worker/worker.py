@@ -87,6 +87,52 @@ def resolve_demo_path(file_path: str) -> str | None:
     return None
 
 
+def record_worker_audit(
+    action: str,
+    entity_type: str,
+    entity_id: str | None = None,
+    parent_type: str | None = None,
+    parent_id: str | None = None,
+    before=None,
+    after=None,
+    metadata=None,
+    success: bool = True,
+    error_code: str | None = None,
+) -> None:
+    if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
+        return
+    if "${{" in INTERNAL_SERVICE_KEY:
+        return
+
+    payload = {
+        "action": action,
+        "entityType": entity_type,
+        "entityId": entity_id,
+        "parentType": parent_type,
+        "parentId": parent_id,
+        "before": before,
+        "after": after,
+        "metadata": metadata,
+        "success": success,
+        "errorCode": error_code,
+    }
+    url = f"{BACKEND_INTERNAL_URL}/api/internal/audit"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Internal-Service-Key": INTERNAL_SERVICE_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15):
+            pass
+    except Exception as err:
+        print(f"[audit] falha ao registrar {action}: {err}")
+
+
 def fetch_demo_from_api(demo_id: str) -> tuple[str | None, str | None]:
     url_error = validate_backend_internal_url(BACKEND_INTERNAL_URL)
     if url_error:
@@ -532,11 +578,20 @@ def process_job(demo_id: str, file_path: str):
             "FAILED",
             fetch_error or "Arquivo da demo indisponível.",
         )
+        record_worker_audit(
+            "demo.processing.fail",
+            "Demo",
+            demo_id,
+            metadata={"reason": fetch_error or "Arquivo da demo indisponível."},
+            success=False,
+            error_code="FILE_UNAVAILABLE",
+        )
         return
 
     file_path = resolved
     print(f"Processando demo {demo_id}: {file_path}")
     update_demo_status(demo_id, "PROCESSING")
+    record_worker_audit("demo.processing.start", "Demo", demo_id)
 
     meta = get_demo_meta(demo_id)
     if meta is None:
@@ -553,6 +608,14 @@ def process_job(demo_id: str, file_path: str):
                 "FAILED",
                 "Configure seu Steam ID no perfil para enviar demo pessoal.",
             )
+            record_worker_audit(
+                "demo.processing.fail",
+                "Demo",
+                demo_id,
+                metadata={"reason": "Steam ID do uploader ausente"},
+                success=False,
+                error_code="MISSING_STEAM_ID",
+            )
             return
 
         player_steam_ids = {str(s.get("steam_id", "")).strip() for s in stats}
@@ -562,6 +625,14 @@ def process_job(demo_id: str, file_path: str):
                 "FAILED",
                 "Você não participou desta partida. Seu Steam ID não foi encontrado no arquivo da demo.",
             )
+            record_worker_audit(
+                "demo.processing.fail",
+                "Demo",
+                demo_id,
+                metadata={"reason": "Uploader não encontrado na demo"},
+                success=False,
+                error_code="UPLOADER_NOT_IN_DEMO",
+            )
             return
 
         stats = [s for s in stats if str(s.get("steam_id", "")).strip() == uploader_steam]
@@ -569,7 +640,22 @@ def process_job(demo_id: str, file_path: str):
     save_player_stats(demo_id, stats)
     if meta and meta.get("match_id"):
         update_match_map_from_demo(demo_id, map_name)
+        record_worker_audit(
+            "demo.match.map_update",
+            "Match",
+            meta.get("match_id"),
+            parent_type="Demo",
+            parent_id=demo_id,
+            after={"map": map_name},
+        )
     update_demo_status(demo_id, "COMPLETED")
+    record_worker_audit(
+        "demo.processing.complete",
+        "Demo",
+        demo_id,
+        after={"playerCount": len(stats), "map": map_name},
+        metadata={"isPersonal": bool(meta.get("is_personal")), "matchId": meta.get("match_id")},
+    )
     print(f"Demo {demo_id} processada com {len(stats)} jogadores")
 
 

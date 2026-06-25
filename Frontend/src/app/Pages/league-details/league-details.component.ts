@@ -13,6 +13,7 @@ import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components
 import { LeagueGroupsComponent } from '../../Components/league-groups/league-groups.component';
 import { LeagueGroupsPreviewComponent } from '../../Components/league-groups-preview/league-groups-preview.component';
 import { LeagueScheduleComponent } from '../../Components/league-schedule/league-schedule.component';
+import { LeagueActivityComponent } from '../../Components/league-activity/league-activity.component';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { getFairBracketSize, formatTeamCapacity, MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
@@ -45,6 +46,7 @@ interface ConfirmConfig {
     LeagueGroupsComponent,
     LeagueGroupsPreviewComponent,
     LeagueScheduleComponent,
+    LeagueActivityComponent,
     ConfirmModalComponent,
   ],
   templateUrl: './league-details.component.html',

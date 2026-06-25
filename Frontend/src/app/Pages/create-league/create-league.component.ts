@@ -129,7 +129,7 @@ export class CreateLeagueComponent implements OnInit {
   }
 
   formatRoundDiff(team: Team): string {
-    const diff = team.roundDifference ?? (team.roundsWon ?? 0) - (team.roundsLost ?? 0);
+    const diff = team.roundDifference ?? team.roundsWon - team.roundsLost;
     if (diff > 0) return `+${diff}`;
     return String(diff);
   }

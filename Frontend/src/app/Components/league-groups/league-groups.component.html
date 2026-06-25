@@ -40,8 +40,8 @@
             <td class="stat-col">{{ row.losses }}</td>
             <td class="stat-col">{{ row.draws }}</td>
             <td class="stat-col">{{ row.points }}</td>
-            <td class="stat-col">{{ row.roundsWon ?? 0 }}</td>
-            <td class="stat-col">{{ row.roundsLost ?? 0 }}</td>
+            <td class="stat-col">{{ row.roundsWon }}</td>
+            <td class="stat-col">{{ row.roundsLost }}</td>
             <td class="stat-col" [class.stat-positive]="roundDifference(row) > 0" [class.stat-negative]="roundDifference(row) < 0">
               {{ formatRoundDifference(row) }}
             </td>

@@ -55,6 +55,12 @@ export const routes: Routes = [
       import('./Pages/match-details/match-details.component').then((m) => m.MatchDetailsComponent),
     canActivate: [authGuard],
   },
+  {
+    path: 'admin-audit',
+    loadComponent: () =>
+      import('./Pages/admin-audit/admin-audit.component').then((m) => m.AdminAuditComponent),
+    canActivate: [authGuard],
+  },
   { path: 'player/:steamId', component: PlayerProfileComponent },
   {
     path: 'demo/:id',

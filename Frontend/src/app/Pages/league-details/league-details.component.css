@@ -1,658 +1,99 @@
-/* Container principal e tipografia */
 .league-detail-container {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 25px;
-    background-color: transparent;
-    color: var(--gc-text);
-    font-family: var(--font-body);
-    border-radius: 0;
-    box-shadow: none;
-  }
-  
-  /* Cabeçalho da Liga */
-  .league-header {
-    text-align: center;
-    margin-bottom: 40px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid var(--gc-orange);
-  }
-  
-  .league-header h1 {
-    font-size: 2.8em;
-    color: var(--gc-orange); /* Cor vibrante para título */
-    margin-bottom: 10px;
-    text-shadow: 0 0 12px rgba(255, 85, 0, 0.4);
-  }
-  
-  .league-description {
-    font-size: 1.1em;
-    color: var(--gc-text-secondary);
-    line-height: 1.6;
-    max-width: 800px;
-    margin: 0 auto 20px;
-  }
-  
-  .league-meta {
-    display: flex;
-    justify-content: center;
-    gap: 30px;
-    font-size: 0.95em;
-    color: var(--gc-text-secondary);
-  }
-  
-  .status-badge {
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 0.8em;
-  }
-  
-  .status-upcoming { background-color: var(--gc-yellow); color: var(--gc-text-on-success); } /* Amarelo */
-  .status-ongoing { background-color: var(--gc-green); color: var(--gc-text-on-primary); } /* Verde */
-  .status-completed { background-color: var(--gc-text-muted); color: var(--gc-text-on-primary); } /* Cinza */
-  .status-archived { background-color: var(--gc-bg-secondary); color: var(--gc-text-muted); }
-  
-  /* Seções de Conteúdo (Chaveamento, Gerenciamento de Equipes) */
-  .section-card {
-    background-color: var(--gc-surface);
-    padding: 30px;
-    border-radius: 8px;
-    margin-bottom: 30px;
-    border: 1px solid var(--gc-border);
-    width: 100%;
-  }
-
-  .section-title {
-    font-size: 1.8em;
-    color: var(--gc-orange);
-    margin-top: 0;
-    margin-bottom: 25px;
-    border-bottom: 1px solid var(--gc-orange);
-    padding-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  /* Chaveamento do Torneio */
-  .bracket-placeholder {
-    text-align: center;
-  }
-  
-  .bracket-placeholder .responsive-image {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
-  
-  .bracket-placeholder p {
-    margin-top: 20px;
-    color: var(--gc-text-secondary);
-    font-style: italic;
-  }
-  
-  /* Gerenciamento de Equipes da Liga */
-  .league-teams-management .add-team-button {
-    background-color: var(--gc-green); /* Verde para adicionar */
-    padding: 8px 15px;
-    font-size: 0.9em;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-  }
-  
-  .league-teams-management .add-team-button:hover {
-    background-color: var(--gc-green-hover);
-  }
-  
-  /* Estilo da Lista de Equipes (usando display grid para a "tabela") */
-  .team-list {
-    display: grid;
-    grid-template-columns: 30px 50px 2fr 1fr 1fr 1fr 1.5fr; /* Ajuste as colunas conforme necessário */
-    gap: 5px 10px;
-    align-items: center;
-    background-color: var(--gc-table-bg); /* Fundo da tabela */
-    border-radius: 8px;
-    overflow: hidden;
-    padding: 10px;
-  }
-  
-  .team-header-row {
-    grid-column: 1 / -1; /* Ocupa todas as colunas */
-    display: contents; /* Permite que os filhos se comportem como itens de grade diretamente */
-    font-weight: bold;
-    color: var(--gc-text);
-    background-color: var(--gc-table-header);
-    padding: 10px 0;
-    border-bottom: 1px solid var(--gc-table-border);
-  }
-  
-  .team-header-row .header-cell {
-    padding: 10px 15px;
-    text-align: left;
-    border-right: 1px solid var(--gc-table-border);
-  }
-  
-  .team-header-row .header-cell:last-child {
-    border-right: none;
-  }
-  
-  .team-row {
-    display: contents; /* Cada linha se comporta como um conjunto de itens de grade */
-    transition: background-color 0.2s ease;
-  }
-  
-  .team-row:hover {
-    background-color: var(--gc-surface-hover);
-  }
-  
-  .team-cell {
-    padding: 10px 15px;
-    border-bottom: 1px solid var(--gc-table-header);
-    text-align: left;
-  }
-  
-  .team-row:last-child .team-cell {
-    border-bottom: none;
-  }
-  
-  .team-cell.position-cell {
-    font-weight: bold;
-    text-align: center;
-    color: var(--gc-orange);
-  }
-  
-  .team-cell.logo-cell img {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    object-fit: cover;
-    vertical-align: middle;
-  }
-  
-  .team-cell.name-cell {
-    font-weight: bold;
-  }
-  
-  .team-cell.stat-cell {
-    text-align: center;
-  }
-  
-  .team-cell.actions-cell {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-  
-  .team-cell.actions-cell button {
-    padding: 6px 10px;
-    font-size: 0.85em;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-  }
-  
-  .team-cell.actions-cell .edit-button {
-    background-color: var(--gc-yellow); /* Amarelo */
-    color: var(--gc-text-on-success);
-  }
-  
-  .team-cell.actions-cell .edit-button:hover {
-    background-color: var(--gc-yellow-hover);
-  }
-  
-  .team-cell.actions-cell .remove-button {
-    background-color: var(--gc-red); /* Vermelho */
-    color: var(--gc-text-on-primary);
-  }
-  
-  .team-cell.actions-cell .remove-button:hover {
-    background-color: var(--gc-red-hover);
-  }
-  
-  /* Estilo para o drag handle */
-  .team-drag-handle {
-    cursor: grab;
-    font-size: 1.2em;
-    color: var(--gc-text-secondary);
-    text-align: center;
-    padding: 0 5px;
-    width: 30px; /* Largura da coluna do handle */
-    border-bottom: 1px solid var(--gc-table-header);
-  }
-  
-  .team-row:last-child .team-drag-handle {
-    border-bottom: none;
-  }
-  
-  /* Estilo para o item arrastado (CDK) */
-  .cdk-drag-placeholder {
-    opacity: 0.5;
-    background-color: var(--gc-surface-elevated);
-    border: 2px dashed var(--gc-orange);
-    border-radius: 8px;
-    box-sizing: border-box;
-  }
-  
-  .cdk-drag-animating {
-    transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
-  }
-  
-  .cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) {
-    transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
-  }
-  
-  /* Mensagens de estado */
-  .loading-spinner, .not-found-message, .no-teams-message {
-    text-align: center;
-    color: var(--gc-text-secondary);
-    margin-top: 50px;
-    font-size: 1.2em;
-  }
-  
-  /* Utilitários de botões */
-.btn {
-  display: inline-block;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1.25rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  margin-right: 0.5rem;
-}
-.btn-primary {
-  background: var(--gc-orange);
-  color: var(--gc-text-on-primary);
-}
-.btn-primary:hover {
-  background: var(--gc-orange-hover);
-}
-.edit-button {
-  background: var(--gc-yellow);
-  color: var(--gc-text-on-success);
-}
-.edit-button:hover {
-  background: var(--gc-yellow-hover);
-}
-.delete-button {
-  background: var(--gc-red);
-  color: var(--gc-text-on-primary);
-}
-.delete-button:hover {
-  background: var(--gc-red-hover);
-}
-@media (max-width: 600px) {
-  .section-card {
-    padding: 10px;
-  }
-  .btn {
-    font-size: 0.95rem;
-    padding: 0.4rem 0.8rem;
-  }
-  .league-header h1 {
-    font-size: 1.5em;
-  }
-  .section-title {
-    font-size: 1.1em;
-  }
-}
-  
-  /* Responsividade Básica */
-  @media (max-width: 768px) {
-    .league-detail-container {
-      padding: 15px;
-      margin: 10px;
-    }
-  
-    .league-header h1 {
-      font-size: 2em;
-    }
-  
-    .league-meta {
-      flex-direction: column;
-      gap: 10px;
-    }
-  
-    .section-title {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-      font-size: 1.5em;
-    }
-  
-    .team-list {
-      grid-template-columns: 30px 1fr 1.5fr; /* Simplifica colunas para telas menores */
-    }
-  
-    .team-header-row {
-      display: none; /* Esconde o cabeçalho da tabela em telas muito pequenas */
-    }
-  
-    .team-cell {
-      border-bottom: none;
-    }
-  
-    .team-cell.position-cell,
-    .team-cell.stat-cell {
-      text-align: left;
-      grid-column: span 1;
-    }
-  
-    .team-cell.logo-cell {
-      grid-column: 2 / 3;
-      grid-row: span 2;
-      align-self: center;
-    }
-    .team-cell.name-cell {
-      grid-column: 3 / -1;
-      grid-row: 1;
-    }
-    .team-cell.actions-cell {
-      grid-column: 2 / -1;
-      grid-row: 2;
-      justify-content: flex-start;
-      padding-top: 0;
-    }
-  }
-
-/* --- BRACKET ESTILO PLAY-OFF AVANÇADO --- */
-.bracket-container {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: flex-start;
-  background: var(--gc-bg-secondary);
-  padding: 40px 0 60px 0;
-  min-height: 500px;
-  position: relative;
-  gap: 64px;
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 25px;
+  background-color: transparent;
+  color: var(--gc-text);
+  font-family: var(--font-body);
 }
 
-.bracket-round {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 180px;
-  position: relative;
-  gap: 64px;
-}
-
-.round-title {
-  color: var(--gc-text-on-primary);
-  font-weight: bold;
-  margin-bottom: 24px;
+.league-header {
   text-align: center;
+  margin-bottom: 40px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--gc-orange);
+}
+
+.league-header h1 {
+  font-size: 2.8em;
+  color: var(--gc-orange);
+  margin-bottom: 10px;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--gc-orange) 40%, transparent);
+}
+
+.league-description {
   font-size: 1.1em;
+  color: var(--gc-text-secondary);
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 auto 20px;
 }
 
-.bracket-matches {
+.league-meta {
   display: flex;
-  flex-direction: column;
-  gap: 64px;
-}
-
-.bracket-match {
-  background: transparent;
-  border: none;
-  min-width: 160px;
-  min-height: 64px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  position: relative;
-  margin-bottom: 0;
   justify-content: center;
-}
-
-.team-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--gc-text-on-primary);
-  font-size: 1em;
-  margin-bottom: 2px;
-}
-
-.team-name {
-  min-width: 80px;
-  font-weight: 500;
-}
-
-.score-input {
-  width: 36px;
-  background: var(--gc-surface);
-  color: var(--gc-text-on-primary);
-  border: 1px solid var(--gc-orange);
-  border-radius: 4px;
-  text-align: center;
-  margin-left: 4px;
-}
-
-.winner-btn {
-  margin-top: 4px;
-  background: var(--gc-orange);
-  color: var(--gc-text-on-primary);
-  border: none;
-  border-radius: 12px;
-  padding: 2px 16px;
-  font-weight: bold;
-  cursor: pointer;
-  align-self: center;
-  transition: background 0.2s;
-}
-.winner-btn:hover {
-  background: var(--gc-orange-hover);
-}
-
-.winner-label {
-  color: var(--gc-green);
+  gap: 30px;
   font-size: 0.95em;
-  margin-top: 2px;
-  align-self: center;
+  color: var(--gc-text-secondary);
 }
 
-/* Linhas do bracket conectando rounds */
-.bracket-round:not(:last-child) .bracket-match {
-  /* espaço para as linhas */
-  padding-right: 40px;
-}
-
-.bracket-round:not(:last-child) .bracket-match::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 40px;
-  height: 0;
-  border-top: 3px solid var(--gc-text-on-primary);
-  z-index: 1;
-}
-
-/* Linhas verticais conectando partidas de rounds diferentes */
-.bracket-round:not(:last-child) .bracket-match::before {
-  content: '';
-  position: absolute;
-  right: -1px;
-  width: 0;
-  height: calc(50% + 32px);
-  border-right: 3px solid var(--gc-text-on-primary);
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1;
-  display: none;
-}
-
-/* Ativa a linha vertical apenas para as partidas que não são a última do round */
-.bracket-match:not(:last-child)::before {
-  display: block;
-}
-
-/* Centraliza o botão Play-Off */
-.playoff-btn {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--gc-green);
-  color: var(--gc-text-on-primary);
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
   font-weight: bold;
-  border-radius: 24px;
-  padding: 8px 32px;
-  font-size: 1.3em;
-  border: 3px solid var(--gc-text-on-primary);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  z-index: 2;
+  text-transform: uppercase;
+  font-size: 0.8em;
 }
 
-.team-table thead {
-  background-color: var(--header-bg);
-  color: var(--text-color);
-  font-weight: bold;
+.status-upcoming { background-color: var(--gc-yellow); color: var(--gc-text-on-success); }
+.status-ongoing { background-color: var(--gc-green); color: var(--gc-text-on-primary); }
+.status-completed { background-color: var(--gc-text-muted); color: var(--gc-text-on-primary); }
+.status-archived { background-color: var(--gc-bg-secondary); color: var(--gc-text-muted); }
+
+.section-card {
+  background-color: var(--gc-surface);
+  padding: 30px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+  border: 1px solid var(--gc-border);
+  width: 100%;
 }
 
-.team-table th {
-  padding: 15px 15px;
-  text-align: left;
-  border-bottom: 1px solid var(--secondary-border);
-  white-space: nowrap;
-  /* Evita que o texto do cabeçalho quebre */
-}
-
-.team-table th:first-child {
-  width: 30px;
-  /* Largura para a coluna # */
-  text-align: center;
-}
-
-.team-table th:nth-child(2) {
-  width: 50px;
-  /* Largura para a coluna Logo */
-}
-
-.team-table tbody tr {
-  transition: background-color 0.2s ease;
-  cursor: grab;
-  /* Indica que a linha é arrastável */
-}
-
-.team-table tbody tr:hover {
-  background-color: var(--row-hover-bg);
-}
-
-.team-table td {
-  padding: 10px 15px;
-  border-bottom: 1px solid var(--header-bg);
-  /* Borda mais suave para células */
-  text-align: left;
-  color: var(--text-color);
-}
-
-.team-table tbody tr:last-child td {
-  border-bottom: none;
-  /* Remove a borda da última linha */
-}
-
-/* Estilos específicos para células */
-.team-table td:first-child {
-  font-weight: bold;
-  text-align: center;
-  color: var(--accent-color);
-}
-
-.team-table td:nth-child(2) img {
-  /* Estilo para o logo na segunda coluna */
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  object-fit: cover;
-  vertical-align: middle;
-}
-
-.team-table td:nth-child(3) {
-  /* Estilo para o nome do time */
-  font-weight: bold;
-}
-
-.team-table td:nth-child(4),
-.team-table td:nth-child(5),
-.team-table td:nth-child(6) {
-  /* Estilos para Vitórias, Derrotas, Pontos */
-  text-align: center;
-}
-
-.team-table td:last-child {
-  white-space: nowrap;
-}
-
-.team-actions-cell {
+.section-title {
+  font-size: 1.8em;
+  color: var(--gc-orange);
+  margin-top: 0;
+  margin-bottom: 25px;
+  border-bottom: 1px solid var(--gc-orange);
+  padding-bottom: 10px;
   display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
 }
 
-.team-actions-cell .meta {
-  color: var(--gc-text-muted);
+.loading-spinner,
+.not-found-message,
+.no-teams-message {
+  text-align: center;
+  color: var(--gc-text-secondary);
+  margin-top: 50px;
+  font-size: 1.2em;
 }
 
-.team-table td button {
-  padding: 6px 10px;
-  font-size: 0.85em;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+@media (max-width: 600px) {
+  .section-card { padding: 10px; }
+  .league-header h1 { font-size: 1.5em; }
+  .section-title { font-size: 1.1em; }
 }
 
-.team-table td .edit-button {
-  background-color: var(--edit-button-bg);
-  color: var(--gc-text-on-success);
+@media (max-width: 768px) {
+  .league-detail-container { padding: 15px; margin: 10px; }
+  .league-header h1 { font-size: 2em; }
+  .league-meta { flex-direction: column; gap: 10px; }
+  .section-title { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 1.5em; }
 }
 
-.team-table td .edit-button:hover {
-  background-color: var(--edit-button-hover-bg);
-}
-
-.team-table td .remove-button {
-  background-color: var(--remove-button-bg);
-  color: var(--gc-text-on-primary);
-}
-
-.team-table td .remove-button:hover {
-  background-color: var(--remove-button-hover-bg);
-}
-
-@media (max-width: 900px) {
-  .bracket-container {
-    flex-direction: column;
-    align-items: stretch;
-    min-width: 0;
-    padding: 16px 0;
-    gap: 24px;
-  }
-  .bracket-round {
-    flex-direction: row;
-    min-width: 0;
-    margin: 0 0 32px 0;
-    justify-content: center;
-    gap: 24px;
-  }
-  .bracket-matches {
-    flex-direction: row;
-    gap: 24px;
-  }
-}
-
-/* --- FIM DO BRACKET --- */
-
-.admin-panel .section-title {
-  margin-bottom: 1.25rem;
-}
+.admin-panel .section-title { margin-bottom: 1.25rem; }
 
 .admin-stats {
   display: grid;
@@ -688,9 +129,7 @@
   line-height: 1.2;
 }
 
-.admin-stat-value.is-open {
-  color: var(--gc-green);
-}
+.admin-stat-value.is-open { color: var(--gc-green); }
 
 .admin-stat-note {
   font-size: 0.8rem;
@@ -712,9 +151,7 @@
   text-underline-offset: 2px;
 }
 
-.admin-stat-link:hover {
-  color: var(--gc-orange-hover);
-}
+.admin-stat-link:hover { color: var(--gc-orange-hover); }
 
 .admin-inline-panel .admin-setting-row {
   margin-top: 0.25rem;
@@ -731,10 +168,7 @@
   gap: 1.25rem;
 }
 
-.admin-setting-copy {
-  flex: 1;
-  min-width: 0;
-}
+.admin-setting-copy { flex: 1; min-width: 0; }
 
 .admin-setting-title {
   display: block;
@@ -768,14 +202,9 @@
   margin-left: auto;
 }
 
-.admin-archive-hint {
-  margin-bottom: 1rem;
-}
+.admin-archive-hint { margin-bottom: 1rem; }
 
-.admin-toolbar .btn {
-  margin-right: 0;
-  min-width: 11rem;
-}
+.admin-toolbar .btn { margin-right: 0; min-width: 11rem; }
 
 .admin-footnote {
   font-size: 0.85rem;
@@ -819,20 +248,11 @@
   margin-bottom: 0;
 }
 
-.admin-form-stacked .multi-select {
-  width: 100%;
-  min-height: 8rem;
-}
+.admin-form-stacked .multi-select { width: 100%; min-height: 8rem; }
 
-.admin-input-cap {
-  max-width: 10rem;
-}
+.admin-input-cap { max-width: 10rem; }
 
-.admin-form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
+.admin-form-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
 .admin-actions {
   display: flex;
@@ -867,10 +287,7 @@
   text-transform: uppercase;
 }
 
-.btn-small {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-}
+.btn-small { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
 
 .completed-notice {
   margin-top: 0.75rem;
@@ -904,14 +321,9 @@
   color: var(--gc-text-secondary);
 }
 
-.result-winner-line strong {
-  color: var(--gc-orange);
-}
+.result-winner-line strong { color: var(--gc-orange); }
 
-/* Abas de confrontos */
-.confrontos-card .section-title {
-  margin-bottom: 1rem;
-}
+.confrontos-card .section-title { margin-bottom: 1rem; }
 
 .gc-tabs {
   display: flex;
@@ -949,10 +361,7 @@
   color: var(--gc-orange);
 }
 
-.gc-tab:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+.gc-tab:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .gc-tab-badge {
   padding: 0.1rem 0.45rem;
@@ -965,13 +374,11 @@
 }
 
 .gc-tab.is-active .gc-tab-badge {
-  background: rgba(255, 85, 0, 0.15);
+  background: var(--gc-orange-dim);
   color: var(--gc-orange);
 }
 
-.gc-tab-panel {
-  min-height: 120px;
-}
+.gc-tab-panel { min-height: 120px; }
 
 .confrontos-empty {
   margin: 0;

@@ -1,0 +1,39 @@
+.admin-audit-inner {
+  max-width: 1100px;
+}
+
+.filters-card {
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.audit-row {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.audit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.badge-red {
+  background: color-mix(in srgb, var(--gc-red) 20%, var(--gc-surface));
+  color: var(--gc-red);
+  border: 1px solid color-mix(in srgb, var(--gc-red) 35%, var(--gc-border));
+}
+
+@media (max-width: 720px) {
+  .filters-row {
+    grid-template-columns: 1fr;
+  }
+}

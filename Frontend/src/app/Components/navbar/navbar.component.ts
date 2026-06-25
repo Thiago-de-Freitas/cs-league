@@ -33,6 +33,9 @@ import { AuthService } from '../../Services/auth.service';
             <li><a routerLink="/create-team" routerLinkActive="active" (click)="closeMenu()">Times</a></li>
             <li><a routerLink="/demo-upload" routerLinkActive="active" (click)="closeMenu()">Demos</a></li>
             <li><a routerLink="/profile" routerLinkActive="active" (click)="closeMenu()">Perfil</a></li>
+            @if (auth.isSystemAdmin()) {
+              <li><a routerLink="/admin-audit" routerLinkActive="active" (click)="closeMenu()">Auditoria</a></li>
+            }
             <li>
               <button class="gc-nav-logout" (click)="logout()">Sair</button>
             </li>

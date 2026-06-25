@@ -13,8 +13,11 @@ import {
   encodeUploadedImageToDataUrl,
   publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
+import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { audit, setAuditContext } from '../lib/audit';
 
 const router = Router();
+router.use(auditResponseMiddleware);
 
 const logoUpload = multer({
   storage: multer.memoryStorage(),
@@ -228,6 +231,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     });
 
     const full = await getTeamWithDetails(team.id);
+    setAuditContext(req, audit.of('team.create', 'Team', team.id, {
+      after: { name: team.name, tag: team.tag },
+    }));
     res.status(201).json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -274,6 +280,9 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.of('team.update', 'Team', req.params.id, {
+      after: data,
+    }));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -306,6 +315,9 @@ router.post('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req: 
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.of('team.logo.upload', 'Team', req.params.id, {
+      metadata: { fileName: req.file.originalname, size: req.file.size },
+    }));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -332,6 +344,7 @@ router.delete('/:id/logo', authMiddleware, async (req: AuthRequest, res: Respons
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.of('team.logo.delete', 'Team', req.params.id));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -363,6 +376,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     await prisma.team.delete({ where: { id: req.params.id } });
     deleteLegacyUploadFile(team.logoUrl);
+    setAuditContext(req, audit.of('team.delete', 'Team', req.params.id, {
+      before: { name: team.name, tag: team.tag },
+    }));
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -403,6 +419,9 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
       include: { invitedUser: { select: { id: true, displayName: true, email: true } } },
     });
 
+    setAuditContext(req, audit.withParent('team.invite.send', 'TeamInvite', invite.id, 'Team', req.params.id, {
+      after: { invitedUserId: userId },
+    }));
     res.status(201).json(invite);
   } catch (err) {
     console.error(err);
@@ -429,6 +448,7 @@ router.post('/:id/invites/:inviteId/reject', authMiddleware, async (req: AuthReq
       data: { status: 'REJECTED' },
     });
 
+    setAuditContext(req, audit.withParent('team.invite.reject', 'TeamInvite', invite.id, 'Team', req.params.id));
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -461,6 +481,9 @@ router.post('/:id/invites/:inviteId/accept', authMiddleware, async (req: AuthReq
     ]);
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('team.invite.accept', 'TeamInvite', invite.id, 'Team', req.params.id, {
+      after: { userId: invite.invitedUserId },
+    }));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -534,6 +557,9 @@ router.post('/:id/members', authMiddleware, async (req: AuthRequest, res: Respon
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('team.member.add', 'TeamMember', userId, 'Team', req.params.id, {
+      after: { userId, role },
+    }));
     res.status(201).json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -610,6 +636,9 @@ router.patch('/:id/members/:userId', authMiddleware, async (req: AuthRequest, re
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('team.member.update', 'TeamMember', req.params.userId, 'Team', req.params.id, {
+      after: updateData,
+    }));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
@@ -642,6 +671,9 @@ router.delete('/:id/members/:userId', authMiddleware, async (req: AuthRequest, r
     });
 
     const full = await getTeamWithDetails(req.params.id);
+    setAuditContext(req, audit.withParent('team.member.remove', 'TeamMember', req.params.userId, 'Team', req.params.id, {
+      before: { role: member.role },
+    }));
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);

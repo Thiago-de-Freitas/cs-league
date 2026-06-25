@@ -56,7 +56,7 @@
                   <div class="team-stats-row">
                     <span class="stat-pill">{{ team.wins }}V · {{ team.losses }}D<span *ngIf="team.draws"> · {{ team.draws }}E</span></span>
                     <span class="stat-pill stat-highlight">{{ team.points }} pts</span>
-                    <span class="stat-pill">RF {{ team.roundsWon ?? 0 }}</span>
+                    <span class="stat-pill">RF {{ team.roundsWon }}</span>
                     <span class="stat-pill" [class.stat-positive]="(team.roundDifference ?? 0) > 0" [class.stat-negative]="(team.roundDifference ?? 0) < 0">
                       Saldo {{ formatRoundDiff(team) }}
                     </span>

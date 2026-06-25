@@ -32,6 +32,12 @@
       </app-league-teams-table>
     </div>
 
+    <div class="section-card">
+      <h2 class="section-title">Atividade e auditoria</h2>
+      <p class="admin-hint">Registro de ações realizadas nesta liga — quem fez o quê e quando.</p>
+      <app-league-activity [leagueId]="league.id"></app-league-activity>
+    </div>
+
     <div class="section-card" *ngIf="canShowPlayerRegistration">
       <h2 class="section-title">Inscrever meu time</h2>
       <p class="admin-hint" *ngIf="registerableTeams.length > 0">

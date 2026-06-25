@@ -165,167 +165,6 @@
   border-bottom-color: var(--gc-orange);
 }
 
-/* Stats grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-
-.stat-card {
-  background: var(--gc-surface);
-  border: 1px solid var(--gc-border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.stat-card-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--gc-text-muted);
-}
-
-.stat-card-gauge {
-  align-items: center;
-  text-align: center;
-}
-
-.stat-card-wide {
-  grid-column: 1 / -1;
-}
-
-.stat-card-meta {
-  font-size: 0.8rem;
-  color: var(--gc-text-secondary);
-  text-align: center;
-  margin: 0;
-}
-
-/* Gauge */
-.gauge {
-  --pct: 0%;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  background: conic-gradient(var(--gc-orange) var(--pct), var(--gc-border) 0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.gauge-green { background: conic-gradient(var(--gc-green) var(--pct), var(--gc-border) 0); }
-.gauge-blue { background: conic-gradient(#4a9eff var(--pct), var(--gc-border) 0); }
-
-.gauge-inner {
-  width: 78%;
-  height: 78%;
-  border-radius: 50%;
-  background: var(--gc-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.gauge-value {
-  font-family: var(--font-display);
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--gc-text);
-}
-
-/* Match dots */
-.stat-card-matches { justify-content: space-between; }
-
-.match-dots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: center;
-  padding: 0.5rem 0;
-}
-
-.match-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-  background: var(--gc-border);
-}
-
-.dot-completed { background: var(--gc-green); }
-.dot-failed { background: var(--gc-red); }
-.dot-processing { background: var(--gc-orange); animation: pulse 1.5s ease-in-out infinite; }
-.dot-pending { background: var(--gc-yellow); }
-
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-/* Metric cards */
-.stat-card-metric { gap: 0.5rem; }
-
-.metric-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.metric-icon {
-  font-size: 1.25rem;
-  color: var(--gc-text-muted);
-}
-
-.metric-value {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.metric-bar {
-  height: 4px;
-  background: var(--gc-border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.metric-bar-fill {
-  height: 100%;
-  background: var(--gc-green);
-  border-radius: 2px;
-  transition: width 0.4s ease;
-}
-
-.metric-bar-orange { background: var(--gc-orange); }
-
-.metric-details {
-  list-style: none;
-  padding: 0;
-  margin: 0.5rem 0 0;
-  display: flex;
-  gap: 1.5rem;
-}
-
-.metric-details li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.metric-details span {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  color: var(--gc-text-muted);
-}
-
-.metric-details strong {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-}
-
 /* History table */
 .profile-history-table { font-size: 0.85rem; }
 .profile-history-table .row-muted { opacity: 0.55; }
@@ -420,18 +259,6 @@
   pointer-events: none;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .demo-stuck-banner {
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
@@ -476,13 +303,6 @@
 .badge.status-completed { background: var(--gc-green-dim); color: var(--gc-green); }
 .badge.status-failed { background: rgba(244, 67, 54, 0.15); color: var(--gc-red); }
 
-.mb-4 { margin-bottom: 1rem; }
-.mt-4 { margin-top: 1rem; }
-
-@media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
 @media (max-width: 768px) {
   .profile-dashboard {
     grid-template-columns: 1fr;
@@ -504,9 +324,6 @@
   .sidebar-email, .sidebar-role { width: 100%; }
   .sidebar-steam, .sidebar-summary, .sidebar-hint { width: 100%; }
   .sidebar-btn { width: 100%; }
-
-  .stats-grid { grid-template-columns: 1fr; }
-  .stat-card-wide { grid-column: 1; }
 
   .profile-history-table { font-size: 0.75rem; }
   .demo-link { max-width: 100px; }

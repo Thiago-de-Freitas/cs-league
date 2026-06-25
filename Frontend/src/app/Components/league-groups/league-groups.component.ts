@@ -99,7 +99,7 @@ export class LeagueGroupsComponent {
   }
 
   roundDifference(row: GroupStanding): number {
-    return row.roundDifference ?? (row.roundsWon ?? 0) - (row.roundsLost ?? 0);
+    return row.roundDifference;
   }
 
   formatRoundDifference(row: GroupStanding): string {
