@@ -7,33 +7,31 @@ import { VersionService } from '../../Services/version.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="gc-build-version" [title]="tooltip">
-      <span class="gc-build-version-label">Front {{ frontendLabel }}</span>
-      <span class="gc-build-version-sep" *ngIf="backendLabel">·</span>
-      <span class="gc-build-version-label" *ngIf="backendLabel">API {{ backendLabel }}</span>
-    </div>
+    <footer class="gc-app-footer">
+      <p class="gc-app-version" [title]="tooltip">
+        CS League <span class="gc-app-version-number">{{ systemVersion }}</span>
+      </p>
+      <p class="gc-app-copyright">
+        © {{ currentYear }}
+        <a
+          href="https://www.punkcodesolution.com.br/"
+          target="_blank"
+          rel="noopener noreferrer">
+          Punk Code Solution
+        </a>
+      </p>
+    </footer>
   `,
 })
 export class BuildVersionComponent implements OnInit {
-  frontendLabel = '';
-  backendLabel: string | null = null;
+  systemVersion = '';
   tooltip = '';
+  currentYear = new Date().getFullYear();
 
   constructor(private versionService: VersionService) {}
 
   ngOnInit(): void {
-    const front = this.versionService.getFrontendBuild();
-    this.frontendLabel = this.versionService.formatLabel(front);
-    this.tooltip = `Build ${front.buildTime} · branch ${front.branch}`;
-
-    this.versionService.getAppVersion().subscribe((info) => {
-      this.backendLabel = info.backendLabel;
-      if (info.backend) {
-        this.tooltip = [
-          `Front: ${info.frontend.buildTime} (${info.frontend.branch})`,
-          `API: ${info.backend.buildTime} (${info.backend.branch})`,
-        ].join('\n');
-      }
-    });
+    this.systemVersion = this.versionService.getSystemVersionLabel();
+    this.tooltip = this.versionService.getSystemVersionTooltip();
   }
 }

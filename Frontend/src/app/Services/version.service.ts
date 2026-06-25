@@ -51,4 +51,15 @@ export class VersionService {
     const dirty = info.dirty ? '-dirty' : '';
     return `v${info.version} (${info.commit}${dirty})`;
   }
+
+  /** Versão única exibida no rodapé do sistema. */
+  getSystemVersionLabel(): string {
+    return `v${BUILD_INFO.version}`;
+  }
+
+  getSystemVersionTooltip(): string {
+    const front = BUILD_INFO;
+    const dirty = front.dirty ? ' (dirty)' : '';
+    return `CS League ${front.version} · build ${front.buildTime} · ${front.branch}${dirty}`;
+  }
 }
