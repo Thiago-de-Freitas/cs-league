@@ -8,7 +8,7 @@ const BCRYPT_ROUNDS = 12;
 
 const prisma = new PrismaClient();
 
-const ADMIN_EMAIL = 'admin@cslegue.com';
+const ADMIN_EMAIL = 'tfgoncalvesfreelancer@gmail.com';
 const ADMIN_DISPLAY_NAME = 'Administrador';
 
 async function main() {
