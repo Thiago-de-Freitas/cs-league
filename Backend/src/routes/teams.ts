@@ -1,8 +1,6 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
@@ -10,33 +8,16 @@ import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats
 import { parseOwnerAsMember } from '../lib/teamCreation';
 import { parsePlayerPositionOptional, type PlayerPosition } from '../lib/playerPosition';
 import { getAverageAdrBySteamIds } from '../lib/teamMemberStats';
-import { sanitizeFileExtension } from '../lib/pathSafe';
 import {
-  getTeamLogoStoragePath,
-  publicUploadFilePath,
+  deleteLegacyUploadFile,
+  encodeUploadedImageToDataUrl,
   publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
 
 const router = Router();
 
-const logoStoragePath = getTeamLogoStoragePath();
-
-if (!fs.existsSync(logoStoragePath)) {
-  fs.mkdirSync(logoStoragePath, { recursive: true });
-}
-
 const logoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, logoStoragePath),
-    filename: (_req, file, cb) => {
-      const ext = sanitizeFileExtension(file.originalname, ['.png', '.jpg', '.jpeg', '.webp', '.gif']);
-      if (!ext) {
-        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'), '');
-        return;
-      }
-      cb(null, `${uuidv4()}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
@@ -48,21 +29,6 @@ const logoUpload = multer({
     }
   },
 });
-
-function publicLogoUrl(fileName: string): string {
-  return `/uploads/team-logos/${fileName}`;
-}
-
-function logoFilePathFromUrl(logoUrl: string | null): string | null {
-  return publicUploadFilePath(logoUrl);
-}
-
-function deleteLogoFile(logoUrl: string | null): void {
-  const filePath = logoFilePathFromUrl(logoUrl);
-  if (filePath && fs.existsSync(filePath)) {
-    fs.unlink(filePath, () => {});
-  }
-}
 
 async function getTeamWithDetails(teamId: string) {
   return prisma.team.findUnique({
@@ -331,8 +297,8 @@ router.post('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req: 
       return;
     }
 
-    const logoUrl = publicLogoUrl(req.file.filename);
-    deleteLogoFile(team.logoUrl);
+    const logoUrl = encodeUploadedImageToDataUrl(req.file);
+    deleteLegacyUploadFile(team.logoUrl);
 
     await prisma.team.update({
       where: { id: req.params.id },
@@ -343,7 +309,6 @@ router.post('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req: 
     res.json(formatTeam(full!));
   } catch (err) {
     console.error(err);
-    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: 'Erro ao enviar logo' });
   }
 });
@@ -360,7 +325,7 @@ router.delete('/:id/logo', authMiddleware, async (req: AuthRequest, res: Respons
       return;
     }
 
-    deleteLogoFile(team.logoUrl);
+    deleteLegacyUploadFile(team.logoUrl);
     await prisma.team.update({
       where: { id: req.params.id },
       data: { logoUrl: null },
@@ -397,7 +362,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     }
 
     await prisma.team.delete({ where: { id: req.params.id } });
-    deleteLogoFile(team.logoUrl);
+    deleteLegacyUploadFile(team.logoUrl);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

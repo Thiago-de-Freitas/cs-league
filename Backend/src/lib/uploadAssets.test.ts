@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import {
+  encodeUploadedImageToDataUrl,
+  isDataImageUrl,
   normalizePublicUploadUrl,
   publicUploadFileExists,
   publicUploadUrlForResponse,
@@ -36,7 +38,25 @@ describe('uploadAssets', () => {
     );
   });
 
-  it('publicUploadUrlForResponse preserva URL mesmo sem arquivo no disco', () => {
+  it('preserva data URLs de imagem', () => {
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+    assert.equal(isDataImageUrl(dataUrl), true);
+    assert.equal(normalizePublicUploadUrl(dataUrl), dataUrl);
+    assert.equal(publicUploadUrlForResponse(dataUrl), dataUrl);
+    assert.equal(sanitizePublicUploadUrl(dataUrl), dataUrl);
+    assert.equal(publicUploadFileExists(dataUrl), true);
+  });
+
+  it('converte buffer de upload em data URL', () => {
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const dataUrl = encodeUploadedImageToDataUrl({
+      originalname: 'logo.png',
+      buffer: pngHeader,
+    } as import('express').Express.Multer.File);
+    assert.match(dataUrl, /^data:image\/png;base64,/);
+  });
+
+  it('publicUploadUrlForResponse preserva URL legada mesmo sem arquivo no disco', () => {
     assert.equal(publicUploadFileExists('/uploads/team-logos/abc.png'), true);
     assert.equal(sanitizePublicUploadUrl('/uploads/team-logos/missing.png'), null);
     assert.equal(

@@ -2,17 +2,14 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import { promisify } from 'node:util';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
-import { sanitizeFileExtension } from '../lib/pathSafe';
 import {
-  getUserAvatarStoragePath,
-  publicUploadFilePath,
+  deleteLegacyUploadFile,
+  encodeUploadedImageToDataUrl,
   publicUploadUrlForResponse,
 } from '../lib/uploadAssets';
 
@@ -25,24 +22,8 @@ const MAX_EMAIL_LENGTH = 255;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 128;
 
-const avatarStoragePath = getUserAvatarStoragePath();
-
-if (!fs.existsSync(avatarStoragePath)) {
-  fs.mkdirSync(avatarStoragePath, { recursive: true });
-}
-
 const avatarUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, avatarStoragePath),
-    filename: (_req, file, cb) => {
-      const ext = sanitizeFileExtension(file.originalname, ['.png', '.jpg', '.jpeg', '.webp', '.gif']);
-      if (!ext) {
-        cb(new Error('Apenas imagens PNG, JPG, WEBP ou GIF são permitidas'), '');
-        return;
-      }
-      cb(null, `${uuidv4()}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
@@ -54,21 +35,6 @@ const avatarUpload = multer({
     }
   },
 });
-
-function publicAvatarUrl(fileName: string): string {
-  return `/uploads/user-avatars/${fileName}`;
-}
-
-function avatarFilePathFromUrl(avatarUrl: string | null): string | null {
-  return publicUploadFilePath(avatarUrl);
-}
-
-function deleteAvatarFile(avatarUrl: string | null): void {
-  const filePath = avatarFilePathFromUrl(avatarUrl);
-  if (filePath && fs.existsSync(filePath)) {
-    fs.unlink(filePath, () => {});
-  }
-}
 
 function sanitizeUser(user: {
   id: string;
@@ -234,8 +200,8 @@ router.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), async (
       return;
     }
 
-    const avatarUrl = publicAvatarUrl(req.file.filename);
-    deleteAvatarFile(current.avatarUrl);
+    const avatarUrl = encodeUploadedImageToDataUrl(req.file);
+    deleteLegacyUploadFile(current.avatarUrl);
 
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
@@ -245,7 +211,6 @@ router.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), async (
     res.json(sanitizeUser(user));
   } catch (err) {
     console.error(err);
-    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: 'Erro ao enviar foto de perfil' });
   }
 });
@@ -258,7 +223,7 @@ router.delete('/me/avatar', authMiddleware, async (req: AuthRequest, res: Respon
       return;
     }
 
-    deleteAvatarFile(current.avatarUrl);
+    deleteLegacyUploadFile(current.avatarUrl);
 
     const user = await prisma.user.update({
       where: { id: req.user!.userId },

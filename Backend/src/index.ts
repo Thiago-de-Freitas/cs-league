@@ -273,14 +273,8 @@ app.use(express.json({ limit: '1mb' }));
 ensureUploadStorageDirectories();
 const uploadStorageStatus = getUploadStorageStatus();
 console.log(
-  `[uploads] team-logos: ${uploadStorageStatus.teamLogos.path} (${uploadStorageStatus.teamLogos.filesOnDisk} arquivo(s))`
+  `[uploads] storage=${uploadStorageStatus.storageMode}; legado em disco: team-logos=${uploadStorageStatus.teamLogos.filesOnDisk}, user-avatars=${uploadStorageStatus.userAvatars.filesOnDisk}`
 );
-console.log(
-  `[uploads] user-avatars: ${uploadStorageStatus.userAvatars.path} (${uploadStorageStatus.userAvatars.filesOnDisk} arquivo(s))`
-);
-for (const warning of uploadStorageStatus.warnings) {
-  console.warn(`[uploads] ${warning}`);
-}
 
 const teamLogosPath = getTeamLogoStoragePath();
 const userAvatarsPath = getUserAvatarStoragePath();
