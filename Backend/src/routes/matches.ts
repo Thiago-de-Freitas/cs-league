@@ -7,6 +7,7 @@ import { resolveBracketSize } from '../lib/bracket';
 import { tryCompleteLeague } from '../lib/leagueComplete';
 import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
+import type { MatchPlayerStat } from '@prisma/client';
 import { canUserAccessMatch, canUserRegisterMatchResult, canUserEditMatchStats } from '../lib/matchPermissions';
 import {
   calcPlayerAdr,
@@ -30,7 +31,7 @@ async function loadMatchRoster(team1Id: string, team2Id: string) {
     include: {
       user: { select: { id: true, displayName: true, steamId: true } },
     },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    orderBy: { role: 'asc' },
   });
 
   const mapTeam = (teamId: string) =>
@@ -56,7 +57,7 @@ function formatMatchDemos(demos: Array<{
   isPersonal: boolean;
   isManual: boolean;
   errorMessage: string | null;
-  stats: unknown[];
+  stats: MatchPlayerStat[];
   createdAt: Date;
 }>) {
   return demos.map((d) => ({
@@ -99,7 +100,7 @@ function formatMatchResponse(
     isPersonal: boolean;
     isManual: boolean;
     errorMessage: string | null;
-    stats: unknown[];
+    stats: MatchPlayerStat[];
     createdAt: Date;
   }>,
   permissions: {

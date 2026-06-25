@@ -2,7 +2,8 @@ import fs from 'fs';
 import { prisma } from './prisma';
 import { tryResolveDemoFilePath } from './demoStorage';
 
-function unlinkDemoFile(filePath: string): void {
+function unlinkDemoFile(filePath: string | null | undefined): void {
+  if (!filePath?.trim()) return;
   const absolutePath = tryResolveDemoFilePath(filePath);
   if (!absolutePath || !fs.existsSync(absolutePath)) return;
   try {

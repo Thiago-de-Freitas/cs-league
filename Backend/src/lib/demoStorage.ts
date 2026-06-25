@@ -38,10 +38,19 @@ export function resolveDemoFilePath(filePath: string): string {
 }
 
 /** Variante segura que retorna null em vez de lançar (para leitura defensiva). */
-export function tryResolveDemoFilePath(filePath: string): string | null {
+export function tryResolveDemoFilePath(filePath: string | null | undefined): string | null {
+  if (!filePath?.trim()) return null;
   try {
     return resolveDemoFilePath(filePath);
   } catch {
     return null;
   }
+}
+
+export function displayDemoFileName(
+  fileName: string | null | undefined,
+  isManual = false
+): string {
+  if (isManual) return 'Stats manuais';
+  return fileName?.trim() || 'demo.dem';
 }

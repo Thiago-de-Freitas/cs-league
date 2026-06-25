@@ -207,14 +207,20 @@ app.get('/api/internal/demos/:id/file', internalServiceAuth, async (req, res) =>
       return;
     }
 
+    if (!demo.filePath) {
+      res.status(404).json({ error: 'Demo sem arquivo associado' });
+      return;
+    }
+
     const absolutePath = tryResolveDemoFilePath(demo.filePath);
     if (!absolutePath || !fs.existsSync(absolutePath)) {
       res.status(404).json({ error: 'Arquivo da demo não encontrado na API' });
       return;
     }
 
+    const safeName = (demo.fileName ?? 'demo.dem').replace(/"/g, '');
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${demo.fileName.replace(/"/g, '')}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
     fs.createReadStream(absolutePath).pipe(res);
   } catch (err) {
     console.error('[internal/demos/file]', err);

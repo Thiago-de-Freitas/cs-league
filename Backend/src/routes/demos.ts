@@ -151,7 +151,7 @@ router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async
         await markDemoFileMissing(demo.id);
         skipped.push({
           id: demo.id,
-          fileName: demo.fileName,
+          fileName: demo.fileName ?? 'demo.dem',
           reason: DEMO_FILE_MISSING_ERROR,
         });
         continue;
@@ -237,7 +237,11 @@ router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), 
     });
 
     try {
-      await enqueueDemoJob(demo.id, demo.filePath);
+      const demoFilePath = demo.filePath;
+      if (!demoFilePath) {
+        throw new Error('Demo criada sem arquivo');
+      }
+      await enqueueDemoJob(demo.id, demoFilePath);
     } catch (enqueueErr) {
       await prisma.demo.delete({ where: { id: demo.id } }).catch(() => {});
       fs.unlink(req.file.path, () => {});
