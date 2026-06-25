@@ -37,6 +37,7 @@ export interface Team {
   roundDifference?: number;
   seed?: number;
   groupId?: string | null;
+  teamAdr?: number | null;
   invites?: TeamInvite[];
 }
 

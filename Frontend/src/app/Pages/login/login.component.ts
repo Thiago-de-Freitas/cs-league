@@ -17,6 +17,7 @@ export class LoginComponent implements OnInit {
   loginForm: FormGroup;
   loginError = '';
   loading = false;
+  showPassword = false;
 
   constructor(
     private fb: FormBuilder,
@@ -67,5 +68,9 @@ export class LoginComponent implements OnInit {
       'Steam em breve',
       { hint: 'O login via Steam será implementado em uma fase futura.' }
     );
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
   }
 }

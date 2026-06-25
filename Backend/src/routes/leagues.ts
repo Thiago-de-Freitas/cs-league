@@ -42,6 +42,7 @@ import {
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
 import { roundDifference } from '../lib/matchResult';
+import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
 
 const router = Router();
@@ -109,7 +110,33 @@ async function getLeagueWithDetails(leagueId: string) {
   });
 }
 
-function formatTeamFromLeagueTeam(lt: {
+function computeTeamAdr(players: { adr: number | null }[]): number | null {
+  const values = players.map((p) => p.adr).filter((v): v is number => v != null);
+  if (values.length === 0) return null;
+  const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.round(avg * 10) / 10;
+}
+
+function collectSteamIdsFromRosters(
+  leagueTeams: Array<{
+    team: { members: { user: { steamId: string | null } }[] };
+  }>
+): string[] {
+  return leagueTeams.flatMap((lt) =>
+    lt.team.members.map((m) => m.user.steamId).filter((id): id is string => !!id?.trim())
+  );
+}
+
+async function buildAdrMapForLeagueTeams(
+  leagueTeams: Array<{
+    team: { members: { user: { steamId: string | null } }[] };
+  }>
+): Promise<Map<string, PlayerAdrSummary>> {
+  return getAverageAdrBySteamIds(collectSteamIdsFromRosters(leagueTeams));
+}
+
+function formatTeamFromLeagueTeam(
+  lt: {
   team: {
     id: string;
     name: string;
@@ -117,7 +144,7 @@ function formatTeamFromLeagueTeam(lt: {
     logoUrl: string | null;
     ownerId: string;
     members: {
-      user: { id: string; displayName: string };
+      user: { id: string; displayName: string; steamId: string | null };
       role: string;
       memberTag: string | null;
       position: string | null;
@@ -131,7 +158,24 @@ function formatTeamFromLeagueTeam(lt: {
   roundsLost: number;
   seed: number | null;
   groupId?: string | null;
-}) {
+},
+  adrBySteam: Map<string, PlayerAdrSummary> = new Map()
+) {
+  const players = lt.team.members.map((m) => {
+    const steamKey = m.user.steamId?.trim().toLowerCase() ?? '';
+    const adrSummary = steamKey ? adrBySteam.get(steamKey) : undefined;
+    return {
+      id: m.user.id,
+      name: m.user.displayName,
+      IGN: m.user.displayName,
+      role: m.role,
+      memberTag: m.memberTag,
+      position: m.position,
+      adr: adrSummary?.adr ?? null,
+      matches: adrSummary?.matches ?? 0,
+    };
+  });
+
   return {
     id: lt.team.id,
     name: lt.team.name,
@@ -147,21 +191,16 @@ function formatTeamFromLeagueTeam(lt: {
     roundDifference: roundDifference(lt.roundsWon, lt.roundsLost),
     seed: lt.seed,
     groupId: lt.groupId ?? null,
-    players: lt.team.members.map((m) => ({
-      id: m.user.id,
-      name: m.user.displayName,
-      IGN: m.user.displayName,
-      role: m.role,
-      memberTag: m.memberTag,
-      position: m.position,
-    })),
+    teamAdr: computeTeamAdr(players),
+    players,
   };
 }
 
 function formatLeague(
   league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>,
   matchIdsWithDemo: Set<string> = new Set(),
-  weekOverrides: { weekStart: string; daysOfWeek: number[] }[] = []
+  weekOverrides: { weekStart: string; daysOfWeek: number[] }[] = [],
+  adrBySteam: Map<string, PlayerAdrSummary> = new Map()
 ) {
   const groupMatches = league.matches.filter((m) => m.phase === 'GROUP');
   const playoffMatches = league.matches.filter((m) => m.phase === 'PLAYOFF');
@@ -215,7 +254,7 @@ function formatLeague(
       id: g.id,
       name: g.name,
       order: g.order,
-      teams: g.teams.map(formatTeamFromLeagueTeam),
+      teams: g.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
       standings: standings.map((s) => {
         const lt = g.teams.find((t) => t.teamId === s.teamId);
         return {
@@ -258,7 +297,7 @@ function formatLeague(
     scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
     scheduleWeekOverrides: weekOverrides,
     groups,
-    teams: league.teams.map(formatTeamFromLeagueTeam),
+    teams: league.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
     matches: league.matches.map(formatMatch),
     createdAt: league.createdAt,
   };
@@ -292,20 +331,19 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
               ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
             ],
           },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        status: true,
-        maxTeams: true,
-        registrationOpen: true,
-        ownerId: true,
-        startDate: true,
-        endDate: true,
+      include: {
+        teams: {
+          include: {
+            team: { select: teamWithRosterSelect },
+          },
+          orderBy: [{ points: 'desc' }, { wins: 'desc' }, { seed: 'asc' }],
+        },
         _count: { select: { teams: true, matches: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    const adrBySteam = await buildAdrMapForLeagueTeams(leagues.flatMap((l) => l.teams));
 
     res.json(
       leagues.map((l) => ({
@@ -320,6 +358,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         endDate: l.endDate,
         teamCount: l._count.teams,
         matchCount: l._count.matches,
+        teams: l.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
       }))
     );
   } catch (err) {
@@ -402,7 +441,13 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       daysOfWeek: parseWeekOverrideDays(r.daysOfWeek) ?? [],
     }));
 
-    res.json(formatLeague(league, matchIdsWithDemo, weekOverrides));
+    const allLeagueTeams = [
+      ...league.teams,
+      ...league.groups.flatMap((g) => g.teams),
+    ];
+    const adrBySteam = await buildAdrMapForLeagueTeams(allLeagueTeams);
+
+    res.json(formatLeague(league, matchIdsWithDemo, weekOverrides, adrBySteam));
   } catch (err) {
     console.error('GET /api/leagues/:id', err);
     res.status(500).json({ error: 'Erro ao buscar liga' });

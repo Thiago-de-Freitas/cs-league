@@ -1,5 +1,5 @@
 <div class="page-container">
-  <div class="page-inner max-width-narrow">
+  <div class="page-inner leagues-page-inner">
     <div class="gc-card-header list-page-header">
       <div>
         <h1 class="page-title">Ligas</h1>
@@ -17,25 +17,93 @@
 
     <div *ngIf="loading" class="loading">Carregando...</div>
 
-    <div class="gc-card" *ngIf="!loading">
-      <h2 class="section-title">Ligas Existentes</h2>
-      <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
-        <li *ngFor="let league of leagues" class="gc-list-item league-list-item">
-          <div class="league-info">
-            <span class="league-name">{{ league.name }}</span>
-            <span class="badge badge-gray">{{ getStatusLabel(league.status) }}</span>
-            <span class="meta" *ngIf="league.teamCount !== undefined">
-              {{ league.teamCount != null ? (league.maxTeams != null ? league.teamCount + '/' + league.maxTeams : league.teamCount) : '' }} times
-            </span>
+    <div *ngIf="!loading && leagues.length > 0" class="leagues-stack">
+      <section *ngFor="let league of leagues" class="league-section gc-card">
+        <div class="league-section-header">
+          <div class="league-section-title-block">
+            <h2 class="league-section-name">{{ league.name }}</h2>
+            <div class="league-section-meta">
+              <span class="badge badge-gray">{{ getStatusLabel(league.status) }}</span>
+              <span class="meta">{{ getTeamCountLabel(league) }}</span>
+              <span class="meta" *ngIf="league.matchCount">{{ league.matchCount }} partida(s)</span>
+            </div>
           </div>
-          <button class="btn btn-secondary btn-small" (click)="goToLeagueDetailsById(league.id)">
+          <button type="button" class="btn btn-secondary btn-small" (click)="goToLeagueDetailsById(league.id)">
             Ver Detalhes
           </button>
-        </li>
-      </ul>
-      <ng-template #noLeagues>
-        <p class="meta">Nenhuma liga cadastrada. Clique em <strong>+ Nova Liga</strong> para começar.</p>
-      </ng-template>
+        </div>
+
+        <div class="teams-grid" *ngIf="league.teams && league.teams.length > 0; else noTeamsInLeague">
+          <article *ngFor="let team of league.teams" class="team-card">
+            <div class="team-card-header">
+              <div class="team-card-brand">
+                <div class="team-logo-wrap">
+                  <img
+                    *ngIf="getTeamLogoUrl(team) as logoUrl"
+                    [src]="logoUrl"
+                    [alt]="'Logo ' + team.name"
+                    class="team-logo-img"
+                    (error)="onTeamLogoError(team.id)" />
+                  <span *ngIf="!getTeamLogoUrl(team)" class="team-tag-mini team-logo-fallback">{{ team.tag }}</span>
+                </div>
+                <div class="team-card-title-block">
+                  <h3 class="team-card-name">{{ team.name }}</h3>
+                  <div class="team-card-meta">
+                    <span class="badge badge-orange">{{ team.tag }}</span>
+                    <span class="badge badge-gray" *ngIf="team.seed">Seed {{ team.seed }}</span>
+                    <span class="meta">{{ team.players.length || 0 }} membros</span>
+                  </div>
+                  <div class="team-stats-row">
+                    <span class="stat-pill">{{ team.wins }}V · {{ team.losses }}D<span *ngIf="team.draws"> · {{ team.draws }}E</span></span>
+                    <span class="stat-pill stat-highlight">{{ team.points }} pts</span>
+                    <span class="stat-pill">RF {{ team.roundsWon ?? 0 }}</span>
+                    <span class="stat-pill" [class.stat-positive]="(team.roundDifference ?? 0) > 0" [class.stat-negative]="(team.roundDifference ?? 0) < 0">
+                      Saldo {{ formatRoundDiff(team) }}
+                    </span>
+                    <span class="stat-pill stat-adr" [class.has-adr]="hasTeamAdr(team)">
+                      ADR {{ formatTeamAdr(team) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-small" (click)="goToTeamDetails(team.id)">Ver</button>
+            </div>
+
+            <div class="team-roster" *ngIf="team.players.length > 0; else emptyRoster">
+              <div class="roster-head">
+                <span>Jogador</span>
+                <span>Função</span>
+                <span>ADR</span>
+              </div>
+              <div class="roster-row" *ngFor="let player of team.players">
+                <div class="roster-player">
+                  <strong>{{ player.name }}</strong>
+                  <span class="badge badge-orange" *ngIf="player.role === 'CAPTAIN'">Capitão</span>
+                  <span class="badge badge-gray" *ngIf="player.memberTag">{{ player.memberTag }}</span>
+                </div>
+                <div class="roster-role">
+                  <span class="badge badge-gray" *ngIf="player.position">{{ formatPosition(player.position) }}</span>
+                  <span class="meta roster-role-empty" *ngIf="!player.position">—</span>
+                </div>
+                <div class="roster-adr" [class.has-adr]="hasAdr(player)">
+                  <strong>{{ formatAdr(player) }}</strong>
+                  <span class="meta" *ngIf="hasAdr(player)">{{ player.matches }} jogo(s)</span>
+                </div>
+              </div>
+            </div>
+            <ng-template #emptyRoster>
+              <p class="meta team-roster-empty">Nenhum jogador no elenco.</p>
+            </ng-template>
+          </article>
+        </div>
+        <ng-template #noTeamsInLeague>
+          <p class="meta league-teams-empty">Nenhum time inscrito nesta liga.</p>
+        </ng-template>
+      </section>
+    </div>
+
+    <div class="gc-card" *ngIf="!loading && leagues.length === 0">
+      <p class="meta">Nenhuma liga cadastrada. Clique em <strong>+ Nova Liga</strong> para começar.</p>
     </div>
   </div>
 </div>

@@ -1,16 +1,289 @@
-.league-list-item {
+.leagues-page-inner {
+  max-width: 1100px;
+}
+
+.list-page-header {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.list-page-subtitle {
+  margin-bottom: 0;
+}
+
+.leagues-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.league-section {
+  padding: 1.15rem 1.2rem;
+}
+
+.league-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--gc-border);
+}
+
+.league-section-name {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gc-orange);
+}
+
+.league-section-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+}
+
+.league-teams-empty {
+  margin: 0;
+}
+
+.teams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
 }
 
-.league-info {
+.team-card {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.05rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
 }
 
-.league-name {
-  font-weight: 600;
+.team-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.team-card-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.team-logo-wrap {
+  flex-shrink: 0;
+}
+
+.team-logo-img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gc-border);
+  background: var(--gc-surface);
+}
+
+.team-logo-fallback {
+  width: 56px;
+  height: 56px;
+  font-size: 0.85rem;
+}
+
+.team-card-title-block {
+  min-width: 0;
+}
+
+.team-card-name {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--gc-text);
+  line-height: 1.2;
+}
+
+.team-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.team-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+}
+
+.stat-pill {
+  font-size: 0.72rem;
+  font-family: var(--font-body);
+  color: var(--gc-text-secondary);
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.45rem;
+}
+
+.stat-pill.stat-highlight {
+  color: var(--gc-orange);
+  border-color: color-mix(in srgb, var(--gc-orange) 35%, var(--gc-border));
+}
+
+.stat-pill.stat-positive {
+  color: var(--gc-green);
+}
+
+.stat-pill.stat-negative {
+  color: var(--gc-red);
+}
+
+.stat-pill.stat-adr {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-pill.stat-adr.has-adr {
+  color: var(--gc-orange);
+  border-color: color-mix(in srgb, var(--gc-orange) 35%, var(--gc-border));
+}
+
+.team-roster {
+  border-top: 1px solid var(--gc-border);
+  padding-top: 0.85rem;
+}
+
+.roster-head,
+.roster-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 0.8fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.roster-head {
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gc-text-label);
+}
+
+.roster-row {
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--gc-border);
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.roster-player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.roster-player strong {
+  color: var(--gc-text);
+}
+
+.roster-role-empty {
+  font-size: 0.85rem;
+}
+
+.roster-adr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: right;
+}
+
+.roster-adr strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--gc-text-secondary);
+}
+
+.roster-adr.has-adr strong {
+  color: var(--gc-orange);
+}
+
+.roster-adr .meta {
+  font-size: 0.72rem;
+}
+
+.team-roster-empty {
+  margin: 0;
+  padding-top: 0.25rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .list-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .list-page-header .btn {
+    width: 100%;
+  }
+
+  .league-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .teams-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-head {
+    display: none;
+  }
+
+  .roster-row {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    padding: 0.75rem 0;
+  }
+
+  .roster-adr {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    text-align: left;
+  }
 }

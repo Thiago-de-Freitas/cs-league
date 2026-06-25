@@ -1,2 +1,43 @@
 .form-field-top { border-radius: 4px 4px 0 0; margin-bottom: -1px; }
 .form-field-bottom { border-radius: 0 0 4px 4px; }
+
+.password-field-wrap {
+  position: relative;
+}
+
+.password-field-input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gc-text-secondary);
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: var(--gc-orange);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--gc-orange);
+  outline-offset: 2px;
+}
+
+.password-toggle-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
