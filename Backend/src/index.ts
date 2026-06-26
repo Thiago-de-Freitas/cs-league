@@ -397,6 +397,11 @@ app.post('/api/internal/highlights/render-result', internalServiceAuth, async (r
         where: { id: highlightId },
         select: { matchId: true },
       });
+      if (!highlight) {
+        skipAudit(req);
+        res.status(200).json({ ok: true, ignored: true });
+        return;
+      }
       await prisma.matchHighlight.updateMany({ where: { id: highlightId }, data });
       if (highlight?.matchId) {
         await bumpHighlightRenderProgress('match', highlight.matchId, status);
@@ -406,6 +411,11 @@ app.post('/api/internal/highlights/render-result', internalServiceAuth, async (r
         where: { id: highlightId },
         select: { demoId: true },
       });
+      if (!highlight) {
+        skipAudit(req);
+        res.status(200).json({ ok: true, ignored: true });
+        return;
+      }
       await prisma.demoHighlight.updateMany({ where: { id: highlightId }, data });
       if (highlight?.demoId) {
         await bumpHighlightRenderProgress('demo', highlight.demoId, status);

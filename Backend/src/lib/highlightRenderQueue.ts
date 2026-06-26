@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { connectRedis, redis } from './redis';
 import { isValidResourceId } from './pathSafe';
 import { resolveDemoFilePath, tryResolveDemoFilePath } from './demoStorage';
+import { normalizeSteamId, readKillTicksFromMetadata } from './highlightPayload';
 
 export const HIGHLIGHT_RENDER_QUEUE = 'highlight:render:queue';
 
@@ -19,6 +20,8 @@ export interface HighlightRenderJob {
   description: string;
   highlightType: string;
   round: number;
+  steamId?: string | null;
+  killTicks?: number[];
 }
 
 export function readRenderableClipTicks(
@@ -96,6 +99,8 @@ export async function enqueueRenderJobsForMatchHighlights(matchId: string, demoI
       description: highlight.description,
       highlightType: highlight.type,
       round: highlight.round,
+      steamId: normalizeSteamId(highlight.steamId),
+      killTicks: readKillTicksFromMetadata(highlight.metadata),
     });
     count += 1;
   }
@@ -140,6 +145,8 @@ export async function enqueueRenderJobsForDemoHighlights(demoId: string): Promis
       description: highlight.description,
       highlightType: highlight.type,
       round: highlight.round,
+      steamId: normalizeSteamId(highlight.steamId),
+      killTicks: readKillTicksFromMetadata(highlight.metadata),
     });
     count += 1;
   }

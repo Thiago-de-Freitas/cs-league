@@ -33,6 +33,14 @@ def clip_ticks(center_tick: int) -> tuple[int, int]:
     return start, end
 
 
+def clip_ticks_for_kills(kill_ticks: list[int]) -> tuple[int, int]:
+    """Intervalo do clipe cobrindo do primeiro ao último abate (com margem)."""
+    ticks = sorted(int(t) for t in kill_ticks if int(t) > 0)
+    if not ticks:
+        return 0, 0
+    return max(0, ticks[0] - CLIP_PADDING_TICKS), ticks[-1] + CLIP_PADDING_TICKS
+
+
 def _row_team_num(row, prefix: str) -> int | None:
     for key in (f"{prefix}_team_num", f"{prefix}team_num"):
         value = row.get(key)
@@ -78,6 +86,11 @@ def _build_highlight(
     metadata: dict | None = None,
 ) -> dict:
     clip_start, clip_end = clip_ticks(tick)
+    meta = dict(metadata or {})
+    kill_ticks = meta.get("killTicks")
+    if isinstance(kill_ticks, list) and kill_ticks:
+        clip_start, clip_end = clip_ticks_for_kills(kill_ticks)
+
     return {
         "round": round_num,
         "tick": tick,
@@ -88,7 +101,7 @@ def _build_highlight(
         "type": htype,
         "description": description,
         "score": score,
-        "metadata": metadata or {},
+        "metadata": meta,
     }
 
 
@@ -108,11 +121,15 @@ def _extract_multi_kills_and_aces(deaths) -> list[dict]:
         tick = int(row.get("tick", 0) or 0)
         is_hs = row.get("headshot") in (True, 1)
         bucket = kills_by_round.setdefault(round_num, {})
-        entry = bucket.setdefault(attacker, {"name": name, "kills": 0, "hs": 0, "last_tick": tick})
+        entry = bucket.setdefault(
+            attacker,
+            {"name": name, "kills": 0, "hs": 0, "last_tick": tick, "kill_ticks": []},
+        )
         entry["kills"] += 1
         if is_hs:
             entry["hs"] += 1
         entry["last_tick"] = tick
+        entry["kill_ticks"].append(tick)
 
     highlights: list[dict] = []
     for round_num, attackers in kills_by_round.items():
@@ -122,6 +139,7 @@ def _extract_multi_kills_and_aces(deaths) -> list[dict]:
                 continue
             htype = "ACE" if kills >= 5 else "MULTI_KILL"
             score = float(kills) + (0.5 if data["hs"] > 0 else 0)
+            kill_ticks = sorted(int(t) for t in data["kill_ticks"] if int(t) > 0)
             highlights.append(
                 _build_highlight(
                     round_num=round_num,
@@ -131,7 +149,7 @@ def _extract_multi_kills_and_aces(deaths) -> list[dict]:
                     htype=htype,
                     description=f"{data['name']}: {kills} abates no round {round_num}",
                     score=score,
-                    metadata={"kills": kills, "headshots": data["hs"]},
+                    metadata={"kills": kills, "headshots": data["hs"], "killTicks": kill_ticks},
                 )
             )
     return highlights
@@ -180,7 +198,7 @@ def _extract_opening_kills(deaths, freeze_end_by_round: dict[int, int]) -> list[
                 htype="OPENING_KILL",
                 description=f"{first['attacker_name']}: opening kill no round {round_num}",
                 score=score,
-                metadata={"victimSteamId": first["victim"], "headshot": first["headshot"]},
+                metadata={"victimSteamId": first["victim"], "headshot": first["headshot"], "killTicks": [first["tick"]]},
             )
         )
     return highlights
@@ -307,7 +325,7 @@ def _extract_clutches(deaths, rounds_end) -> list[dict]:
                 htype="CLUTCH",
                 description=f"{clutch_name}: clutch 1v{clutch_enemies} no round {round_num}",
                 score=score,
-                metadata={"enemies": clutch_enemies},
+                metadata={"enemies": clutch_enemies, "killTicks": [clutch_tick]},
             )
         )
 

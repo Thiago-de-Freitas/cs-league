@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapHighlightPayload, normalizeHighlightType, normalizeSteamId, filterHighlightsForPersonalDemo } from './highlightPayload';
-import { getHighlightClipPublicUrl } from './highlightStorage';
+import { mapHighlightPayload, normalizeHighlightType, normalizeSteamId, filterHighlightsForPersonalDemo, readKillTicksFromMetadata } from './highlightPayload';
+import { getHighlightClipPublicUrl, deleteHighlightClipFile } from './highlightStorage';
 
 describe('highlightPayload', () => {
   it('normaliza tipos válidos', () => {
@@ -55,6 +55,11 @@ describe('highlightPayload', () => {
     const mapped = mapHighlightPayload({ steamId: '76561198000000000.0', round: 1, playerName: 'P', type: 'ACE', description: 'x' });
     assert.equal(mapped.steamId, '76561198000000000');
   });
+
+  it('readKillTicksFromMetadata extrai ticks ordenados', () => {
+    assert.deepEqual(readKillTicksFromMetadata({ killTicks: [900, 500, 700] }), [500, 700, 900]);
+    assert.deepEqual(readKillTicksFromMetadata(null), []);
+  });
 });
 
 describe('highlightStorage', () => {
@@ -64,5 +69,10 @@ describe('highlightStorage', () => {
       '/uploads/highlights/abc123.mp4'
     );
     assert.equal(getHighlightClipPublicUrl(null), null);
+  });
+
+  it('deleteHighlightClipFile ignora path vazio', () => {
+    deleteHighlightClipFile(null);
+    deleteHighlightClipFile('');
   });
 });

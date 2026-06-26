@@ -22,6 +22,12 @@ import {
   showSeriesVetoPanel,
 } from '../../Utils/match-series-view.util';
 import {
+  getHighlightTypeAccent,
+  getHighlightRenderBadgeClass,
+  getHighlightRenderLabel,
+  getHighlightTypeLabel,
+} from '../../Utils/highlight-display.util';
+import {
   clearHighlightGeneratePending,
   createHighlightSnapshot,
   findHighlightGeneratePendingForDemo,
@@ -76,9 +82,15 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   manualStatsSaving = false;
   cs2Maps = CS2_MAPS;
   getMapLabel = getMapLabel;
+  getHighlightTypeLabel = getHighlightTypeLabel;
+  getHighlightRenderLabel = getHighlightRenderLabel;
+  getHighlightTypeAccent = getHighlightTypeAccent;
+  getHighlightRenderBadgeClass = getHighlightRenderBadgeClass;
   imageUploading = false;
   imageCaption = '';
   generatingHighlights = false;
+  deletingHighlightId = '';
+  deletingAllHighlights = false;
   pollingHighlights = false;
   highlightProgressPercent = 0;
   highlightProgressMessage = '';
@@ -663,27 +675,6 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     });
   }
 
-  getHighlightTypeLabel(type: string): string {
-    const labels: Record<string, string> = {
-      MULTI_KILL: 'Multi-kill',
-      ACE: 'ACE',
-      CLUTCH: 'Clutch',
-      OPENING_KILL: 'Opening kill',
-    };
-    return labels[type] ?? type;
-  }
-
-  getHighlightRenderLabel(status?: string | null): string {
-    const labels: Record<string, string> = {
-      PENDING: 'Vídeo na fila',
-      PROCESSING: 'Renderizando vídeo',
-      COMPLETED: 'Vídeo pronto',
-      FAILED: 'Falha no vídeo',
-      UNAVAILABLE: 'Vídeo indisponível',
-    };
-    return labels[status ?? ''] ?? '';
-  }
-
   canDownloadHighlightVideo(highlight: MatchHighlight): boolean {
     return highlight.clipRenderStatus === 'COMPLETED' && !!highlight.clipVideoUrl;
   }
@@ -733,6 +724,94 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     });
   }
 
+  deleteHighlight(highlightId: string): void {
+    const highlight = this.visibleHighlights.find((h) => h.id === highlightId);
+    const label = highlight
+      ? `${highlight.playerName} · Round ${highlight.round}`
+      : 'este destaque';
+    if (!confirm(`Excluir o destaque "${label}"?`)) return;
+
+    this.deletingHighlightId = highlightId;
+    const onSuccess = () => {
+      this.deletingHighlightId = '';
+      this.removeHighlightFromView(highlightId);
+      this.notify.success('Destaque excluído.');
+    };
+    const onError = (err: { error?: { error?: string } }) => {
+      this.deletingHighlightId = '';
+      this.notify.error(err.error?.error || 'Erro ao excluir destaque.');
+    };
+
+    if (this.isDemoView && this.demo) {
+      this.demoService.deleteDemoHighlight(this.demo.id, highlightId).subscribe({
+        next: onSuccess,
+        error: onError,
+      });
+      return;
+    }
+    if (!this.match) return;
+    this.matchService.deleteMatchHighlight(this.match.id, highlightId).subscribe({
+      next: onSuccess,
+      error: onError,
+    });
+  }
+
+  deleteAllHighlights(): void {
+    const count = this.visibleHighlights.length;
+    if (!count || !this.canDeleteHighlights) return;
+    if (!confirm(`Excluir todos os ${count} destaque(s)?`)) return;
+
+    this.deletingAllHighlights = true;
+    const onSuccess = (deleted: number) => {
+      this.deletingAllHighlights = false;
+      this.clearHighlightsFromView();
+      this.notify.success(`${deleted} destaque(s) excluído(s).`);
+    };
+    const onError = (err: { error?: { error?: string } }) => {
+      this.deletingAllHighlights = false;
+      this.notify.error(err.error?.error || 'Erro ao excluir destaques.');
+    };
+
+    if (this.isDemoView && this.demo) {
+      this.demoService.deleteAllDemoHighlights(this.demo.id).subscribe({
+        next: (res) => onSuccess(res.deleted),
+        error: onError,
+      });
+      return;
+    }
+    if (!this.match) return;
+    this.matchService.deleteAllMatchHighlights(this.match.id).subscribe({
+      next: (res) => onSuccess(res.deleted),
+      error: onError,
+    });
+  }
+
+  private removeHighlightFromView(highlightId: string): void {
+    if (this.isDemoView && this.demo?.highlights) {
+      this.demo = {
+        ...this.demo,
+        highlights: this.demo.highlights.filter((h) => h.id !== highlightId),
+      };
+      return;
+    }
+    if (this.match?.highlights) {
+      this.match = {
+        ...this.match,
+        highlights: this.match.highlights.filter((h) => h.id !== highlightId),
+      };
+    }
+  }
+
+  private clearHighlightsFromView(): void {
+    if (this.isDemoView && this.demo) {
+      this.demo = { ...this.demo, highlights: [] };
+      return;
+    }
+    if (this.match) {
+      this.match = { ...this.match, highlights: [] };
+    }
+  }
+
   private saveHighlightBlob(blob: Blob, highlightId: string, extension: string, successMessage: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -766,6 +845,17 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
 
   get canGenerateHighlights(): boolean {
     return this.canShowHighlightsSection && !this.generatingHighlights;
+  }
+
+  get canDeleteHighlights(): boolean {
+    if (!this.authService.currentUser) return false;
+    if (this.isDemoView) return this.canReprocessDemo;
+    if (this.authService.isSystemAdmin()) return true;
+    if (this.match?.league?.ownerId && this.authService.isLeagueOwner(this.match.league.ownerId)) {
+      return true;
+    }
+    const userId = this.authService.currentUser.id;
+    return (this.match?.demos ?? []).some((demo) => demo.uploadedById === userId);
   }
 
   get generateHighlightsLabel(): string {

@@ -44,6 +44,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   personalHighlights: PersonalHighlightEntry[] = [];
   highlightsLoading = false;
   highlightsLoadError = '';
+  deletingHighlightId = '';
+  deletingAllHighlights = false;
   showUploadModal = false;
   reprocessingId: string | null = null;
   deletingId: string | null = null;
@@ -578,6 +580,43 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.demoService.downloadDemoHighlightVideo(highlight.demoId, highlight.id).subscribe({
       next: (blob) => this.saveHighlightBlob(blob, highlight.id, 'mp4', 'Vídeo MP4 baixado.'),
       error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar vídeo do destaque.'),
+    });
+  }
+
+  deleteHighlight(highlight: PersonalHighlightEntry): void {
+    if (!highlight.demoId) return;
+    const label = `${highlight.playerName} · Round ${highlight.round}`;
+    if (!confirm(`Excluir o destaque "${label}"?`)) return;
+
+    this.deletingHighlightId = highlight.id;
+    this.demoService.deleteDemoHighlight(highlight.demoId, highlight.id).subscribe({
+      next: () => {
+        this.deletingHighlightId = '';
+        this.personalHighlights = this.personalHighlights.filter((h) => h.id !== highlight.id);
+        this.notify.success('Destaque excluído.');
+      },
+      error: (err) => {
+        this.deletingHighlightId = '';
+        this.notify.error(err.error?.error || 'Erro ao excluir destaque.');
+      },
+    });
+  }
+
+  deleteAllHighlights(): void {
+    if (!this.hasPersonalHighlights) return;
+    if (!confirm(`Excluir todos os ${this.personalHighlights.length} destaque(s)?`)) return;
+
+    this.deletingAllHighlights = true;
+    this.demoService.deleteAllPersonalHighlights().subscribe({
+      next: (res) => {
+        this.deletingAllHighlights = false;
+        this.personalHighlights = [];
+        this.notify.success(`${res.deleted} destaque(s) excluído(s).`);
+      },
+      error: (err) => {
+        this.deletingAllHighlights = false;
+        this.notify.error(err.error?.error || 'Erro ao excluir destaques.');
+      },
     });
   }
 

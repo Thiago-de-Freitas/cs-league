@@ -3,6 +3,7 @@ import unittest
 from highlight_extraction import (
     clip_duration_seconds,
     clip_ticks,
+    clip_ticks_for_kills,
     _normalize_team_key,
     _normalize_steam_id,
     _matches_uploader_steam,
@@ -17,6 +18,11 @@ class HighlightExtractionTest(unittest.TestCase):
 
     def test_clip_ticks_zero_center(self):
         self.assertEqual(clip_ticks(0), (0, 0))
+
+    def test_clip_ticks_for_kills_spans_first_to_last(self):
+        start, end = clip_ticks_for_kills([5000, 5200, 5400])
+        self.assertEqual(start, 5000 - 64 * 5)
+        self.assertEqual(end, 5400 + 64 * 5)
 
     def test_clip_duration_seconds_bounds(self):
         self.assertGreaterEqual(clip_duration_seconds(0, 64), 3)

@@ -294,6 +294,13 @@
   flex-wrap: wrap;
 }
 
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .personal-demo-item { flex-direction: column; align-items: stretch; }
 .personal-demo-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .personal-demo-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1; }

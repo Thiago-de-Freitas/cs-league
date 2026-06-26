@@ -38,6 +38,7 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
 | `DEMO_STORAGE_PATH` | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | `/data/team-logos` |
 | `USER_AVATAR_STORAGE_PATH` | `/data/user-avatars` |
+| `HIGHLIGHT_CLIPS_PATH` | `/data/highlights` (MP4 dos destaques — **todas as réplicas** do back leem o mesmo volume) |
 
 > **Não** coloque `JWT_SECRET`, `DATABASE_URL` ou `CORS_ORIGIN` no cs-league-front — o proxy só precisa de `API_URL`.
 
@@ -58,7 +59,7 @@ Acesse **só a URL da API** — o frontend é servido pelo mesmo domínio. `CORS
        │              ┌─────────────┐
        ├─────────────▶│    Redis    │◀──── Worker (Python)
        │              └─────────────┘
-       └──── Volume /data (demos + team-logos + user-avatars) no cs-league-back
+       └──── Volume /data (demos, logos, avatares, highlights MP4) no cs-league-back — compartilhado entre réplicas
 ```
 
 ## Variáveis de ambiente (config as code)
@@ -127,6 +128,7 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
 | `USER_AVATAR_STORAGE_PATH` | Sim | `/data/user-avatars` |
+| `HIGHLIGHT_CLIPS_PATH` | Sim | `/data/highlights` — MP4 servidos por qualquer réplica do back (volume compartilhado) |
 | `CORS_ORIGIN` | Sim | URL pública da API (ex.: `https://cs-league-api-production.up.railway.app`) |
 | `PORT` | Não | Railway define automaticamente |
 | `NODE_ENV` | Não | `production` (já no Dockerfile) |
@@ -135,7 +137,8 @@ Os arquivos usam referências Railway (`${{Postgres.DATABASE_URL}}`, `${{cs-leag
 3. **Volume persistente** (só na API — cs-league-back):
    - Command Palette (`Ctrl+K` / `⌘K`) → **Add Volume**, ou clique direito no serviço no canvas
    - Mount path: `/data`
-   - Isso persiste demos (`.dem`), logos de times e fotos de perfil entre redeploys
+   - Isso persiste demos (`.dem`), logos de times, fotos de perfil e **clips de destaques** (`.mp4`) entre redeploys
+   - Com **várias réplicas** do `cs-league-back`, todas montam o **mesmo** volume em `/data` — exclusão e streaming de destaques ficam consistentes (Postgres + Redis + arquivos no volume)
    - **A Railway não permite compartilhar o mesmo volume entre dois serviços.** O worker baixa o `.dem` da API via rede privada (`BACKEND_INTERNAL_URL`).
 
 4. **Networking** → **Generate Domain** para obter a URL pública
@@ -238,6 +241,7 @@ Para o deploy passar e a aplicação funcionar, configure **todas** estas variá
 | `DEMO_STORAGE_PATH` | Sim | `/data/demos` |
 | `TEAM_LOGO_STORAGE_PATH` | Sim | `/data/team-logos` |
 | `USER_AVATAR_STORAGE_PATH` | Sim | `/data/user-avatars` |
+| `HIGHLIGHT_CLIPS_PATH` | Sim | `/data/highlights` |
 | `NODE_ENV` | Não | `production` (já no Dockerfile) |
 | `PORT` | Não | Injetado automaticamente pela Railway |
 
@@ -255,6 +259,7 @@ REDIS_URL=${{Redis.REDIS_URL}}   # Plugin Redis — NÃO use redis://redis:6379
 JWT_SECRET=            # Obrigatório — gere um valor forte
 DEMO_STORAGE_PATH=/data/demos
 TEAM_LOGO_STORAGE_PATH=/data/team-logos
+HIGHLIGHT_CLIPS_PATH=/data/highlights
 CORS_ORIGIN=https://seu-dominio.up.railway.app
 PORT=                  # Injetado pela Railway
 ```

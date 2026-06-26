@@ -12,6 +12,7 @@ import {
   validateDuplicateDemoUpload,
   canUserManageMatchDemo,
   canUserViewDemo,
+  canUserDeleteDemoHighlights,
 } from '../lib/demoValidation';
 import { buildPersonalStatsOverview } from '../lib/personalStats';
 import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from '../lib/demoStorage';
@@ -28,6 +29,11 @@ import { getHighlightProgress } from '../lib/highlightProgress';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
 import { serializeHighlight } from '../lib/highlightSerialization';
 import { getDemoMaxUploadBytes } from '../lib/demoUploadLimits';
+import {
+  deleteAllDemoHighlights,
+  deleteAllPersonalHighlightsForUser,
+  deleteDemoHighlightById,
+} from '../lib/highlightDelete';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -153,6 +159,26 @@ router.get('/personal/highlights', authMiddleware, async (req: AuthRequest, res:
     }
     console.error(err);
     res.status(500).json({ error: 'Erro ao listar destaques pessoais' });
+  }
+});
+
+router.delete('/personal/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const deleted = await deleteAllPersonalHighlightsForUser(req.user!.userId);
+
+    setAuditContext(req, audit.of('demo.highlights.delete_all_personal', 'User', req.user!.userId, {
+      metadata: { count: deleted },
+    }));
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && (err.code === 'P2021' || err.code === 'P2022')) {
+      res.status(503).json({
+        error: 'Banco desatualizado: execute as migrações do backend (prisma migrate deploy).',
+      });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir destaques pessoais' });
   }
 });
 
@@ -557,6 +583,66 @@ router.get('/:id/highlights/:highlightId/video', authMiddleware, async (req: Aut
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao baixar vídeo do destaque' });
+  }
+});
+
+router.delete('/:id/highlights/:highlightId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserDeleteDemoHighlights(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+
+    const removed = await deleteDemoHighlightById(req.params.id, req.params.highlightId);
+    if (!removed) {
+      res.status(404).json({ error: 'Destaque não encontrado' });
+      return;
+    }
+
+    setAuditContext(req, audit.of('demo.highlight.delete', 'DemoHighlight', req.params.highlightId, {
+      metadata: { demoId: req.params.id },
+    }));
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir destaque' });
+  }
+});
+
+router.delete('/:id/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserDeleteDemoHighlights(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+
+    const deleted = await deleteAllDemoHighlights(req.params.id);
+
+    setAuditContext(req, audit.of('demo.highlights.delete_all', 'Demo', req.params.id, {
+      metadata: { count: deleted },
+    }));
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao excluir destaques' });
   }
 });
 

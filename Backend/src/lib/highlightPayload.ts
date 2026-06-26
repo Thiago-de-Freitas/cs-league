@@ -26,6 +26,16 @@ export function filterHighlightsForPersonalDemo<T extends { steamId?: string | n
   );
 }
 
+export function readKillTicksFromMetadata(metadata: unknown): number[] {
+  if (!metadata || typeof metadata !== 'object') return [];
+  const raw = (metadata as Record<string, unknown>).killTicks;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((tick) => Number(tick))
+    .filter((tick) => Number.isFinite(tick) && tick > 0)
+    .sort((a, b) => a - b);
+}
+
 export function mapHighlightPayload(h: Record<string, unknown>) {
   return {
     round: Number(h.round) || 0,

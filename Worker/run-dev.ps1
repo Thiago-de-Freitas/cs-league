@@ -11,11 +11,23 @@ if (-not $env:REDIS_URL) {
 if (-not $env:DEMO_STORAGE_PATH) {
   $env:DEMO_STORAGE_PATH = Join-Path $root "Backend\data\demos"
 }
+if (-not $env:HIGHLIGHT_CLIPS_PATH) {
+  $env:HIGHLIGHT_CLIPS_PATH = Join-Path $root "Backend\data\highlights"
+}
 if (-not $env:BACKEND_INTERNAL_URL) {
   $env:BACKEND_INTERNAL_URL = "http://localhost:3000"
 }
 if (-not $env:INTERNAL_SERVICE_KEY) {
   $env:INTERNAL_SERVICE_KEY = "dev-internal-service-key"
+}
+if (-not $env:CS2_EXE_PATH) {
+  $cs2 = "C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"
+  if (Test-Path $cs2) {
+    $env:CS2_EXE_PATH = $cs2
+  }
+}
+if (-not $env:HIGHLIGHT_RENDER_MODE) {
+  $env:HIGHLIGHT_RENDER_MODE = "auto"
 }
 
 Set-Location $PSScriptRoot

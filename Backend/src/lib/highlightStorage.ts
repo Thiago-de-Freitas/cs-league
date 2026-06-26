@@ -40,3 +40,16 @@ export function getHighlightClipPublicUrl(clipVideoPath: string | null | undefin
   const fileName = path.basename(clipVideoPath);
   return `/uploads/highlights/${fileName}`;
 }
+
+/** Remove arquivo MP4 do disco, se existir (ignora erros de path). */
+export function deleteHighlightClipFile(clipVideoPath: string | null | undefined): void {
+  if (!clipVideoPath?.trim()) return;
+  try {
+    const resolved = resolveHighlightClipPath(clipVideoPath);
+    if (fs.existsSync(resolved)) {
+      fs.unlinkSync(resolved);
+    }
+  } catch {
+    // path inválido ou arquivo já removido
+  }
+}

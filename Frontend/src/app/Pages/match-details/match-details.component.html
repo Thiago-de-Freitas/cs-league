@@ -109,52 +109,102 @@
       </ng-template>
     </div>
 
-    <div *ngIf="canShowHighlightsSection" class="gc-card mt-4">
-      <div class="highlights-header">
-        <h2 class="section-title">{{ isDemoView ? 'Destaques da demo' : 'Destaques da partida' }}</h2>
-        <button
-          *ngIf="canGenerateHighlights"
-          type="button"
-          class="btn btn-primary btn-small"
-          (click)="generateHighlights()">
-          {{ generateHighlightsLabel }}
-        </button>
-        <span *ngIf="generatingHighlights || pollingHighlights" class="meta highlight-progress-label">
-          {{ highlightProgressMessage || 'Gerando destaques...' }}
-          <strong *ngIf="highlightProgressPercent > 0"> {{ highlightProgressPercent }}%</strong>
-        </span>
+    <div *ngIf="canShowHighlightsSection" class="gc-card mt-4 highlights-panel">
+      <header class="highlights-header">
+        <div class="highlights-header-main">
+          <h2 class="section-title">{{ isDemoView ? 'Destaques da demo' : 'Destaques da partida' }}</h2>
+          <p class="meta highlights-intro">
+            Melhores jogadas detectadas na demo. A extração não reprocessa estatísticas. O MP4 é gerado após a detecção.
+          </p>
+        </div>
+        <div class="highlights-header-actions">
+          <button
+            *ngIf="canDeleteHighlights && visibleHighlights.length"
+            type="button"
+            class="btn btn-ghost btn-small btn-danger-text"
+            (click)="deleteAllHighlights()"
+            [disabled]="deletingAllHighlights">
+            {{ deletingAllHighlights ? 'Excluindo...' : 'Excluir todos' }}
+          </button>
+          <button
+            *ngIf="canGenerateHighlights"
+            type="button"
+            class="btn btn-primary btn-small"
+            (click)="generateHighlights()">
+            {{ generateHighlightsLabel }}
+          </button>
+        </div>
+      </header>
+
+      <div *ngIf="generatingHighlights || pollingHighlights" class="highlights-progress-banner">
+        <div class="highlights-progress-top">
+          <span>{{ highlightProgressMessage || 'Gerando destaques...' }}</span>
+          <strong *ngIf="highlightProgressPercent > 0">{{ highlightProgressPercent }}%</strong>
+        </div>
+        <div class="highlight-progress-bar" [style.--pct]="highlightProgressPercent + '%'">
+          <div class="highlight-progress-fill"></div>
+        </div>
       </div>
-      <div *ngIf="generatingHighlights || pollingHighlights" class="highlight-progress-bar" [style.--pct]="highlightProgressPercent + '%'">
-        <div class="highlight-progress-fill"></div>
-      </div>
-      <p *ngIf="highlightProgressError" class="meta highlight-error">{{ highlightProgressError }}</p>
-      <p class="meta mb-4">Melhores jogadas detectadas na demo. A extração não reprocessa estatísticas. O MP4 é gerado após a detecção.</p>
-      <p *ngIf="!visibleHighlights.length && !generatingHighlights" class="meta">Nenhum destaque encontrado ainda. Clique em "Gerar destaques" para analisar a demo.</p>
-      <ul *ngIf="visibleHighlights.length" class="gc-list">
-        <li *ngFor="let h of visibleHighlights" class="gc-list-item highlight-item">
-          <div>
-            <strong>{{ h.playerName }}</strong>
-            <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
-            <span *ngIf="getHighlightRenderLabel(h.clipRenderStatus)" class="badge badge-gray">{{ getHighlightRenderLabel(h.clipRenderStatus) }}</span>
-            <p class="meta">{{ h.description }} · Round {{ h.round }}</p>
-            <p *ngIf="h.clipRenderError" class="meta highlight-error">{{ h.clipRenderError }}</p>
-          </div>
-          <div class="highlight-actions">
-            <button
-              *ngIf="h.clipStartTick != null && h.clipEndTick != null"
-              type="button"
-              class="btn btn-secondary btn-small"
-              (click)="isDemoView ? downloadDemoHighlightClip(h.id) : downloadHighlightClip(h.id)">
-              Baixar spec
-            </button>
-            <button
-              *ngIf="canDownloadHighlightVideo(h)"
-              type="button"
-              class="btn btn-primary btn-small"
-              (click)="downloadHighlightVideo(h.id)">
-              Baixar MP4
-            </button>
-            <span *ngIf="isHighlightVideoRendering(h)" class="meta">Gerando MP4...</span>
+
+      <p *ngIf="highlightProgressError" class="error-message highlight-error">{{ highlightProgressError }}</p>
+
+      <p *ngIf="!visibleHighlights.length && !generatingHighlights && !pollingHighlights" class="meta highlights-empty-msg">
+        Nenhum destaque encontrado ainda. Clique em "Gerar destaques" para analisar a demo.
+      </p>
+
+      <p *ngIf="visibleHighlights.length" class="highlights-count">
+        {{ visibleHighlights.length }} destaque{{ visibleHighlights.length === 1 ? '' : 's' }}
+      </p>
+
+      <ul *ngIf="visibleHighlights.length" class="highlights-list">
+        <li *ngFor="let h of visibleHighlights" class="highlight-card">
+          <div class="highlight-card-accent" [ngClass]="getHighlightTypeAccent(h.type)"></div>
+          <div class="highlight-card-content">
+            <div class="highlight-card-row">
+              <div class="highlight-round-badge" aria-label="Round {{ h.round }}">
+                <span class="highlight-round-label">RD</span>
+                <span class="highlight-round-num">{{ h.round }}</span>
+              </div>
+              <div class="highlight-card-main">
+                <div class="highlight-card-title">
+                  <strong>{{ h.playerName }}</strong>
+                  <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
+                  <span
+                    *ngIf="getHighlightRenderLabel(h.clipRenderStatus)"
+                    class="badge"
+                    [ngClass]="getHighlightRenderBadgeClass(h.clipRenderStatus)">
+                    {{ getHighlightRenderLabel(h.clipRenderStatus) }}
+                  </span>
+                </div>
+                <p class="highlight-card-desc">{{ h.description }}</p>
+                <p *ngIf="h.clipRenderError" class="error-message highlight-error">{{ h.clipRenderError }}</p>
+              </div>
+            </div>
+            <footer class="highlight-card-footer">
+              <span *ngIf="isHighlightVideoRendering(h)" class="highlight-rendering">Gerando MP4…</span>
+              <button
+                *ngIf="h.clipStartTick != null && h.clipEndTick != null"
+                type="button"
+                class="btn btn-secondary btn-small"
+                (click)="isDemoView ? downloadDemoHighlightClip(h.id) : downloadHighlightClip(h.id)">
+                Baixar spec
+              </button>
+              <button
+                *ngIf="canDownloadHighlightVideo(h)"
+                type="button"
+                class="btn btn-primary btn-small"
+                (click)="downloadHighlightVideo(h.id)">
+                Baixar MP4
+              </button>
+              <button
+                *ngIf="canDeleteHighlights"
+                type="button"
+                class="btn btn-ghost btn-small btn-danger-text"
+                (click)="deleteHighlight(h.id)"
+                [disabled]="deletingHighlightId === h.id">
+                Excluir
+              </button>
+            </footer>
           </div>
         </li>
       </ul>

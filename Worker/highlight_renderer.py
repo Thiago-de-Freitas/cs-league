@@ -10,19 +10,29 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-from highlight_extraction import clip_duration_seconds
+from highlight_extraction import TICK_RATE, clip_duration_seconds
 
 WORKER_DIR = Path(__file__).resolve().parent
 BACKEND_HIGHLIGHTS = WORKER_DIR.parent / "Backend" / "data" / "highlights"
 
-HIGHLIGHT_RENDER_MODE = os.environ.get("HIGHLIGHT_RENDER_MODE", "card").strip().lower()
+HIGHLIGHT_RENDER_MODE = os.environ.get("HIGHLIGHT_RENDER_MODE", "auto").strip().lower()
 HIGHLIGHT_CLIPS_PATH = os.environ.get("HIGHLIGHT_CLIPS_PATH")
 FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 CS2_EXE_PATH = os.environ.get("CS2_EXE_PATH", "").strip()
 BACKEND_INTERNAL_URL = os.environ.get("BACKEND_INTERNAL_URL", "").rstrip("/")
 INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 
+# Margem de cada corte em montagens multi-kill (segundos de jogo)
+KILL_CUT_PRE_TICKS = 64 * 2
+KILL_CUT_POST_TICKS = 64 * 2
+
 HIGHLIGHT_RENDER_QUEUE = "highlight:render:queue"
+
+_CS2_CANDIDATE_PATHS = [
+    Path(r"C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"),
+    Path(r"C:\Program Files\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"),
+    Path.home() / ".steam/steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe",
+]
 
 
 def get_highlight_clips_dir() -> Path:
@@ -36,6 +46,27 @@ def get_highlight_clips_dir() -> Path:
     return storage
 
 
+def resolve_cs2_exe() -> str | None:
+    candidates: list[Path] = []
+    if CS2_EXE_PATH:
+        candidates.append(Path(CS2_EXE_PATH))
+    candidates.extend(_CS2_CANDIDATE_PATHS)
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return str(candidate.resolve())
+        except OSError:
+            continue
+    return None
+
+
+def resolve_render_mode() -> str:
+    mode = HIGHLIGHT_RENDER_MODE or "auto"
+    if mode == "auto":
+        return "cs2" if resolve_cs2_exe() else "card"
+    return mode
+
+
 def _ffmpeg_available() -> bool:
     return shutil.which(FFMPEG_PATH) is not None
 
@@ -46,6 +77,11 @@ def _sanitize_drawtext(value: str) -> str:
     return cleaned[:120]
 
 
+def _sanitize_spec_name(value: str) -> str:
+    cleaned = re.sub(r'["\\]', "", value)
+    return cleaned[:64] or "Player"
+
+
 def _type_label(highlight_type: str) -> str:
     labels = {
         "MULTI_KILL": "Multi-kill",
@@ -54,6 +90,112 @@ def _type_label(highlight_type: str) -> str:
         "OPENING_KILL": "Opening kill",
     }
     return labels.get(highlight_type.upper(), highlight_type)
+
+
+def _parse_kill_ticks(job: dict) -> list[int]:
+    raw = job.get("killTicks")
+    if not isinstance(raw, list):
+        return []
+    ticks = sorted(int(t) for t in raw if int(t) > 0)
+    return ticks
+
+
+def _tick_offset_seconds(tick: int, clip_start_tick: int) -> float:
+    return max(0.0, (int(tick) - int(clip_start_tick)) / TICK_RATE)
+
+
+def _ffmpeg_trim_segment(source: Path, start_sec: float, end_sec: float, output: Path) -> None:
+    duration = max(0.25, end_sec - start_sec)
+    cmd = [
+        FFMPEG_PATH,
+        "-y",
+        "-ss",
+        f"{start_sec:.3f}",
+        "-i",
+        str(source),
+        "-t",
+        f"{duration:.3f}",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-an",
+        "-movflags",
+        "+faststart",
+        str(output),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao recortar segmento")
+
+
+def _ffmpeg_concat_segments(segments: list[Path], output: Path) -> None:
+    if not segments:
+        raise RuntimeError("Nenhum segmento para concatenar")
+    if len(segments) == 1:
+        shutil.copy2(segments[0], output)
+        return
+
+    list_file = output.parent / f"concat-{output.stem}.txt"
+    list_file.write_text(
+        "\n".join(f"file '{segment.resolve().as_posix()}'" for segment in segments),
+        encoding="utf-8",
+    )
+    cmd = [
+        FFMPEG_PATH,
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(list_file),
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        str(output),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao concatenar segmentos")
+    try:
+        list_file.unlink()
+    except OSError:
+        pass
+
+
+def build_kill_montage(
+    source_video: Path,
+    *,
+    clip_start_tick: int,
+    kill_ticks: list[int],
+    output_path: Path,
+) -> None:
+    """Recorta um trecho por abate e concatena (cortes da jogada)."""
+    if len(kill_ticks) < 2:
+        shutil.copy2(source_video, output_path)
+        return
+
+    work_dir = output_path.parent / f".montage-{output_path.stem}"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    segments: list[Path] = []
+
+    try:
+        for index, kill_tick in enumerate(sorted(kill_ticks)):
+            start = _tick_offset_seconds(kill_tick - KILL_CUT_PRE_TICKS, clip_start_tick)
+            end = _tick_offset_seconds(kill_tick + KILL_CUT_POST_TICKS, clip_start_tick)
+            if end <= start:
+                end = start + 1.0
+            segment_path = work_dir / f"kill_{index:02d}.mp4"
+            _ffmpeg_trim_segment(source_video, start, end, segment_path)
+            segments.append(segment_path)
+
+        _ffmpeg_concat_segments(segments, output_path)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def render_card_clip(
@@ -108,62 +250,57 @@ def render_card_clip(
         raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao gerar clipe")
 
 
-def render_cs2_clip(
-    output_path: Path,
+def _demo_path_for_cs2(demo_path: str) -> str:
+    return str(Path(demo_path).resolve()).replace("\\", "/")
+
+
+def _build_cs2_record_cfg(
+    cfg_path: Path,
     *,
     demo_path: str,
     clip_start_tick: int,
     clip_end_tick: int,
+    frame_prefix: Path,
+    steam_id: str | None,
+    player_name: str | None,
 ) -> None:
-    if not CS2_EXE_PATH or not Path(CS2_EXE_PATH).is_file():
-        raise RuntimeError("CS2_EXE_PATH não configurado para renderização GOTV")
-    if not _ffmpeg_available():
-        raise RuntimeError("FFmpeg necessário para converter frames do CS2")
-
-    duration = clip_duration_seconds(clip_start_tick, clip_end_tick)
-    temp_dir = output_path.parent / f".render-{output_path.stem}"
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    frame_prefix = temp_dir / "frame"
-
-    cfg_path = temp_dir / "highlight.cfg"
-    cfg_lines = [
+    demo = _demo_path_for_cs2(demo_path)
+    lines = [
+        "volume 0",
+        "snd_mute_losefocus 1",
+        "cl_draw_only_deathnotices 0",
         "demo_pauseafterinit 1",
-        f"demo_gototick {clip_start_tick}",
-        "demo_pause 1",
-        "host_framerate 30",
-        "host_timescale 1",
-        f"startmovie {frame_prefix.as_posix()} tga",
-        f"demo_gototick {clip_end_tick}",
-        "endmovie",
-        "quit",
+        f'demo_gototick {clip_start_tick}',
+        "demo_resume",
     ]
-    cfg_path.write_text("\n".join(cfg_lines), encoding="utf-8")
 
-    cs2_cmd = [
-        CS2_EXE_PATH,
-        "-insecure",
-        "-novid",
-        "-console",
-        "+playdemo",
-        demo_path,
-        "+exec",
-        str(cfg_path),
-    ]
-    result = subprocess.run(cs2_cmd, capture_output=True, text=True, timeout=max(180, duration * 4))
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr[-500] or "CS2 não concluiu a renderização")
+    if steam_id and steam_id.isdigit():
+        lines.append(f"spec_lock_to_accountid {steam_id}")
+    elif player_name:
+        lines.append(f'spec_player "{_sanitize_spec_name(player_name)}"')
 
-    frames = sorted(temp_dir.glob("frame*.tga"))
-    if not frames:
-        raise RuntimeError("CS2 não gerou frames para o clipe")
+    lines.extend(
+        [
+            "spec_mode 4",
+            "host_framerate 30",
+            "host_timescale 1",
+            f"startmovie {frame_prefix.as_posix()} tga",
+            f"demo_gototick {clip_end_tick}",
+            "endmovie",
+            "quit",
+        ]
+    )
+    cfg_path.write_text("\n".join(lines), encoding="utf-8")
 
+
+def _frames_to_mp4(frames_dir: Path, output_path: Path) -> None:
     cmd = [
         FFMPEG_PATH,
         "-y",
         "-framerate",
         "30",
         "-i",
-        str(temp_dir / "frame%04d.tga"),
+        str(frames_dir / "frame%04d.tga"),
         "-c:v",
         "libx264",
         "-pix_fmt",
@@ -172,20 +309,85 @@ def render_cs2_clip(
         "+faststart",
         str(output_path),
     ]
-    ffmpeg_result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    if ffmpeg_result.returncode != 0:
-        raise RuntimeError(ffmpeg_result.stderr[-500] or "FFmpeg falhou ao converter frames")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao converter frames")
 
-    for frame in frames:
-        try:
-            frame.unlink()
-        except OSError:
-            pass
+
+def render_cs2_clip(
+    output_path: Path,
+    *,
+    demo_path: str,
+    clip_start_tick: int,
+    clip_end_tick: int,
+    steam_id: str | None = None,
+    player_name: str | None = None,
+    kill_ticks: list[int] | None = None,
+) -> None:
+    cs2_exe = resolve_cs2_exe()
+    if not cs2_exe:
+        raise RuntimeError("CS2 não encontrado — configure CS2_EXE_PATH no worker")
+    if not _ffmpeg_available():
+        raise RuntimeError("FFmpeg necessário para converter frames do CS2")
+    if not Path(demo_path).is_file():
+        raise RuntimeError(f"Demo não encontrada para renderização: {demo_path}")
+
+    duration = clip_duration_seconds(clip_start_tick, clip_end_tick)
+    temp_dir = output_path.parent / f".render-{output_path.stem}"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    frame_prefix = temp_dir / "frame"
+    cfg_path = temp_dir / "highlight.cfg"
+    raw_video = temp_dir / "raw.mp4"
+
     try:
-        cfg_path.unlink()
-        temp_dir.rmdir()
-    except OSError:
-        pass
+        _build_cs2_record_cfg(
+            cfg_path,
+            demo_path=demo_path,
+            clip_start_tick=clip_start_tick,
+            clip_end_tick=clip_end_tick,
+            frame_prefix=frame_prefix,
+            steam_id=steam_id,
+            player_name=player_name,
+        )
+
+        cs2_cmd = [
+            cs2_exe,
+            "-insecure",
+            "-novid",
+            "-windowed",
+            "-w",
+            "1280",
+            "-h",
+            "720",
+            "-console",
+            "+playdemo",
+            _demo_path_for_cs2(demo_path),
+            "+exec",
+            str(cfg_path.resolve()),
+        ]
+        timeout = max(300, duration * 6)
+        result = subprocess.run(cs2_cmd, capture_output=True, text=True, timeout=timeout)
+        if result.returncode != 0:
+            tail = (result.stderr or result.stdout or "")[-800:]
+            raise RuntimeError(tail or "CS2 não concluiu a renderização")
+
+        frames = sorted(temp_dir.glob("frame*.tga"))
+        if not frames:
+            raise RuntimeError("CS2 não gerou frames para o clipe")
+        _frames_to_mp4(temp_dir, raw_video)
+
+        ticks = kill_ticks or []
+        if len(ticks) >= 2:
+            build_kill_montage(
+                raw_video,
+                clip_start_tick=clip_start_tick,
+                kill_ticks=ticks,
+                output_path=output_path,
+            )
+        else:
+            shutil.copy2(raw_video, output_path)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def render_highlight_clip(job: dict) -> Path:
@@ -193,18 +395,39 @@ def render_highlight_clip(job: dict) -> Path:
     output_path = get_highlight_clips_dir() / f"{highlight_id}.mp4"
     clip_start = int(job["clipStartTick"])
     clip_end = int(job["clipEndTick"])
+    kill_ticks = _parse_kill_ticks(job)
+    steam_id = str(job.get("steamId") or "").strip() or None
+    player_name = str(job.get("playerName") or "Jogador")
 
-    if HIGHLIGHT_RENDER_MODE == "cs2":
-        render_cs2_clip(
-            output_path,
-            demo_path=str(job["demoPath"]),
-            clip_start_tick=clip_start,
-            clip_end_tick=clip_end,
-        )
+    mode = resolve_render_mode()
+    if mode == "cs2":
+        try:
+            render_cs2_clip(
+                output_path,
+                demo_path=str(job["demoPath"]),
+                clip_start_tick=clip_start,
+                clip_end_tick=clip_end,
+                steam_id=steam_id,
+                player_name=player_name,
+                kill_ticks=kill_ticks,
+            )
+        except Exception as err:
+            if HIGHLIGHT_RENDER_MODE == "cs2":
+                raise
+            print(f"[highlights] CS2 indisponível ({err}); usando card como fallback")
+            render_card_clip(
+                output_path,
+                player_name=player_name,
+                description=str(job.get("description", "Destaque")),
+                highlight_type=str(job.get("highlightType", "MULTI_KILL")),
+                round_num=int(job.get("round", 0) or 0),
+                clip_start_tick=clip_start,
+                clip_end_tick=clip_end,
+            )
     else:
         render_card_clip(
             output_path,
-            player_name=str(job.get("playerName", "Jogador")),
+            player_name=player_name,
             description=str(job.get("description", "Destaque")),
             highlight_type=str(job.get("highlightType", "MULTI_KILL")),
             round_num=int(job.get("round", 0) or 0),
@@ -269,7 +492,7 @@ def process_highlight_render_job(payload: str) -> None:
             status="COMPLETED",
             clip_video_path=output_path.name,
         )
-        print(f"[highlights] clipe renderizado: {output_path}")
+        print(f"[highlights] clipe renderizado ({resolve_render_mode()}): {output_path}")
     except Exception as err:
         message = str(err)[:500]
         post_render_result(

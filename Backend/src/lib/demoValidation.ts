@@ -157,3 +157,25 @@ export async function canUserManageMatchDemo(
     error: 'Sem permissão para enviar ou associar demo nesta partida.',
   };
 }
+
+export async function canUserDeleteDemoHighlights(
+  userId: string,
+  role: string,
+  demo: { uploadedById: string; isPersonal: boolean; matchId: string | null }
+): Promise<{ allowed: boolean; error?: string }> {
+  if (role === 'ADMIN' || demo.uploadedById === userId) {
+    return { allowed: true };
+  }
+
+  if (!demo.isPersonal && demo.matchId) {
+    const match = await prisma.match.findUnique({
+      where: { id: demo.matchId },
+      include: { league: { select: { ownerId: true } } },
+    });
+    if (match?.league.ownerId === userId) {
+      return { allowed: true };
+    }
+  }
+
+  return { allowed: false, error: 'Sem permissão para excluir destaques desta demo.' };
+}

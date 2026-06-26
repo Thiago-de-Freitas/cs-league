@@ -124,4 +124,12 @@ export class MatchService {
   getHighlightProgress(matchId: string): Observable<HighlightProgress> {
     return this.http.get<HighlightProgress>(`${this.apiUrl}/${matchId}/highlights/progress`);
   }
+
+  deleteMatchHighlight(matchId: string, highlightId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${matchId}/highlights/${highlightId}`);
+  }
+
+  deleteAllMatchHighlights(matchId: string): Observable<{ ok: boolean; deleted: number }> {
+    return this.http.delete<{ ok: boolean; deleted: number }>(`${this.apiUrl}/${matchId}/highlights`);
+  }
 }

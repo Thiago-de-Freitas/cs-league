@@ -129,6 +129,10 @@ export function getEnvConfigStatus() {
     redisErrors: getRedisEnvErrors(),
     warnings: getRedisWarnings(),
     demoMaxUploadMb: getDemoMaxUploadMb(),
+    highlightClipsPath: {
+      set: (process.env.HIGHLIGHT_CLIPS_PATH?.trim() ?? '').length > 0,
+      value: process.env.HIGHLIGHT_CLIPS_PATH?.trim() || null,
+    },
   };
 }
 

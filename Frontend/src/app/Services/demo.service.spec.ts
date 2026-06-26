@@ -91,4 +91,20 @@ describe('DemoService', () => {
     expect(req.request.method).toBe('POST');
     req.flush({ ok: true, message: 'Geração enfileirada' });
   });
+
+  it('deleteDemoHighlight remove um destaque', () => {
+    service.deleteDemoHighlight('demo-1', 'hl-1').subscribe();
+    const req = httpMock.expectOne('/api/demos/demo-1/highlights/hl-1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
+  it('deleteAllPersonalHighlights remove todos os destaques pessoais', () => {
+    service.deleteAllPersonalHighlights().subscribe((res) => {
+      expect(res.deleted).toBe(3);
+    });
+    const req = httpMock.expectOne('/api/demos/personal/highlights');
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ ok: true, deleted: 3 });
+  });
 });

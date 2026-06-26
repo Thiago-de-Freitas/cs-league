@@ -235,9 +235,19 @@
             <h2 class="section-title">Destaques</h2>
             <p class="meta">Jogadas detectadas nas suas demos pessoais.</p>
           </div>
-          <button type="button" class="btn btn-secondary btn-small" (click)="loadPersonalHighlights()" [disabled]="highlightsLoading">
-            Atualizar
-          </button>
+          <div class="section-header-actions">
+            <button
+              *ngIf="hasPersonalHighlights && !highlightsLoading"
+              type="button"
+              class="btn btn-ghost btn-small btn-danger-text"
+              (click)="deleteAllHighlights()"
+              [disabled]="deletingAllHighlights">
+              {{ deletingAllHighlights ? 'Excluindo...' : 'Excluir todos' }}
+            </button>
+            <button type="button" class="btn btn-secondary btn-small" (click)="loadPersonalHighlights()" [disabled]="highlightsLoading">
+              Atualizar
+            </button>
+          </div>
         </div>
 
         <p *ngIf="hasRenderingHighlights && !highlightsLoading" class="meta highlights-updating">
@@ -290,6 +300,13 @@
                 Baixar MP4
               </button>
               <span *ngIf="isHighlightVideoRendering(h)" class="meta">Gerando MP4...</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-small btn-danger-text"
+                (click)="deleteHighlight(h)"
+                [disabled]="deletingHighlightId === h.id">
+                Excluir
+              </button>
             </div>
           </li>
         </ul>

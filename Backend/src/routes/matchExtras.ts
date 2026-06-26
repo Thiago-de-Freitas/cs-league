@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest, authMiddleware } from '../middleware/auth';
 import { participationGuard } from '../middleware/participationGuard';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
+import { canUserManageMatchDemo } from '../lib/demoValidation';
 import { isValidMapId } from '../lib/cs2Maps';
 import {
   banMapForMatch,
@@ -22,8 +23,11 @@ import { getHighlightProgress } from '../lib/highlightProgress';
 import { requireDemoQueue } from '../middleware/demoQueue';
 import { getSeriesForMatch } from '../lib/matchSeriesService';
 import { encodeUploadedImageToDataUrl } from '../lib/uploadAssets';
-import { setAuditContext } from '../lib/audit';
-import { audit } from '../lib/audit';
+import { setAuditContext, audit } from '../lib/audit';
+import {
+  deleteAllMatchHighlights,
+  deleteMatchHighlightById,
+} from '../lib/highlightDelete';
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
@@ -468,6 +472,50 @@ export function registerMatchExtras(router: Router): void {
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Erro ao baixar vídeo do destaque' });
+    }
+  });
+
+  router.delete('/:id/highlights/:highlightId', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const access = await canUserManageMatchDemo(req.user!.userId, req.user!.role, req.params.id);
+      if (!access.allowed) {
+        res.status(403).json({ error: access.error ?? 'Sem permissão para excluir destaques desta partida.' });
+        return;
+      }
+
+      const removed = await deleteMatchHighlightById(req.params.id, req.params.highlightId);
+      if (!removed) {
+        res.status(404).json({ error: 'Destaque não encontrado' });
+        return;
+      }
+
+      setAuditContext(req, audit.of('match.highlight.delete', 'MatchHighlight', req.params.highlightId, {
+        metadata: { matchId: req.params.id },
+      }));
+      res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao excluir destaque' });
+    }
+  });
+
+  router.delete('/:id/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const access = await canUserManageMatchDemo(req.user!.userId, req.user!.role, req.params.id);
+      if (!access.allowed) {
+        res.status(403).json({ error: access.error ?? 'Sem permissão para excluir destaques desta partida.' });
+        return;
+      }
+
+      const deleted = await deleteAllMatchHighlights(req.params.id);
+
+      setAuditContext(req, audit.of('match.highlights.delete_all', 'Match', req.params.id, {
+        metadata: { count: deleted },
+      }));
+      res.json({ ok: true, deleted });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao excluir destaques' });
     }
   });
 

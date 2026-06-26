@@ -172,4 +172,16 @@ export class DemoService {
   generateHighlights(demoId: string): Observable<{ ok: boolean; message: string }> {
     return this.http.post<{ ok: boolean; message: string }>(`${this.apiUrl}/${demoId}/highlights/generate`, {});
   }
+
+  deleteDemoHighlight(demoId: string, highlightId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${demoId}/highlights/${highlightId}`);
+  }
+
+  deleteAllDemoHighlights(demoId: string): Observable<{ ok: boolean; deleted: number }> {
+    return this.http.delete<{ ok: boolean; deleted: number }>(`${this.apiUrl}/${demoId}/highlights`);
+  }
+
+  deleteAllPersonalHighlights(): Observable<{ ok: boolean; deleted: number }> {
+    return this.http.delete<{ ok: boolean; deleted: number }>(`${this.apiUrl}/personal/highlights`);
+  }
 }
