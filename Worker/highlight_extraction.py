@@ -11,6 +11,20 @@ MAX_HIGHLIGHTS = 20
 TICK_RATE = 64
 
 
+def _normalize_steam_id(steam_id) -> str:
+    if steam_id is None:
+        return ""
+    value = str(steam_id).strip()
+    if value.endswith(".0"):
+        value = value[:-2]
+    return value
+
+
+def _matches_uploader_steam(highlight_steam_id, uploader_steam_id: str) -> bool:
+    if not uploader_steam_id:
+        return False
+    return _normalize_steam_id(highlight_steam_id) == uploader_steam_id
+
 def clip_ticks(center_tick: int) -> tuple[int, int]:
     if center_tick <= 0:
         return 0, 0
@@ -322,7 +336,12 @@ def _parse_freeze_end_by_round(parser: DemoParser) -> dict[int, int]:
     return freeze_end_by_round
 
 
-def extract_highlights(file_path: str, uploader_steam_id: str | None = None) -> list[dict]:
+def extract_highlights(
+    file_path: str,
+    uploader_steam_id: str | None = None,
+    *,
+    personal_demo: bool = False,
+) -> list[dict]:
     parser = DemoParser(file_path)
     deaths = parser.parse_event(
         "player_death",
@@ -349,8 +368,17 @@ def extract_highlights(file_path: str, uploader_steam_id: str | None = None) -> 
     highlights.extend(_extract_opening_kills(deaths, freeze_end_by_round))
     highlights.extend(_extract_clutches(deaths, rounds_end))
 
-    if uploader_steam_id:
-        highlights = [h for h in highlights if h.get("steamId") == uploader_steam_id]
+    normalized_uploader = _normalize_steam_id(uploader_steam_id)
+    if personal_demo:
+        if not normalized_uploader:
+            return []
+        highlights = [
+            h for h in highlights if _matches_uploader_steam(h.get("steamId"), normalized_uploader)
+        ]
+    elif normalized_uploader:
+        highlights = [
+            h for h in highlights if _matches_uploader_steam(h.get("steamId"), normalized_uploader)
+        ]
 
     deduped: dict[tuple[int, str, str], dict] = {}
     for highlight in highlights:

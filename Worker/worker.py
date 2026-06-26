@@ -16,7 +16,7 @@ from pathlib import Path
 import psycopg2
 import redis
 from demoparser2 import DemoParser
-from highlight_extraction import extract_highlights
+from highlight_extraction import extract_highlights, _normalize_steam_id
 from highlight_progress import set_highlight_progress
 from highlight_renderer import HIGHLIGHT_RENDER_QUEUE, process_highlight_render_job
 
@@ -426,17 +426,23 @@ def save_and_extract_highlights(
     demo_id: str,
     meta: dict | None,
 ) -> None:
-    uploader_steam = None
-    if meta and meta.get("is_personal") and meta.get("uploader_steam_id"):
-        uploader_steam = str(meta["uploader_steam_id"])
+    is_personal = bool(meta and meta.get("is_personal"))
+    uploader_steam = _normalize_steam_id(meta.get("uploader_steam_id") if meta else None)
+    if is_personal and not uploader_steam:
+        print(f"[highlights] demo pessoal {demo_id} sem Steam ID do uploader — destaques ignorados")
+        return
 
     try:
-        hl = extract_highlights(file_path, uploader_steam_id=uploader_steam)
+        hl = extract_highlights(
+            file_path,
+            uploader_steam_id=uploader_steam or None,
+            personal_demo=is_personal,
+        )
         if not hl:
             return
-        if meta and meta.get("match_id"):
+        if meta and meta.get("match_id") and not is_personal:
             post_match_highlights(meta["match_id"], demo_id, hl)
-        elif meta and meta.get("is_personal"):
+        elif is_personal:
             post_demo_highlights(demo_id, hl)
     except Exception as err:
         print(f"[highlights] extração falhou: {err}")
@@ -480,11 +486,25 @@ def process_highlight_extract_job(payload: str) -> None:
             message="Analisando jogadas (sem reprocessar estatísticas)...",
         )
 
-        uploader_steam = None
-        if meta and meta.get("is_personal") and meta.get("uploader_steam_id"):
-            uploader_steam = str(meta["uploader_steam_id"])
+        is_personal = bool(meta and meta.get("is_personal"))
+        uploader_steam = _normalize_steam_id(meta.get("uploader_steam_id") if meta else None)
+        if is_personal and not uploader_steam:
+            set_highlight_progress(
+                scope,
+                parent_id,
+                percent=100,
+                phase="failed",
+                message="Configure o Steam ID no perfil para gerar destaques pessoais.",
+                error="Steam ID do uploader ausente",
+            )
+            print(f"[highlights] demo pessoal {demo_id} sem Steam ID do uploader")
+            return
 
-        hl = extract_highlights(resolved, uploader_steam_id=uploader_steam)
+        hl = extract_highlights(
+            resolved,
+            uploader_steam_id=uploader_steam or None,
+            personal_demo=is_personal,
+        )
 
         set_highlight_progress(
             scope,
@@ -505,9 +525,9 @@ def process_highlight_extract_job(payload: str) -> None:
             print(f"[highlights] nenhum destaque para demo {demo_id}")
             return
 
-        if meta and meta.get("match_id"):
+        if meta and meta.get("match_id") and not is_personal:
             post_match_highlights(meta["match_id"], demo_id, hl)
-        elif meta and meta.get("is_personal"):
+        elif is_personal:
             post_demo_highlights(demo_id, hl)
         else:
             post_demo_highlights(demo_id, hl)

@@ -22,6 +22,7 @@ import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
 import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
+import { filterHighlightsForPersonalDemo } from '../lib/highlightPayload';
 import { getHighlightProgress } from '../lib/highlightProgress';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
 import { serializeHighlight } from '../lib/highlightSerialization';
@@ -106,6 +107,11 @@ router.get('/personal/overview', authMiddleware, async (req: AuthRequest, res: R
 
 router.get('/personal/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { steamId: true },
+    });
+
     const highlights = await prisma.demoHighlight.findMany({
       where: {
         demo: {
@@ -121,7 +127,9 @@ router.get('/personal/highlights', authMiddleware, async (req: AuthRequest, res:
       orderBy: [{ score: 'desc' }, { round: 'asc' }],
     });
 
-    const serialized = highlights.map((highlight) => ({
+    const scopedHighlights = filterHighlightsForPersonalDemo(highlights, user?.steamId);
+
+    const serialized = scopedHighlights.map((highlight) => ({
       ...serializeHighlight(highlight, { demoId: highlight.demoId }),
       demoFileName: highlight.demo.fileName ?? 'demo.dem',
       demoCreatedAt: highlight.demo.createdAt,
@@ -361,6 +369,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       include: {
         stats: true,
         highlights: { orderBy: [{ score: 'desc' }, { round: 'asc' }] },
+        uploadedBy: { select: { steamId: true } },
         match: {
           include: {
             team1: { select: { id: true, name: true, tag: true } },
@@ -381,6 +390,10 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const visibleHighlights = demo.isPersonal
+      ? filterHighlightsForPersonalDemo(demo.highlights, demo.uploadedBy.steamId)
+      : demo.highlights;
+
     res.json({
       id: demo.id,
       fileName: demo.fileName,
@@ -391,7 +404,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       uploadedById: demo.uploadedById,
       match: demo.match,
       stats: demo.stats,
-      highlights: demo.highlights.map((highlight) =>
+      highlights: visibleHighlights.map((highlight) =>
         serializeHighlight(highlight, { demoId: demo.id })
       ),
       createdAt: demo.createdAt,

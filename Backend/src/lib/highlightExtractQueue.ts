@@ -22,7 +22,14 @@ export async function enqueueHighlightExtractJob(
 
   const demo = await prisma.demo.findUnique({
     where: { id: demoId },
-    select: { filePath: true, status: true, isManual: true, matchId: true, isPersonal: true },
+    select: {
+      filePath: true,
+      status: true,
+      isManual: true,
+      matchId: true,
+      isPersonal: true,
+      uploadedBy: { select: { steamId: true } },
+    },
   });
   if (!demo) {
     throw new Error('Demo não encontrada');
@@ -32,6 +39,9 @@ export async function enqueueHighlightExtractJob(
   }
   if (demo.status !== 'COMPLETED') {
     throw new Error('A demo precisa estar processada antes de gerar destaques');
+  }
+  if (demo.isPersonal && !demo.uploadedBy.steamId?.trim()) {
+    throw new Error('Configure o Steam ID no perfil para gerar destaques de demos pessoais');
   }
 
   const demoPath = tryResolveDemoFilePath(demo.filePath);

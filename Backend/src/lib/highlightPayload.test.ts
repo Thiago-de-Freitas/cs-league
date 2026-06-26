@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapHighlightPayload, normalizeHighlightType } from './highlightPayload';
+import { mapHighlightPayload, normalizeHighlightType, normalizeSteamId, filterHighlightsForPersonalDemo } from './highlightPayload';
 import { getHighlightClipPublicUrl } from './highlightStorage';
 
 describe('highlightPayload', () => {
@@ -25,6 +25,20 @@ describe('highlightPayload', () => {
     assert.equal(mapped.type, 'OPENING_KILL');
     assert.equal(mapped.round, 5);
     assert.equal(mapped.clipStartTick, 11680);
+  });
+
+  it('normaliza Steam ID e filtra destaques de demo pessoal', () => {
+    assert.equal(normalizeSteamId('76561198000000000.0'), '76561198000000000');
+
+    const highlights = [
+      { steamId: '76561198000000000', playerName: 'Eu' },
+      { steamId: '76561198999999999', playerName: 'Outro' },
+    ];
+
+    const filtered = filterHighlightsForPersonalDemo(highlights, '76561198000000000');
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].playerName, 'Eu');
+    assert.equal(filterHighlightsForPersonalDemo(highlights, '').length, 0);
   });
 });
 

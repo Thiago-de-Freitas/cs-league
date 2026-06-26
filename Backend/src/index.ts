@@ -17,7 +17,7 @@ import { prisma } from './lib/prisma';
 import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
 import { getDemoStoragePath } from './lib/demoStorage';
 import { getHighlightClipsPath } from './lib/highlightStorage';
-import { mapHighlightPayload } from './lib/highlightPayload';
+import { mapHighlightPayload, filterHighlightsForPersonalDemo } from './lib/highlightPayload';
 import {
   enqueueRenderJobsForDemoHighlights,
   enqueueRenderJobsForMatchHighlights,
@@ -323,9 +323,32 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
       return;
     }
 
+    const demo = await prisma.demo.findUnique({
+      where: { id: demoId },
+      select: {
+        isPersonal: true,
+        uploadedBy: { select: { steamId: true } },
+      },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+
+    const scopedHighlights = demo.isPersonal
+      ? filterHighlightsForPersonalDemo(highlights, demo.uploadedBy.steamId)
+      : highlights;
+
+    if (demo.isPersonal && scopedHighlights.length === 0) {
+      await prisma.demoHighlight.deleteMany({ where: { demoId } });
+      skipAudit(req);
+      res.status(201).json({ ok: true, count: 0, renderJobs: 0 });
+      return;
+    }
+
     await prisma.demoHighlight.deleteMany({ where: { demoId } });
     await prisma.demoHighlight.createMany({
-      data: highlights.map((h: Record<string, unknown>) => ({
+      data: scopedHighlights.map((h: Record<string, unknown>) => ({
         demoId,
         ...mapHighlightPayload(h),
       })),
@@ -335,7 +358,7 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
     await markHighlightRenderQueued('demo', demoId, renderJobs);
 
     skipAudit(req);
-    res.status(201).json({ ok: true, count: highlights.length, renderJobs });
+    res.status(201).json({ ok: true, count: scopedHighlights.length, renderJobs });
   } catch (err) {
     console.error('[internal/demo-highlights]', err);
     res.status(500).json({ error: 'Erro ao salvar highlights da demo' });

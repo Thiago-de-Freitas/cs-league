@@ -9,13 +9,30 @@ export function normalizeHighlightType(value: unknown): HighlightType {
     : 'MULTI_KILL';
 }
 
+export function normalizeSteamId(value: unknown): string {
+  if (value == null) return '';
+  const raw = String(value).trim();
+  return raw.endsWith('.0') ? raw.slice(0, -2) : raw;
+}
+
+export function filterHighlightsForPersonalDemo<T extends { steamId?: string | null }>(
+  highlights: T[],
+  uploaderSteamId: string | null | undefined
+): T[] {
+  const normalizedUploader = normalizeSteamId(uploaderSteamId);
+  if (!normalizedUploader) return [];
+  return highlights.filter(
+    (highlight) => normalizeSteamId(highlight.steamId) === normalizedUploader
+  );
+}
+
 export function mapHighlightPayload(h: Record<string, unknown>) {
   return {
     round: Number(h.round) || 0,
     tick: h.tick != null ? Number(h.tick) : null,
     clipStartTick: h.clipStartTick != null ? Number(h.clipStartTick) : null,
     clipEndTick: h.clipEndTick != null ? Number(h.clipEndTick) : null,
-    steamId: h.steamId ? String(h.steamId) : null,
+    steamId: h.steamId ? normalizeSteamId(h.steamId) : null,
     playerName: String(h.playerName ?? 'Jogador'),
     type: normalizeHighlightType(h.type),
     description: String(h.description ?? 'Destaque'),
