@@ -31,5 +31,16 @@ export const RANKING_POSITION_OPTIONS: { id: RankingPositionFilter; label: strin
 
 export function getPlayerPositionLabel(position: PlayerPosition | string | null | undefined): string {
   if (!position) return '';
-  return PLAYER_POSITION_LABELS[position as PlayerPosition] ?? position;
+  const normalized = position.toString().trim().toUpperCase();
+  return PLAYER_POSITION_LABELS[normalized as PlayerPosition] ?? position;
+}
+
+export function normalizePlayerPositionForForm(
+  position: PlayerPosition | string | null | undefined
+): PlayerPosition | '' {
+  if (!position?.toString().trim()) return '';
+  const normalized = position.toString().trim().toUpperCase();
+  return (PLAYER_POSITIONS as readonly string[]).includes(normalized)
+    ? (normalized as PlayerPosition)
+    : '';
 }

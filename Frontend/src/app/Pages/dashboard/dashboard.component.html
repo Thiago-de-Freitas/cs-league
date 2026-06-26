@@ -7,13 +7,6 @@
           <p *ngIf="userName">Bem-vindo de volta, <strong>{{ userName }}</strong></p>
           <p *ngIf="!userName">Sua plataforma competitiva de Counter-Strike 2</p>
         </div>
-
-        <div class="dashboard-hero-actions" *ngIf="!loading">
-          <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova liga</button>
-          <button type="button" class="btn btn-secondary btn-small" (click)="openCreateTeamModal()">+ Novo time</button>
-          <a routerLink="/profile" class="btn btn-ghost btn-small">Meu perfil</a>
-          <a routerLink="/demo-upload" class="btn btn-ghost btn-small">Demos de partida</a>
-        </div>
       </div>
 
       <div class="dashboard-hero-stats" *ngIf="!loading">

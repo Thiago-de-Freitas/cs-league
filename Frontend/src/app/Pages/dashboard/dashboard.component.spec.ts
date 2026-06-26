@@ -175,14 +175,6 @@ describe('DashboardComponent', () => {
     expect(html.textContent).not.toContain('Enviar Demo');
   });
 
-  it('hero exibe atalhos para perfil e demos de partida', () => {
-    const html = fixture.nativeElement as HTMLElement;
-    expect(html.textContent).toContain('Meu perfil');
-    expect(html.textContent).toContain('Demos de partida');
-    expect(html.querySelector('a[href="/profile"]')).not.toBeNull();
-    expect(html.querySelector('a[href="/demo-upload"]')).not.toBeNull();
-  });
-
   it('exibe seções Minha competição e Rankings', () => {
     const html = fixture.nativeElement as HTMLElement;
     expect(html.textContent).toContain('Minha competição');

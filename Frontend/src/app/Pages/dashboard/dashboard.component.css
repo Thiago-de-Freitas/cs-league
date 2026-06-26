@@ -14,23 +14,11 @@
 }
 
 .dashboard-hero-main {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1.25rem 2rem;
   margin-bottom: 1.5rem;
 }
 
 .dashboard-hero-copy h1 {
   margin-bottom: 0.35rem;
-}
-
-.dashboard-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
 }
 
 .dashboard-hero-stats {
@@ -289,9 +277,5 @@
 
   .ranking-range {
     align-self: flex-start;
-  }
-
-  .dashboard-hero-actions {
-    width: 100%;
   }
 }

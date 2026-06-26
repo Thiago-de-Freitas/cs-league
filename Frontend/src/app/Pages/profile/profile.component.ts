@@ -10,7 +10,7 @@ import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/inte
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
-import { PLAYER_POSITIONS, getPlayerPositionLabel } from '../../Utils/player-positions';
+import { PLAYER_POSITIONS, getPlayerPositionLabel, normalizePlayerPositionForForm } from '../../Utils/player-positions';
 
 type ProfileTab = 'stats' | 'demos' | 'settings';
 
@@ -75,14 +75,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.userName = user.displayName;
         this.email = user.email;
         this.steamId = user.steamId || '';
-        this.position = user.position || '';
+        this.position = normalizePlayerPositionForForm(user.position);
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
         this.role = user.role;
         this.profileForm.patchValue({
           displayName: user.displayName,
           steamId: user.steamId || '',
-          position: user.position || '',
+          position: this.position,
         });
       },
       error: () => {
@@ -274,9 +274,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
       next: (user) => {
         this.userName = user.displayName;
         this.steamId = user.steamId || '';
-        this.position = user.position || '';
+        this.position = normalizePlayerPositionForForm(user.position);
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
+        this.profileForm.patchValue({
+          displayName: user.displayName,
+          steamId: user.steamId || '',
+          position: this.position,
+        });
         this.successMsg = 'Perfil atualizado com sucesso!';
         this.errorMsg = '';
       },
