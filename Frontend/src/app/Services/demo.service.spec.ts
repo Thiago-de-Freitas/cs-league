@@ -39,7 +39,7 @@ describe('DemoService', () => {
     service.uploadDemoWithProgress(file, { isPersonal: true }).subscribe();
 
     httpMock.expectOne('/runtime-config.json').flush({ apiBaseUrl: '' });
-    const upload = httpMock.expectOne('/api/demos/upload');
+    const upload = httpMock.expectOne((req) => req.url.endsWith('/api/demos/upload'));
     expect(upload.request.method).toBe('POST');
     expect(upload.request.body instanceof FormData).toBeTrue();
     upload.flush({ id: 'd1', fileName: 'match.dem', status: 'pending' });

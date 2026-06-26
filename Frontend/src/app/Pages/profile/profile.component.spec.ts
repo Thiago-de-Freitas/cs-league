@@ -7,6 +7,7 @@ import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
 import { PersonalStatsOverview } from '../../Models/interfaces';
+import { HIGHLIGHTS_FEATURE_ENABLED } from '../../Utils/feature-flags';
 
 const emptyOverview: PersonalStatsOverview = {
   summary: {
@@ -80,6 +81,12 @@ describe('ProfileComponent', () => {
   });
 
   it('carrega destaques ao abrir a aba', () => {
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      component.setTab('highlights');
+      expect(demoServiceSpy.listPersonalHighlights).not.toHaveBeenCalled();
+      expect(component.activeTab).toBe('stats');
+      return;
+    }
     demoServiceSpy.listPersonalHighlights.and.returnValue(
       of({ highlights: [], total: 0, videoExportAvailable: false })
     );
@@ -90,6 +97,9 @@ describe('ProfileComponent', () => {
   });
 
   it('exibe erro detalhado quando API de destaques falha', () => {
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      return;
+    }
     demoServiceSpy.listPersonalHighlights.and.returnValue(
       throwError(() => ({ status: 503, error: { error: 'Banco desatualizado' } }))
     );
@@ -99,6 +109,9 @@ describe('ProfileComponent', () => {
   });
 
   it('trata falha de conexão ao carregar destaques', () => {
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      return;
+    }
     demoServiceSpy.listPersonalHighlights.and.returnValue(throwError(() => ({ status: 0 })));
     component.setTab('highlights');
     expect(component.highlightsLoadError).toContain('conectar à API');
