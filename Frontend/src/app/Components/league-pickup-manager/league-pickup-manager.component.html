@@ -32,23 +32,21 @@
   </div>
 
   <div class="pickup-add" *ngIf="!disabled && !hasMatches">
-    <div class="pickup-add-grid">
-      <div class="form-group">
-        <label class="form-label" for="pickup-invite-team">Time ao convidar</label>
-        <select id="pickup-invite-team" class="input-field" [(ngModel)]="inviteTeamId">
-          <option value="">Sem time (pool)</option>
-          <option *ngFor="let squad of displaySquads" [value]="squad.id">{{ squad.name }}</option>
-        </select>
-      </div>
-      <div class="pickup-add-search">
-        <app-user-search-picker
-          label="Convidar jogador"
-          placeholder="Buscar por nome, e-mail ou Steam ID..."
-          actionLabel="Convidar"
-          [disabled]="disabled"
-          (userPick)="onPlayerPicked($event)">
-        </app-user-search-picker>
-      </div>
+    <div class="pickup-invite-grid">
+      <label class="form-label pickup-invite-team-label" for="pickup-invite-team">Time ao convidar</label>
+      <label class="form-label pickup-invite-search-label" for="pickup-invite-search">Convidar jogador</label>
+      <select id="pickup-invite-team" class="input-field pickup-invite-team-select" [(ngModel)]="inviteTeamId">
+        <option value="">Sem time (pool)</option>
+        <option *ngFor="let squad of displaySquads" [value]="squad.id">{{ squad.name }}</option>
+      </select>
+      <app-user-search-picker
+        inputId="pickup-invite-search"
+        [embedInToolbar]="true"
+        placeholder="Buscar por nome, e-mail ou Steam ID..."
+        actionLabel="Convidar"
+        [disabled]="disabled"
+        (userPick)="onPlayerPicked($event)">
+      </app-user-search-picker>
     </div>
   </div>
 

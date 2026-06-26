@@ -57,18 +57,28 @@
   gap: 0.55rem;
 }
 
-.pickup-add-grid {
+.pickup-invite-grid {
   display: grid;
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: end;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
+  align-items: center;
 }
 
-.pickup-add-grid .form-group {
+.pickup-invite-team-label {
+  grid-column: 1;
+  grid-row: 1;
   margin: 0;
 }
 
-.pickup-add-search {
+.pickup-invite-search-label {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+}
+
+.pickup-invite-team-select {
+  grid-column: 1;
+  grid-row: 2;
   min-width: 0;
 }
 
@@ -108,9 +118,19 @@
 
 @media (max-width: 720px) {
   .pickup-squad-forms,
-  .pickup-add-grid,
   .pickup-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pickup-invite-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pickup-invite-team-label,
+  .pickup-invite-search-label,
+  .pickup-invite-team-select {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .pickup-squad-fields {

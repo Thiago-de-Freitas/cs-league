@@ -12,8 +12,11 @@ import { splitBySearchQuery } from '../../Utils/user-search.util';
   selector: 'app-user-search-picker',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  host: {
+    '[class.user-search-embed]': 'embedInToolbar',
+  },
   template: `
-    <div class="user-search-picker">
+    <div class="user-search-picker" [class.user-search-embed-inner]="embedInToolbar">
       <label *ngIf="label" class="form-label" [attr.for]="inputId">{{ label }}</label>
       <div class="user-search-input-wrap">
         <span class="user-search-icon" aria-hidden="true">⌕</span>
@@ -234,6 +237,26 @@ import { splitBySearchQuery } from '../../Utils/user-search.util';
     .user-search-hint {
       margin: 0;
     }
+
+    :host.user-search-embed {
+      display: contents;
+    }
+
+    :host.user-search-embed .user-search-embed-inner {
+      display: contents;
+    }
+
+    :host.user-search-embed .user-search-input-wrap {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+    }
+
+    :host.user-search-embed .user-search-hint,
+    :host.user-search-embed .user-search-results,
+    :host.user-search-embed .user-search-empty {
+      grid-column: 1 / -1;
+    }
   `],
 })
 export class UserSearchPickerComponent implements OnDestroy {
@@ -243,6 +266,8 @@ export class UserSearchPickerComponent implements OnDestroy {
   @Input() disabled = false;
   @Input() excludeUserIds: string[] = [];
   @Input() inputId = 'user-search-input';
+  /** Quando true, o host não cria caixa própria — útil para alinhar o input em toolbar ao lado de outros campos. */
+  @Input() embedInToolbar = false;
 
   @Output() userPick = new EventEmitter<User>();
 
