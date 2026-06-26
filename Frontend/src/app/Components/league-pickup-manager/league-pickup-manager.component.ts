@@ -66,8 +66,24 @@ export class LeaguePickupManagerComponent implements OnInit {
 
   get canStartMatch(): boolean {
     if (!this.state || this.hasMatches || this.disabled) return false;
-    if (this.state.squads.length < this.fixedTeamCount) return false;
-    return this.state.squads.every((squad) => squad.players.length > 0);
+    const squads = this.displaySquads;
+    if (squads.length < this.fixedTeamCount) return false;
+    return squads.every((squad) => squad.players.length > 0);
+  }
+
+  get displaySquads(): PickupSquad[] {
+    if (!this.state) return [];
+    if (this.state.squads.length >= this.fixedTeamCount) {
+      return this.state.squads;
+    }
+    return this.squadDrafts.map((draft, index) => ({
+      id: draft.id,
+      name: draft.name,
+      tag: draft.tag,
+      seed: index + 1,
+      players: this.state?.squads.find((squad) => squad.id === draft.id)?.players ?? [],
+      teamRating: this.state?.squads.find((squad) => squad.id === draft.id)?.teamRating ?? null,
+    }));
   }
 
   get assignedPlayerIds(): Set<string> {
@@ -98,14 +114,23 @@ export class LeaguePickupManagerComponent implements OnInit {
     this.state = state;
     this.playersPerTeam = state.playersPerTeam;
     this.balanceModes = normalizePickupBalanceModes(state.balanceModes ?? state.balanceMode);
-    this.squadDrafts = state.squads.map((squad) => ({
-      id: squad.id,
-      name: squad.name,
-      tag: squad.tag,
-    }));
+    this.syncSquadDrafts(state.squads);
     if (!this.inviteTeamId && state.squads[0]) {
       this.inviteTeamId = state.squads[0].id;
     }
+  }
+
+  private syncSquadDrafts(squads: PickupSquad[]): void {
+    const defaults = [
+      { id: '', name: 'Time 1', tag: 'T1' },
+      { id: '', name: 'Time 2', tag: 'T2' },
+    ];
+
+    this.squadDrafts = defaults.map((fallback, index) => {
+      const squad = squads[index];
+      if (!squad) return { ...fallback };
+      return { id: squad.id, name: squad.name, tag: squad.tag };
+    });
   }
 
   isBalanceModeSelected(mode: PickupBalanceMode): boolean {
@@ -147,6 +172,12 @@ export class LeaguePickupManagerComponent implements OnInit {
   }
 
   saveSquads(): void {
+    const missingId = this.squadDrafts.some((squad) => !squad.id);
+    if (missingId) {
+      this.loadState();
+      this.notify.info('Carregando times da liga...');
+      return;
+    }
     if (this.squadDrafts.length !== this.fixedTeamCount) {
       this.notify.error('Configure os dois times da liga.');
       return;

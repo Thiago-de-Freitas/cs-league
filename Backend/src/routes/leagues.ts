@@ -41,7 +41,7 @@ import {
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
-import { releasePickupPlayers, PICKUP_LEAGUE_FIXED_TEAM_COUNT } from '../lib/pickupLeague';
+import { releasePickupPlayers, PICKUP_LEAGUE_FIXED_TEAM_COUNT, ensureEphemeralSquads } from '../lib/pickupLeague';
 import { roundDifference } from '../lib/matchResult';
 import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
@@ -469,6 +469,18 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 
     const leagueId = req.params.id;
+    const leagueMeta = await prisma.league.findUnique({
+      where: { id: leagueId },
+      select: {
+        format: true,
+        ownerId: true,
+        _count: { select: { matches: true } },
+      },
+    });
+    if (leagueMeta?.format === 'ONE_VS_ONE' && leagueMeta._count.matches === 0) {
+      await ensureEphemeralSquads(leagueId, leagueMeta.ownerId, PICKUP_LEAGUE_FIXED_TEAM_COUNT);
+    }
+
     const [league, matchIdsWithDemo, weekOverrideRows] = await Promise.all([
       getLeagueWithDetails(leagueId),
       getMatchIdsWithGeneralDemo(leagueId),

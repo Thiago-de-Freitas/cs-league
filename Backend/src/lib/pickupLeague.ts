@@ -172,31 +172,19 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
 
   await ensureEphemeralSquads(leagueId, league.ownerId, PICKUP_LEAGUE_FIXED_TEAM_COUNT);
 
-  const [entries, squads] = await Promise.all([
-    prisma.leaguePlayerEntry.findMany({
-      where: { leagueId },
-      include: {
-        user: { select: { id: true, displayName: true, steamId: true, avatarUrl: true, position: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    }),
-    prisma.leagueTeam.findMany({
-      where: { leagueId, team: { leagueId } },
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-            tag: true,
-            members: {
-              select: { user: { select: { steamId: true } } },
-            },
-          },
-        },
-      },
-      orderBy: [{ seed: 'asc' }, { team: { name: 'asc' } }],
-    }),
-  ]);
+  const entries = await prisma.leaguePlayerEntry.findMany({
+    where: { leagueId },
+    include: {
+      user: { select: { id: true, displayName: true, steamId: true, avatarUrl: true, position: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const ephemeralTeams = await prisma.team.findMany({
+    where: { leagueId },
+    orderBy: { createdAt: 'asc' },
+    take: PICKUP_LEAGUE_FIXED_TEAM_COUNT,
+  });
 
   const steamIds = entries.map((e) => e.user.steamId).filter((id): id is string => !!id?.trim());
   const [adrBySteam, extraBySteam] = await Promise.all([
@@ -206,13 +194,13 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
 
   const players = await Promise.all(entries.map((e) => formatPickupPlayer(e, adrBySteam, extraBySteam)));
   const pool = players.filter((p) => !p.teamId);
-  const squadViews: PickupSquadView[] = squads.map((lt) => {
-    const squadPlayers = players.filter((p) => p.teamId === lt.teamId);
+  const squadViews: PickupSquadView[] = ephemeralTeams.map((team, index) => {
+    const squadPlayers = players.filter((p) => p.teamId === team.id);
     return {
-      id: lt.team.id,
-      name: lt.team.name,
-      tag: lt.team.tag,
-      seed: lt.seed,
+      id: team.id,
+      name: team.name,
+      tag: team.tag,
+      seed: index + 1,
       players: squadPlayers,
       teamRating: squadRating(squadPlayers),
     };
@@ -245,12 +233,11 @@ export async function ensureEphemeralSquads(
   ownerId: string,
   teamCount: number
 ): Promise<Array<{ id: string; name: string; tag: string }>> {
-  const existing = await prisma.team.findMany({
+  let squads = await prisma.team.findMany({
     where: { leagueId },
     orderBy: { createdAt: 'asc' },
   });
 
-  const squads = [...existing];
   for (let i = squads.length; i < teamCount; i++) {
     const num = i + 1;
     const created = await prisma.team.create({
@@ -261,13 +248,21 @@ export async function ensureEphemeralSquads(
         leagueId,
       },
     });
-    await prisma.leagueTeam.create({
-      data: { leagueId, teamId: created.id, seed: num },
-    });
     squads.push(created);
   }
 
-  return squads.slice(0, teamCount).map((s) => ({ id: s.id, name: s.name, tag: s.tag }));
+  squads = squads.slice(0, teamCount);
+
+  for (let i = 0; i < squads.length; i++) {
+    const squad = squads[i]!;
+    await prisma.leagueTeam.upsert({
+      where: { leagueId_teamId: { leagueId, teamId: squad.id } },
+      create: { leagueId, teamId: squad.id, seed: i + 1 },
+      update: { seed: i + 1 },
+    });
+  }
+
+  return squads.map((s) => ({ id: s.id, name: s.name, tag: s.tag }));
 }
 
 async function syncEphemeralRoster(teamId: string, userIds: string[]): Promise<void> {

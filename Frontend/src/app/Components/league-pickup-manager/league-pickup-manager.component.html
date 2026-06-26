@@ -4,7 +4,7 @@
     Convide jogadores, balanceie automaticamente ou ajuste manualmente cada elenco.
   </p>
 
-  <div class="pickup-squads-setup" *ngIf="!disabled && !hasMatches && squadDrafts.length > 0">
+  <div class="pickup-squads-setup" *ngIf="!disabled && !hasMatches">
     <h3 class="pickup-subtitle">Times do confronto</h3>
     <p class="form-hint pickup-squads-hint">Dois times obrigatórios. Eles existem apenas nesta liga.</p>
     <div class="pickup-squad-forms">
@@ -37,7 +37,7 @@
         <label class="form-label" for="pickup-invite-team">Time ao convidar</label>
         <select id="pickup-invite-team" class="input-field" [(ngModel)]="inviteTeamId">
           <option value="">Sem time (pool)</option>
-          <option *ngFor="let squad of state?.squads" [value]="squad.id">{{ squad.name }}</option>
+          <option *ngFor="let squad of displaySquads" [value]="squad.id">{{ squad.name }}</option>
         </select>
       </div>
       <div class="pickup-add-search">
@@ -113,10 +113,10 @@
     </ul>
   </div>
 
-  <div class="pickup-squads" *ngIf="state && state.squads.length > 0">
+  <div class="pickup-squads" *ngIf="state && (state.squads.length > 0 || squadDrafts.length > 0)">
     <h3 class="pickup-subtitle">Elencos</h3>
     <div class="pickup-squad-grid">
-      <div *ngFor="let squad of state.squads; trackBy: trackSquad" class="gc-card pickup-squad-card">
+      <div *ngFor="let squad of displaySquads; trackBy: trackSquad" class="gc-card pickup-squad-card">
         <div class="pickup-squad-header">
           <strong>{{ squad.name }}</strong>
           <span class="meta">[{{ squad.tag }}]</span>
@@ -155,7 +155,7 @@
       [ngModel]="player.teamId || ''"
       (ngModelChange)="movePlayer(player, $event)">
       <option value="">Sem time</option>
-      <option *ngFor="let squad of state?.squads" [value]="squad.id">{{ squad.name }}</option>
+      <option *ngFor="let squad of displaySquads" [value]="squad.id">{{ squad.name }}</option>
     </select>
     <button type="button" class="btn btn-secondary btn-small" (click)="removePlayer(player)">Remover</button>
   </div>
