@@ -17,11 +17,17 @@ import {
 import { syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import {
   getStatDeltasForTeams,
+  getRoundsOnlyStatDeltas,
+  getPlayoffSeriesWinStatDeltas,
   parseMatchRounds,
   resolveMatchOutcome,
 } from '../lib/matchResult';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, recordAuditInTransaction, setAuditContext, skipAudit } from '../lib/audit';
+import { registerMatchExtras } from './matchExtras';
+import { ensureMatchMapVeto } from '../lib/mapVetoService';
+import { getMapLabel } from '../lib/cs2Maps';
+import { getSeriesForMatch, advanceSeriesAfterMapWin } from '../lib/matchSeriesService';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -93,6 +99,10 @@ function formatMatchResponse(
     map: string | null;
     team1Rounds: number | null;
     team2Rounds: number | null;
+    team1StartingSide?: string | null;
+    team2StartingSide?: string | null;
+    seriesId?: string | null;
+    seriesGameNumber?: number | null;
     scheduledAt: Date | null;
     playedAt: Date | null;
   },
@@ -109,8 +119,18 @@ function formatMatchResponse(
   permissions: {
     canRegisterResult: boolean;
     canEditManualStats: boolean;
+    captainTeamIds?: string[];
   },
-  roster?: Awaited<ReturnType<typeof loadMatchRoster>>
+  roster?: Awaited<ReturnType<typeof loadMatchRoster>>,
+  extras?: {
+    mapVeto?: unknown;
+    mapVetoEnabled?: boolean;
+    lineup?: unknown[];
+    images?: unknown[];
+    highlights?: unknown[];
+    series?: unknown;
+    seriesGameNumber?: number | null;
+  }
 ) {
   const hasFileDemo = demos.some(
     (d) => !d.isManual && ['PENDING', 'PROCESSING', 'COMPLETED'].includes(d.status.toUpperCase())
@@ -132,6 +152,9 @@ function formatMatchResponse(
     round: match.round,
     bracketPosition: match.bracketPosition,
     map: match.map,
+    mapLabel: match.map ? getMapLabel(match.map) : null,
+    team1StartingSide: match.team1StartingSide?.toLowerCase() ?? null,
+    team2StartingSide: match.team2StartingSide?.toLowerCase() ?? null,
     team1Rounds: match.team1Rounds,
     team2Rounds: match.team2Rounds,
     scheduledAt: match.scheduledAt,
@@ -142,6 +165,13 @@ function formatMatchResponse(
     hasFileDemo,
     manualDemoId: manualDemo?.id ?? null,
     permissions,
+    mapVeto: extras?.mapVeto ?? null,
+    mapVetoEnabled: extras?.mapVetoEnabled ?? false,
+    lineup: extras?.lineup ?? [],
+    images: extras?.images ?? [],
+    highlights: extras?.highlights ?? [],
+    series: extras?.series ?? null,
+    seriesGameNumber: match.seriesGameNumber ?? null,
   };
 }
 
@@ -170,7 +200,23 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         team1: { select: { id: true, name: true, tag: true } },
         team2: { select: { id: true, name: true, tag: true } },
         winner: { select: { id: true, name: true, tag: true } },
-        league: { select: { id: true, name: true, ownerId: true, maxTeams: true, bracketSize: true } },
+        league: {
+          select: {
+            id: true,
+            name: true,
+            ownerId: true,
+            maxTeams: true,
+            bracketSize: true,
+            format: true,
+            mapPool: true,
+            mapVetoEnabled: true,
+            seriesFormat: true,
+          },
+        },
+        lineup: true,
+        images: { orderBy: { createdAt: 'desc' } },
+        highlights: { orderBy: [{ score: 'desc' }, { round: 'asc' }] },
+        mapVeto: true,
         demos: {
           where: { isPersonal: false },
           include: { stats: true },
@@ -192,9 +238,52 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
     const statsAccess = await canUserEditMatchStats(req.user!.userId, req.user!.role, match.id);
+    const captainTeamIds =
+      req.user!.role === 'ADMIN' || match.league.ownerId === req.user!.userId
+        ? [match.team1Id, match.team2Id]
+        : (
+            await prisma.teamMember.findMany({
+              where: {
+                userId: req.user!.userId,
+                teamId: { in: [match.team1Id, match.team2Id] },
+                role: 'CAPTAIN',
+              },
+              select: { teamId: true },
+            })
+          ).map((m) => m.teamId);
     const roster = statsAccess.allowed
       ? await loadMatchRoster(match.team1Id, match.team2Id)
       : undefined;
+
+    const seriesData = match.seriesId ? await getSeriesForMatch(match.id) : null;
+
+    let mapVeto = null;
+    if (match.league.mapVetoEnabled) {
+      const isBo3Series = seriesData?.series?.format === 'bo3';
+      const seriesVetoReady =
+        !isBo3Series ||
+        seriesData?.series?.vetoStatus === 'maps_assigned' ||
+        seriesData?.series?.vetoStatus === 'completed';
+
+      if (seriesVetoReady) {
+        if (isBo3Series) {
+          const existingVeto = await prisma.matchMapVeto.findUnique({ where: { matchId: match.id } });
+          if (existingVeto) {
+            mapVeto = await ensureMatchMapVeto(match);
+          }
+        } else {
+          mapVeto = await ensureMatchMapVeto(match);
+        }
+      }
+    }
+
+    const lineupUsers = match.lineup.length
+      ? await prisma.user.findMany({
+          where: { id: { in: match.lineup.map((l) => l.userId) } },
+          select: { id: true, displayName: true, steamId: true },
+        })
+      : [];
+    const userById = new Map(lineupUsers.map((u) => [u.id, u]));
 
     res.json(
       formatMatchResponse(
@@ -203,8 +292,22 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         {
           canRegisterResult: resultAccess.allowed && match.status !== 'COMPLETED',
           canEditManualStats: statsAccess.allowed,
+          captainTeamIds,
         },
-        roster
+        roster,
+        {
+          mapVeto,
+          mapVetoEnabled: match.league.mapVetoEnabled,
+          lineup: match.lineup.map((l) => ({
+            teamId: l.teamId,
+            userId: l.userId,
+            playerName: userById.get(l.userId)?.displayName ?? 'Jogador',
+            steamId: userById.get(l.userId)?.steamId ?? null,
+          })),
+          images: match.images,
+          highlights: match.highlights,
+          series: seriesData,
+        }
       )
     );
   } catch (err) {
@@ -357,7 +460,10 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const match = await prisma.match.findUnique({
       where: { id: req.params.id },
-      include: { league: { select: { maxTeams: true, bracketSize: true } } },
+      include: {
+        league: { select: { maxTeams: true, bracketSize: true, seriesFormat: true } },
+        series: { select: { format: true } },
+      },
     });
 
     if (!match) {
@@ -396,15 +502,24 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
     }
 
     const winnerId = outcome.winnerId;
-    const statDeltas = getStatDeltasForTeams(
-      match.team1Id,
-      match.team2Id,
-      rounds.team1Rounds,
-      rounds.team2Rounds,
-      outcome
-    );
+    const isBo3Map =
+      !!match.seriesId && (match.series?.format === 'BO3' || match.league.seriesFormat === 'BO3');
+
+    const statDeltas = isBo3Map
+      ? getRoundsOnlyStatDeltas(match.team1Id, match.team2Id, rounds.team1Rounds, rounds.team2Rounds)
+      : getStatDeltasForTeams(
+          match.team1Id,
+          match.team2Id,
+          rounds.team1Rounds,
+          rounds.team2Rounds,
+          outcome
+        );
 
     let groupPhaseJustCompleted = false;
+    const bracketSize = resolveBracketSize(
+      await prisma.leagueTeam.count({ where: { leagueId: match.leagueId } }),
+      match.league.bracketSize
+    );
 
     await prisma.$transaction(async (tx) => {
       await tx.match.update({
@@ -447,14 +562,13 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         }
       }
 
-      await tryAdvanceBracket(
-        tx,
-        { ...match, winnerId },
-        resolveBracketSize(
-          await tx.leagueTeam.count({ where: { leagueId: match.leagueId } }),
-          match.league.bracketSize
-        )
-      );
+      if (!isBo3Map) {
+        await tryAdvanceBracket(
+          tx,
+          { ...match, winnerId },
+          bracketSize
+        );
+      }
 
       await tryCompleteLeague(tx, match.leagueId);
 
@@ -471,6 +585,44 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
         { req }
       );
     });
+
+    if (match.seriesId && winnerId) {
+      const seriesResult = await advanceSeriesAfterMapWin(match.seriesId, winnerId);
+      if (seriesResult.completed && seriesResult.winnerId) {
+        await prisma.$transaction(async (tx) => {
+          const seriesWinDeltas = getPlayoffSeriesWinStatDeltas(
+            match.team1Id,
+            match.team2Id,
+            seriesResult.winnerId!
+          );
+          for (const [teamId, delta] of seriesWinDeltas) {
+            await tx.leagueTeam.updateMany({
+              where: { leagueId: match.leagueId, teamId },
+              data: {
+                wins: { increment: delta.wins },
+                losses: { increment: delta.losses },
+                points: { increment: delta.points },
+              },
+            });
+          }
+
+          await tryAdvanceBracket(
+            tx,
+            {
+              id: match.id,
+              leagueId: match.leagueId,
+              phase: match.phase,
+              round: match.round,
+              bracketPosition: match.bracketPosition,
+              winnerId: seriesResult.winnerId,
+            },
+            bracketSize
+          );
+
+          await tryCompleteLeague(tx, match.leagueId);
+        });
+      }
+    }
 
     const updated = await prisma.match.findUnique({
       where: { id: req.params.id },
@@ -551,5 +703,7 @@ router.patch('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Resp
     res.status(500).json({ error: 'Erro ao remarcar partida' });
   }
 });
+
+registerMatchExtras(router);
 
 export default router;

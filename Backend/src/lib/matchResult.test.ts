@@ -5,6 +5,8 @@ import {
   parseMatchRounds,
   resolveMatchOutcome,
   roundDifference,
+  getRoundsOnlyStatDeltas,
+  getPlayoffSeriesWinStatDeltas,
 } from './matchResult';
 
 describe('matchResult', () => {
@@ -67,5 +69,45 @@ describe('matchResult', () => {
       roundsLost: 16,
     });
     assert.equal(roundDifference(16, 12), 4);
+  });
+
+  it('BO3 mapa individual — getRoundsOnlyStatDeltas não altera vitórias/pontos', () => {
+    const deltas = getRoundsOnlyStatDeltas('a', 'b', 16, 10);
+    assert.deepEqual(deltas.get('a'), {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      roundsWon: 16,
+      roundsLost: 10,
+    });
+    assert.deepEqual(deltas.get('b'), {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      roundsWon: 10,
+      roundsLost: 16,
+    });
+  });
+
+  it('BO3 série completa — getPlayoffSeriesWinStatDeltas concede 1 vitória na classificação', () => {
+    const deltas = getPlayoffSeriesWinStatDeltas('a', 'b', 'a');
+    assert.deepEqual(deltas.get('a'), {
+      wins: 1,
+      losses: 0,
+      draws: 0,
+      points: 3,
+      roundsWon: 0,
+      roundsLost: 0,
+    });
+    assert.deepEqual(deltas.get('b'), {
+      wins: 0,
+      losses: 1,
+      draws: 0,
+      points: 0,
+      roundsWon: 0,
+      roundsLost: 0,
+    });
   });
 });

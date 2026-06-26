@@ -23,6 +23,11 @@
 }
 .demo-view-meta { margin-top: 0; }
 .match-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.match-images-upload { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; align-items: center; }
+.match-images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+.match-image-item { margin: 0; background: var(--gc-bg-secondary); border: 1px solid var(--gc-border); border-radius: var(--radius-md); padding: 0.5rem; }
+.match-image-item img { width: 100%; height: auto; border-radius: var(--radius-sm); display: block; }
+.match-image-item figcaption { font-size: 0.8rem; color: var(--gc-text-secondary); margin: 0.35rem 0; }
 .demo-list-item { flex-wrap: wrap; gap: 0.5rem; }
 .demo-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; flex-wrap: wrap; }
 .demo-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
@@ -30,6 +35,8 @@
 .result-winner-line { margin: 0 0 1rem; color: var(--gc-text-secondary); }
 .result-winner-line strong { color: var(--gc-text); }
 .mt-4 { margin-top: 1rem; }
+.series-game-nav { margin-top: 1rem; padding: 1rem; }
+.series-game-nav-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .manual-stats-intro { margin: 0 0 1rem; }
 .manual-rounds-row {
   display: flex;

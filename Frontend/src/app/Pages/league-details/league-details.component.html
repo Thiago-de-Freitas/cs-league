@@ -11,6 +11,8 @@
       <span *ngIf="league.endDate && !isSingleGroupFormat">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
       <span *ngIf="isGroupStageFormat" class="badge badge-orange">{{ formatBadgeLabel }}</span>
+      <span *ngIf="isOneVsOneFormat" class="badge badge-orange">1x1 · {{ seriesFormatLabel }}</span>
+      <span *ngIf="!isOneVsOneFormat && !isGroupStageFormat && league.seriesFormat" class="badge badge-orange">{{ seriesFormatLabel }} · veto {{ league.mapVetoEnabled !== false ? 'on' : 'off' }}</span>
       <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Pública</span>
     </div>
     <p *ngIf="isArchived" class="archived-notice">Esta liga está arquivada e não aparece na página inicial.</p>
@@ -20,6 +22,41 @@
   </header>
 
   <section class="league-content">
+    <div class="section-card" *ngIf="isOneVsOneFormat && isAdmin && !hasLeagueMatches">
+      <h2 class="section-title">Partida 1x1</h2>
+      <p class="admin-hint">
+        Escolha os dois times e os jogadores que disputarão o duelo.
+        <span *ngIf="isBo3League">Série em melhor de 3 mapas — veto com 2 bans e 2 picks na página da partida.</span>
+        <span *ngIf="!isBo3League && league?.mapVetoEnabled !== false">Veto BO1 na página da partida (bans até 1 mapa).</span>
+        <span *ngIf="!isBo3League && league?.mapVetoEnabled === false">Sem veto — informe o mapa ao registrar o resultado.</span>
+      </p>
+      <div class="admin-form admin-form-stacked">
+        <label class="form-label" for="ov1-team1">Time 1</label>
+        <select id="ov1-team1" class="input-field" [(ngModel)]="oneVsOneTeam1Id">
+          <option value="">Selecione</option>
+          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
+        </select>
+        <label class="form-label" for="ov1-p1">Jogador do time 1</label>
+        <select id="ov1-p1" class="input-field" [(ngModel)]="oneVsOnePlayer1Id" [disabled]="!oneVsOneTeam1Id">
+          <option value="">Selecione</option>
+          <option *ngFor="let p of oneVsOneTeam1Players" [value]="p.id">{{ p.name || p.IGN }}</option>
+        </select>
+        <label class="form-label" for="ov1-team2">Time 2</label>
+        <select id="ov1-team2" class="input-field" [(ngModel)]="oneVsOneTeam2Id">
+          <option value="">Selecione</option>
+          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
+        </select>
+        <label class="form-label" for="ov1-p2">Jogador do time 2</label>
+        <select id="ov1-p2" class="input-field" [(ngModel)]="oneVsOnePlayer2Id" [disabled]="!oneVsOneTeam2Id">
+          <option value="">Selecione</option>
+          <option *ngFor="let p of oneVsOneTeam2Players" [value]="p.id">{{ p.name || p.IGN }}</option>
+        </select>
+        <button type="button" class="btn btn-primary" [disabled]="oneVsOneSetupLoading" (click)="setupOneVsOneMatch()">
+          {{ oneVsOneSetupLoading ? 'Criando...' : (isBo3League ? 'Criar série BO3' : 'Criar partida e iniciar veto') }}
+        </button>
+      </div>
+    </div>
+
     <div class="section-card">
       <h2 class="section-title">Classificação</h2>
       <app-league-teams-table
@@ -106,6 +143,25 @@
           </span>
         </div>
 
+        <div class="admin-stat" *ngIf="!isArchived && (isOneVsOneFormat || !isGroupStageFormat)">
+          <span class="admin-stat-label">Vencedor do confronto</span>
+          <span class="admin-stat-value">{{ seriesFormatLabel }}</span>
+          <span class="admin-stat-note">
+            {{ league.mapVetoEnabled !== false ? 'Veto de mapas ativo' : 'Sem veto — mapa manual' }}
+            · {{ (league.mapPool?.length || 7) }} mapas no pool
+          </span>
+          <button
+            type="button"
+            class="admin-stat-link"
+            *ngIf="canEditMapSettings"
+            (click)="openMapSettingsEditor()">
+            {{ editMapSettings ? 'Fechar' : 'Configurar' }}
+          </button>
+          <span class="admin-stat-note" *ngIf="!canEditMapSettings && hasLeagueMatches">
+            Não pode alterar após criar a partida.
+          </span>
+        </div>
+
         <div class="admin-stat" *ngIf="!isArchived">
           <span class="admin-stat-label">Visibilidade</span>
           <span class="admin-stat-value" [class.is-open]="league.registrationOpen">
@@ -127,6 +183,26 @@
       <p *ngIf="canArchive" class="admin-hint admin-archive-hint">
         Todos os jogos foram finalizados. Você pode arquivar a liga para removê-la da página inicial.
       </p>
+
+      <div *ngIf="editMapSettings && canEditMapSettings" class="admin-inline-panel">
+        <h3 class="admin-panel-title">Vencedor e seleção de mapas</h3>
+        <p class="admin-panel-desc">Configure antes de iniciar o torneio. A seleção de mapas muda conforme o formato escolhido.</p>
+        <app-league-series-map-settings
+          [seriesFormat]="editSeriesFormat"
+          [mapPool]="editMapPool"
+          [mapVetoEnabled]="editMapVetoEnabled"
+          [scopeHint]="mapSeriesScopeHint"
+          (seriesFormatChange)="editSeriesFormat = $event"
+          (mapPoolChange)="editMapPool = $event"
+          (mapVetoEnabledChange)="editMapVetoEnabled = $event">
+        </app-league-series-map-settings>
+        <div class="admin-form-actions">
+          <button type="button" class="btn btn-primary" [disabled]="savingMapSettings" (click)="saveMapSettings()">
+            {{ savingMapSettings ? 'Salvando...' : 'Salvar' }}
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="editMapSettings = false" [disabled]="savingMapSettings">Cancelar</button>
+        </div>
+      </div>
 
       <div *ngIf="editMaxTeams && !isArchived" class="admin-inline-panel">
         <h3 class="admin-panel-title">Limite de vagas</h3>
@@ -292,8 +368,8 @@
     <div class="section-card confrontos-card">
       <h2 class="section-title">Confrontos</h2>
 
-      <!-- Eliminatória direta -->
-      <ng-container *ngIf="!isGroupStageFormat">
+      <!-- Eliminatória direta ou 1x1 -->
+      <ng-container *ngIf="!isGroupStageFormat && !isOneVsOneFormat">
         <app-league-bracket
           [teams]="league.teams"
           [bracketSize]="league.bracketSize ?? null"
@@ -319,6 +395,37 @@
               </button>
             </ng-container>
           </div>
+        </div>
+      </ng-container>
+
+      <!-- Duelo 1x1 (BO1 ou BO3) -->
+      <ng-container *ngIf="isOneVsOneFormat">
+        <p *ngIf="!hasLeagueMatches" class="confrontos-empty">
+          Configure a partida na seção acima após inscrever os dois times.
+        </p>
+        <div *ngIf="hasLeagueMatches" class="one-vs-one-series">
+          <p class="meta" *ngIf="isBo3League && oneVsOneSeriesMatches.length">
+            Placar da série: <strong>{{ oneVsOneSeriesMapWins.team1 }} – {{ oneVsOneSeriesMapWins.team2 }}</strong>
+            (melhor de 3)
+          </p>
+          <ul class="gc-list">
+            <li *ngFor="let match of oneVsOneSeriesMatches.length ? oneVsOneSeriesMatches : league.matches" class="gc-list-item match-row">
+              <div>
+                <strong *ngIf="match.seriesGameNumber">Mapa {{ match.seriesGameNumber }}</strong>
+                <span *ngIf="match.map"> · {{ match.mapLabel || getMapLabel(match.map) }}</span>
+                <p class="meta">{{ match.team1.name }} vs {{ match.team2.name }}</p>
+              </div>
+              <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
+              <button type="button" class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Abrir</button>
+              <button
+                *ngIf="canRegisterResultForMatch(match) && match.status !== 'completed'"
+                type="button"
+                class="btn btn-primary btn-small"
+                (click)="registerResult(match)">
+                Resultado
+              </button>
+            </li>
+          </ul>
         </div>
       </ng-container>
 

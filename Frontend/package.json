@@ -12,10 +12,12 @@
     "build:dev": "ng build --configuration development",
     "pretest": "npm run version:generate",
     "pretest:ci": "npm run version:generate",
+    "pretest:unit": "npm run version:generate",
     "start:prod": "node serve.prod.cjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:ci": "ng test --no-watch --browsers=ChromeHeadless"
+    "test:ci": "ng test --no-watch --browsers=ChromeHeadlessCustom",
+    "test:unit": "tsx --test src/app/Utils/**/*.test.ts"
   },
   "private": true,
   "engines": {
@@ -55,6 +57,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "postcss": "^8.5.6",
+    "tsx": "^4.19.2",
     "typescript": "~5.7.2"
   }
 }

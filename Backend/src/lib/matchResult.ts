@@ -114,6 +114,67 @@ export function getStatDeltasForTeams(
   ]);
 }
 
+export function getRoundsOnlyStatDeltas(
+  team1Id: string,
+  team2Id: string,
+  team1Rounds: number,
+  team2Rounds: number
+): Map<string, LeagueTeamStatDelta> {
+  const zero = (): LeagueTeamStatDelta => ({
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    points: 0,
+    roundsWon: 0,
+    roundsLost: 0,
+  });
+
+  const team1 = zero();
+  const team2 = zero();
+  team1.roundsWon = team1Rounds;
+  team1.roundsLost = team2Rounds;
+  team2.roundsWon = team2Rounds;
+  team2.roundsLost = team1Rounds;
+
+  return new Map([
+    [team1Id, team1],
+    [team2Id, team2],
+  ]);
+}
+
+export function getPlayoffSeriesWinStatDeltas(
+  team1Id: string,
+  team2Id: string,
+  winnerId: string
+): Map<string, LeagueTeamStatDelta> {
+  const zero = (): LeagueTeamStatDelta => ({
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    points: 0,
+    roundsWon: 0,
+    roundsLost: 0,
+  });
+
+  const team1 = zero();
+  const team2 = zero();
+
+  if (winnerId === team1Id) {
+    team1.wins = 1;
+    team1.points = 3;
+    team2.losses = 1;
+  } else {
+    team2.wins = 1;
+    team2.points = 3;
+    team1.losses = 1;
+  }
+
+  return new Map([
+    [team1Id, team1],
+    [team2Id, team2],
+  ]);
+}
+
 export function roundDifference(roundsWon: number, roundsLost: number): number {
   return roundsWon - roundsLost;
 }

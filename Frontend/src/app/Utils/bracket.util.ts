@@ -62,6 +62,7 @@ export interface BracketMatchView {
   teamB: BracketSlot;
   matchId?: string;
   status?: string;
+  seriesScore?: string;
 }
 
 export interface BracketColumnView {
@@ -87,6 +88,12 @@ export interface MatchInput {
   id: string;
   round?: number;
   bracketPosition?: number | null;
+  seriesGameNumber?: number | null;
+  seriesId?: string | null;
+  seriesStatus?: string | null;
+  seriesWinnerId?: string | null;
+  team1MapWins?: number | null;
+  team2MapWins?: number | null;
   status: string;
   team1: { id: string; name: string; tag?: string };
   team2: { id: string; name: string; tag?: string };
@@ -163,15 +170,28 @@ function winnerSlot(match: BracketMatchView): BracketSlot | null {
   return { ...slot, isWinner: false };
 }
 
+function bracketSlotMatch(matches: MatchInput[], round: number, position: number): MatchInput | undefined {
+  const slot = matches.filter((m) => m.round === round && m.bracketPosition === position);
+  return slot.find((m) => m.seriesGameNumber === 1 || m.seriesGameNumber == null) ?? slot[0];
+}
+
 function applyMatchResult(match: BracketMatchView, m: MatchInput): BracketMatchView {
-  const completed = m.status === 'completed';
-  const teamA = slotFromTeam(m.team1, completed && m.winnerId === m.team1.id);
-  const teamB = slotFromTeam(m.team2, completed && m.winnerId === m.team2.id);
+  const seriesComplete = m.seriesStatus === 'completed' && !!m.seriesWinnerId;
+  const seriesActive = !!m.seriesId && !seriesComplete;
+  const completed = seriesComplete || (!m.seriesId && m.status === 'completed');
+  const effectiveWinnerId = seriesComplete ? m.seriesWinnerId : m.winnerId;
+  const teamA = slotFromTeam(m.team1, completed && effectiveWinnerId === m.team1.id);
+  const teamB = slotFromTeam(m.team2, completed && effectiveWinnerId === m.team2.id);
+  const seriesScore =
+    m.team1MapWins != null && m.team2MapWins != null
+      ? `${m.team1MapWins}–${m.team2MapWins}`
+      : undefined;
   return {
     teamA,
     teamB,
     matchId: m.id,
-    status: m.status,
+    status: seriesActive ? 'in_progress' : m.status,
+    seriesScore,
   };
 }
 
@@ -223,7 +243,7 @@ export function buildBracketView(
       teamA: slotFromSeed(s1, seedMap),
       teamB: slotFromSeed(s2, seedMap),
     };
-    const dbMatch = matches.find((m) => m.round === 1 && m.bracketPosition === idx + 1);
+    const dbMatch = bracketSlotMatch(matches, 1, idx + 1);
     return dbMatch ? applyMatchResult(base, dbMatch) : base;
   });
 
@@ -238,7 +258,7 @@ export function buildBracketView(
     }
 
     roundMatches = roundMatches.map((base, idx) => {
-      const dbMatch = matches.find((m) => m.round === round && m.bracketPosition === idx + 1);
+      const dbMatch = bracketSlotMatch(matches, round, idx + 1);
       return dbMatch ? applyMatchResult(base, dbMatch) : base;
     });
 

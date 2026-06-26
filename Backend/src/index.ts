@@ -8,6 +8,7 @@ import userRoutes from './routes/users';
 import teamRoutes from './routes/teams';
 import leagueRoutes from './routes/leagues';
 import matchRoutes from './routes/matches';
+import seriesRoutes from './routes/series';
 import demoRoutes from './routes/demos';
 import rankingsRoutes from './routes/rankings';
 import auditRoutes from './routes/audit';
@@ -260,6 +261,45 @@ app.post('/api/internal/audit', internalServiceAuth, async (req, res) => {
   }
 });
 
+app.post('/api/internal/matches/:id/highlights', internalServiceAuth, async (req, res) => {
+  try {
+    const matchId = req.params.id;
+    if (!isValidResourceId(matchId)) {
+      res.status(400).json({ error: 'ID inválido' });
+      return;
+    }
+    const highlights = Array.isArray(req.body?.highlights) ? req.body.highlights : [];
+    if (highlights.length === 0) {
+      res.status(400).json({ error: 'Nenhum highlight informado' });
+      return;
+    }
+
+    await prisma.matchHighlight.deleteMany({ where: { matchId } });
+    await prisma.matchHighlight.createMany({
+      data: highlights.map((h: Record<string, unknown>) => ({
+        matchId,
+        demoId: h.demoId ? String(h.demoId) : null,
+        round: Number(h.round) || 0,
+        tick: h.tick != null ? Number(h.tick) : null,
+        clipStartTick: h.clipStartTick != null ? Number(h.clipStartTick) : null,
+        clipEndTick: h.clipEndTick != null ? Number(h.clipEndTick) : null,
+        steamId: h.steamId ? String(h.steamId) : null,
+        playerName: String(h.playerName ?? 'Jogador'),
+        type: String(h.type ?? 'MULTI_KILL').toUpperCase() as 'MULTI_KILL' | 'ACE' | 'CLUTCH' | 'OPENING_KILL',
+        description: String(h.description ?? 'Destaque'),
+        score: Number(h.score) || 0,
+        metadata: h.metadata ?? undefined,
+      })),
+    });
+
+    skipAudit(req);
+    res.status(201).json({ ok: true, count: highlights.length });
+  } catch (err) {
+    console.error('[internal/highlights]', err);
+    res.status(500).json({ error: 'Erro ao salvar highlights' });
+  }
+});
+
 // CORS antes de qualquer bloqueio — upload direto front→back exige preflight com Authorization
 const corsOptions = cors({
   origin(origin, callback) {
@@ -333,6 +373,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/leagues', leagueRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/series', seriesRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/rankings', rankingsRoutes);
 app.use('/api/audit', auditRoutes);

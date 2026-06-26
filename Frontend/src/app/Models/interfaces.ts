@@ -52,7 +52,7 @@ export interface League {
   id: string;
   name: string;
   description: string;
-  format?: 'single_elimination' | 'group_stage' | string;
+  format?: 'single_elimination' | 'group_stage' | 'one_vs_one' | string;
   maxTeams?: number | null;
   bracketSize?: number | null;
   effectiveBracketSize?: number;
@@ -81,6 +81,9 @@ export interface League {
   matchCount?: number;
   remainingSlots?: number;
   userHasTeamInLeague?: boolean;
+  mapPool?: string[];
+  mapVetoEnabled?: boolean;
+  seriesFormat?: 'bo1' | 'bo3' | string;
 }
 
 export interface LeagueGroup {
@@ -122,11 +125,27 @@ export interface Match {
   round?: number;
   bracketPosition?: number | null;
   map?: string | null;
+  mapLabel?: string | null;
+  team1StartingSide?: string | null;
+  team2StartingSide?: string | null;
   team1Rounds?: number | null;
   team2Rounds?: number | null;
+  seriesId?: string | null;
+  seriesGameNumber?: number | null;
+  seriesStatus?: string | null;
+  seriesWinnerId?: string | null;
+  team1MapWins?: number | null;
+  team2MapWins?: number | null;
   scheduledAt?: string | null;
   playedAt?: string | null;
-  league?: { id: string; name: string; ownerId: string; maxTeams?: number | null; bracketSize?: number | null };
+  league?: {
+    id: string;
+    name: string;
+    ownerId: string;
+    maxTeams?: number | null;
+    bracketSize?: number | null;
+    seriesFormat?: string;
+  };
   demos?: Demo[];
   aggregatedStats?: MatchPlayerStat[];
   hasGeneralDemo?: boolean;
@@ -139,7 +158,83 @@ export interface Match {
   permissions?: {
     canRegisterResult?: boolean;
     canEditManualStats?: boolean;
+    captainTeamIds?: string[];
   };
+  mapVetoEnabled?: boolean;
+  mapVeto?: MapVetoState | null;
+  lineup?: MatchLineupEntry[];
+  images?: MatchImage[];
+  highlights?: MatchHighlight[];
+  series?: MatchSeriesInfo | null;
+}
+
+export interface SeriesVetoState {
+  seriesId: string;
+  format: string;
+  mapPool: string[];
+  bannedMaps: string[];
+  pickedMaps: string[];
+  assignedMaps: { game: number; map: string | null }[];
+  firstActionTeamId: string;
+  vetoTurnTeamId: string | null;
+  vetoStatus: 'ban_phase' | 'pick_phase' | 'maps_assigned' | 'completed' | string;
+  activeGameNumber: number;
+  team1MapWins: number;
+  team2MapWins: number;
+  isStale: boolean;
+  autoResolved?: boolean;
+}
+
+export interface MatchSeriesInfo {
+  series: SeriesVetoState;
+  matches: { id: string; seriesGameNumber: number | null; map: string | null; status: string }[];
+}
+
+export interface MapVetoState {
+  mapPool: string[];
+  bannedMaps: string[];
+  firstBanTeamId: string;
+  vetoTurnTeamId: string | null;
+  sidePickTeamId: string | null;
+  status: 'ban_phase' | 'map_decided' | 'side_phase' | 'completed' | string;
+  remainingMaps: string[];
+  selectedMap: string | null;
+  team1StartingSide: string | null;
+  team2StartingSide: string | null;
+  bansRequired: number;
+  bansCompleted: number;
+  isStale: boolean;
+  autoResolved?: boolean;
+}
+
+export interface MatchLineupEntry {
+  teamId: string;
+  userId: string;
+  playerName: string;
+  steamId?: string | null;
+}
+
+export interface MatchImage {
+  id: string;
+  matchId: string;
+  imageUrl: string;
+  caption?: string | null;
+  createdAt?: string;
+}
+
+export interface MatchHighlight {
+  id: string;
+  matchId: string;
+  round: number;
+  tick?: number | null;
+  clipStartTick?: number | null;
+  clipEndTick?: number | null;
+  steamId?: string | null;
+  playerName: string;
+  type: string;
+  description: string;
+  score: number;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface MatchRosterPlayer {

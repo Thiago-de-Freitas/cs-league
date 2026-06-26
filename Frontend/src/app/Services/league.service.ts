@@ -45,6 +45,21 @@ export class LeagueService {
     return (source) => source.pipe(tap(() => this.invalidateLeagues()));
   }
 
+  setupOneVsOne(
+    leagueId: string,
+    data: {
+      team1Id: string;
+      team2Id: string;
+      team1PlayerUserId: string;
+      team2PlayerUserId: string;
+      scheduledAt?: string;
+    }
+  ): Observable<{ matchId: string; seriesId?: string; matchIds?: string[]; seriesFormat?: string }> {
+    return this.http
+      .post<{ matchId: string }>(`${this.apiUrl}/${leagueId}/one-vs-one/setup`, data)
+      .pipe(this.afterLeagueMutation());
+  }
+
   createLeague(data: {
     name: string;
     description?: string;
@@ -58,6 +73,9 @@ export class LeagueService {
     advancePerGroup?: number;
     homeAndAway?: boolean;
     matchesPerMatchDay?: number;
+    mapPool?: string[];
+    seriesFormat?: string;
+    mapVetoEnabled?: boolean;
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data).pipe(this.afterLeagueMutation());
   }
@@ -68,6 +86,9 @@ export class LeagueService {
     advancePerGroup?: number;
     homeAndAway?: boolean;
     matchesPerMatchDay?: number;
+    mapPool?: string[];
+    seriesFormat?: string;
+    mapVetoEnabled?: boolean;
   }): Observable<League> {
     return this.http.put<League>(`${this.apiUrl}/${id}`, data).pipe(this.afterLeagueMutation());
   }

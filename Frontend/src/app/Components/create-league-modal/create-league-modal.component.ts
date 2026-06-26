@@ -4,11 +4,20 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { LeagueService } from '../../Services/league.service';
 import { League } from '../../Models/interfaces';
 import { MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
+import {
+  buildMapSettingsPayload,
+  getMapSeriesScopeHint,
+  showMapSeriesOptions,
+  validateLeagueMapSettings,
+  type LeagueSeriesFormat,
+} from '../../Utils/series-map.util';
+import { LeagueSeriesMapSettingsComponent } from '../league-series-map-settings/league-series-map-settings.component';
+import { DEFAULT_MAP_POOL } from '../../Utils/maps';
 
 @Component({
   selector: 'app-create-league-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, LeagueSeriesMapSettingsComponent],
   templateUrl: './create-league-modal.component.html',
   styleUrls: ['./create-league-modal.component.css']
 })
@@ -21,6 +30,9 @@ export class CreateLeagueModalComponent {
   errorMessage = '';
   minTeams = MIN_LEAGUE_TEAMS;
   maxTeamsLimit = MAX_LEAGUE_TEAMS;
+  mapPool: string[] = [...DEFAULT_MAP_POOL];
+  seriesFormat: LeagueSeriesFormat = 'bo1';
+  mapVetoEnabled = true;
 
   constructor(
     private fb: FormBuilder,
@@ -52,7 +64,23 @@ export class CreateLeagueModalComponent {
     return this.form.get('format')?.value === 'multi_group';
   }
 
+  get isOneVsOne(): boolean {
+    return this.form.get('format')?.value === 'one_vs_one';
+  }
+
+  get showMapSeriesOptions(): boolean {
+    return showMapSeriesOptions(this.form.get('format')?.value);
+  }
+
+  get mapSeriesScopeHint(): string {
+    return getMapSeriesScopeHint({
+      isOneVsOne: this.isOneVsOne,
+      isGroupStage: this.isGroupStage,
+    });
+  }
+
   get minTeamsForFormat(): number {
+    if (this.isOneVsOne) return 2;
     return this.isSingleGroup ? 3 : this.isMultiGroup ? 4 : MIN_LEAGUE_TEAMS;
   }
 
@@ -68,9 +96,22 @@ export class CreateLeagueModalComponent {
     }
   }
 
+  private validateMapSettings(): boolean {
+    if (!this.showMapSeriesOptions) return true;
+    const error = validateLeagueMapSettings(this.mapPool, this.seriesFormat);
+    if (error) {
+      this.errorMessage = error;
+      return false;
+    }
+    return true;
+  }
+
   onSubmit(): void {
     if (!this.form.valid) {
       this.errorMessage = 'Preencha o nome da liga.';
+      return;
+    }
+    if (!this.validateMapSettings()) {
       return;
     }
 
@@ -100,10 +141,14 @@ export class CreateLeagueModalComponent {
       apiFormat = 'group_stage';
       apiGroupCount = Number(groupCount) || 2;
       apiAdvance = Number(advancePerGroup) || 2;
+    } else if (format === 'one_vs_one') {
+      apiFormat = 'ONE_VS_ONE';
+      registrationCap = 2;
     }
 
     let apiHomeAndAway = false;
     let apiMatchesPerDay = 0;
+
     if (apiFormat === 'group_stage') {
       apiHomeAndAway = !!homeAndAway;
       const perDay = Number(matchesPerMatchDay);
@@ -115,6 +160,10 @@ export class CreateLeagueModalComponent {
       apiMatchesPerDay = perDay;
     }
 
+    const mapSettingsPayload = this.showMapSeriesOptions
+      ? buildMapSettingsPayload(this.seriesFormat, this.mapVetoEnabled, this.mapPool)
+      : {};
+
     this.leagueService.createLeague({
       name: leagueName,
       description,
@@ -125,6 +174,7 @@ export class CreateLeagueModalComponent {
       advancePerGroup: apiAdvance,
       homeAndAway: apiHomeAndAway,
       matchesPerMatchDay: apiMatchesPerDay,
+      ...mapSettingsPayload,
     }).subscribe({
       next: (league) => {
         this.loading = false;

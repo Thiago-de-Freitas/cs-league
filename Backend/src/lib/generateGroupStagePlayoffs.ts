@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { getFairBracketSize, getFirstRoundPairings, rankTeamsForSeeding } from './bracket';
 import { advanceBracketFromRound } from './bracketAdvance';
+import { createPlayoffSlot } from './playoffMatchFactory';
 import {
   areAllGroupMatchesComplete,
   computeGroupStandings,
@@ -157,16 +158,13 @@ export async function tryGenerateGroupStagePlayoffs(
     }
 
     if (teamA && teamB) {
-      await tx.match.create({
-        data: {
-          leagueId,
-          team1Id: teamA.teamId,
-          team2Id: teamB.teamId,
-          round: 1,
-          bracketPosition: pos,
-          phase: 'PLAYOFF',
-          status: 'SCHEDULED',
-        },
+      await createPlayoffSlot(tx, league, {
+        leagueId,
+        team1Id: teamA.teamId,
+        team2Id: teamB.teamId,
+        round: 1,
+        bracketPosition: pos,
+        phase: 'PLAYOFF',
       });
       round1Matches++;
     }

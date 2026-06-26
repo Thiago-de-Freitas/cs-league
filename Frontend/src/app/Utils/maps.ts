@@ -9,3 +9,18 @@ export const CS2_MAPS = [
   { value: 'de_anubis', label: 'Anubis' },
   { value: 'de_train', label: 'Train' },
 ] as const;
+
+export const DEFAULT_MAP_POOL = [
+  'de_ancient',
+  'de_anubis',
+  'de_dust2',
+  'de_inferno',
+  'de_mirage',
+  'de_nuke',
+  'de_vertigo',
+] as const;
+
+export function getMapLabel(mapId: string): string {
+  const found = CS2_MAPS.find((m) => m.value === mapId);
+  return found?.label ?? mapId;
+}

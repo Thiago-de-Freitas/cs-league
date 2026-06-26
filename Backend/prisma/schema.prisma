@@ -50,6 +50,38 @@ enum MatchStatus {
 enum LeagueFormat {
   SINGLE_ELIMINATION
   GROUP_STAGE
+  ONE_VS_ONE
+}
+
+enum SeriesFormat {
+  BO1
+  BO3
+}
+
+enum SeriesVetoStatus {
+  BAN_PHASE
+  PICK_PHASE
+  MAPS_ASSIGNED
+  COMPLETED
+}
+
+enum GameSide {
+  CT
+  T
+}
+
+enum MapVetoStatus {
+  BAN_PHASE
+  MAP_DECIDED
+  SIDE_PHASE
+  COMPLETED
+}
+
+enum HighlightType {
+  MULTI_KILL
+  ACE
+  CLUTCH
+  OPENING_KILL
 }
 
 enum MatchPhase {
@@ -154,6 +186,9 @@ model League {
   defaultMatchDays  Json?
   defaultMatchTime  String       @default("20:00")
   scheduleTimezone  String       @default("America/Sao_Paulo")
+  mapPool           Json?
+  mapVetoEnabled    Boolean      @default(true)
+  seriesFormat      SeriesFormat @default(BO1)
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -162,6 +197,7 @@ model League {
   groups          LeagueGroup[]
   matches         Match[]
   scheduleWeeks   LeagueScheduleWeek[]
+  matchSeries     MatchSeries[]
 }
 
 model LeagueScheduleWeek {
@@ -227,6 +263,10 @@ model Match {
   map             String?
   team1Rounds     Int?
   team2Rounds     Int?
+  team1StartingSide GameSide?
+  team2StartingSide GameSide?
+  seriesId          String?
+  seriesGameNumber  Int?
   scheduledAt     DateTime?
   playedAt        DateTime?
   createdAt DateTime    @default(now())
@@ -238,8 +278,14 @@ model Match {
   team2   Team         @relation("MatchTeam2", fields: [team2Id], references: [id])
   winner  Team?        @relation("MatchWinner", fields: [winnerId], references: [id])
   demos   Demo[]
+  mapVeto   MatchMapVeto?
+  lineup    MatchLineup[]
+  images    MatchImage[]
+  highlights MatchHighlight[]
+  series   MatchSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
 
   @@index([leagueId])
+  @@index([seriesId])
   @@index([groupId])
   @@index([leagueId, phase])
 }
@@ -312,4 +358,95 @@ model AuditEvent {
   @@index([parentType, parentId])
   @@index([actorUserId])
   @@index([action])
+}
+
+model MatchSeries {
+  id                String           @id @default(cuid())
+  leagueId          String
+  team1Id           String
+  team2Id           String
+  format            SeriesFormat     @default(BO1)
+  team1MapWins      Int              @default(0)
+  team2MapWins      Int              @default(0)
+  winnerId          String?
+  status            MatchStatus      @default(SCHEDULED)
+  mapPool           Json
+  bannedMaps        Json             @default("[]")
+  pickedMaps        Json             @default("[]")
+  firstActionTeamId String
+  vetoTurnTeamId    String?
+  vetoStatus        SeriesVetoStatus @default(BAN_PHASE)
+  activeGameNumber  Int              @default(1)
+  autoResolved      Boolean          @default(false)
+  lastActionAt      DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  league  League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  matches Match[]
+
+  @@index([leagueId])
+}
+
+model MatchMapVeto {
+  id             String        @id @default(cuid())
+  matchId        String        @unique
+  mapPool        Json
+  bannedMaps     Json          @default("[]")
+  firstBanTeamId String
+  vetoTurnTeamId String?
+  sidePickTeamId String?
+  status         MapVetoStatus @default(BAN_PHASE)
+  autoResolved   Boolean       @default(false)
+  lastActionAt   DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
+
+model MatchLineup {
+  id      String @id @default(cuid())
+  matchId String
+  teamId  String
+  userId  String
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamId])
+  @@index([matchId])
+}
+
+model MatchImage {
+  id           String   @id @default(cuid())
+  matchId      String
+  imageUrl     String
+  caption      String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+}
+
+model MatchHighlight {
+  id          String        @id @default(cuid())
+  matchId     String
+  demoId      String?
+  round       Int
+  tick        Int?
+  steamId     String?
+  playerName  String
+  type        HighlightType
+  description String
+  score         Float         @default(0)
+  clipStartTick Int?
+  clipEndTick   Int?
+  metadata      Json?
+  createdAt   DateTime      @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
 }

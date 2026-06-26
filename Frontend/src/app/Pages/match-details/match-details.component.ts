@@ -10,8 +10,16 @@ import { NotificationService } from '../../Services/notification.service';
 import { Demo, Match, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
-import { CS2_MAPS } from '../../Utils/maps';
+import { MatchMapVetoComponent } from '../../Components/match-map-veto/match-map-veto.component';
+import { SeriesMapVetoComponent } from '../../Components/series-map-veto/series-map-veto.component';
+import { CS2_MAPS, getMapLabel } from '../../Utils/maps';
 import { resolveBracketSize } from '../../Utils/bracket.util';
+import {
+  formatSeriesMapWins,
+  isBo3Match as checkIsBo3Match,
+  showMatchMapVeto,
+  showSeriesVetoPanel,
+} from '../../Utils/match-series-view.util';
 
 interface ManualStatDraft {
   key: string;
@@ -30,7 +38,7 @@ interface ManualStatDraft {
 @Component({
   selector: 'app-match-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
+  imports: [CommonModule, RouterModule, FormsModule, DemoUploadModalComponent, DemoStatusLoaderComponent, MatchMapVetoComponent, SeriesMapVetoComponent],
   templateUrl: './match-details.component.html',
   styleUrls: ['./match-details.component.css']
 })
@@ -57,6 +65,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   manualTotalRounds: number | null = null;
   manualStatsSaving = false;
   cs2Maps = CS2_MAPS;
+  getMapLabel = getMapLabel;
+  imageUploading = false;
+  imageCaption = '';
+  myCaptainTeamIds: string[] = [];
   private pollSub?: Subscription;
 
   constructor(
@@ -140,6 +152,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     this.matchService.getMatch(id).subscribe({
       next: (match) => {
         this.match = match;
+        this.myCaptainTeamIds = match.permissions?.captainTeamIds ?? [];
         this.stats = match.aggregatedStats || this.buildAggregatedStats(match.demos || []);
         this.loading = false;
         this.startPollingPendingDemos();
@@ -250,6 +263,44 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
 
   get canRegisterResult(): boolean {
     return !!this.match?.permissions?.canRegisterResult;
+  }
+
+  get showSeriesVeto(): boolean {
+    return showSeriesVetoPanel(this.match?.series?.series ?? null);
+  }
+
+  get isBo3Match(): boolean {
+    return checkIsBo3Match({
+      seriesFormat: this.match?.series?.series?.format,
+      leagueSeriesFormat: this.match?.league?.seriesFormat,
+    });
+  }
+
+  get showSeriesPanel(): boolean {
+    return this.isBo3Match;
+  }
+
+  get seriesMapWins(): string {
+    const s = this.match?.series?.series;
+    if (!s || !this.match) return '';
+    return formatSeriesMapWins(s.team1MapWins, s.team2MapWins);
+  }
+
+  get seriesGames(): { id: string; seriesGameNumber: number | null; map: string | null; status: string }[] {
+    return this.match?.series?.matches ?? [];
+  }
+
+  isCurrentSeriesGame(gameId: string): boolean {
+    return this.match?.id === gameId;
+  }
+
+  get showMatchVeto(): boolean {
+    return showMatchMapVeto({
+      mapVetoEnabled: this.match?.mapVetoEnabled,
+      isBo3: this.isBo3Match,
+      seriesVetoStatus: this.match?.series?.series?.vetoStatus,
+      hasMapVeto: !!this.match?.mapVeto,
+    });
   }
 
   get canEditManualStats(): boolean {
@@ -543,5 +594,68 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     if (remaining === 2) return 'Semifinal';
     if (remaining === 3) return 'Quartas';
     return `Rodada ${round}`;
+  }
+
+  onVetoUpdated(): void {
+    if (this.matchId) this.loadMatch(this.matchId);
+  }
+
+  onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.match) return;
+    this.imageUploading = true;
+    this.matchService.uploadMatchImage(this.match.id, file, this.imageCaption.trim() || undefined).subscribe({
+      next: (image) => {
+        this.match!.images = [image, ...(this.match!.images ?? [])];
+        this.imageUploading = false;
+        this.imageCaption = '';
+        input.value = '';
+        this.notify.success('Imagem anexada à partida.');
+      },
+      error: (err) => {
+        this.imageUploading = false;
+        this.notify.error(err.error?.error || 'Erro ao enviar imagem.');
+      },
+    });
+  }
+
+  deleteImage(imageId: string): void {
+    if (!this.match) return;
+    this.matchService.deleteMatchImage(this.match.id, imageId).subscribe({
+      next: () => {
+        this.match!.images = (this.match!.images ?? []).filter((i) => i.id !== imageId);
+        this.notify.success('Imagem removida.');
+      },
+      error: () => this.notify.error('Erro ao remover imagem.'),
+    });
+  }
+
+  getHighlightTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      MULTI_KILL: 'Multi-kill',
+      ACE: 'ACE',
+      CLUTCH: 'Clutch',
+      OPENING_KILL: 'Opening kill',
+    };
+    return labels[type] ?? type;
+  }
+
+  downloadHighlightClip(highlightId: string): void {
+    if (!this.match) return;
+    this.matchService.downloadHighlightClip(this.match.id, highlightId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `highlight-${highlightId.slice(0, 8)}.vdm.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.notify.success('Spec de clipe baixada.');
+      },
+      error: (err) => {
+        this.notify.error(err.error?.error || 'Erro ao baixar spec do clipe.');
+      },
+    });
   }
 }

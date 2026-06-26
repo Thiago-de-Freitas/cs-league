@@ -26,7 +26,10 @@
             [attr.tabindex]="match.matchId ? 0 : null"
             (keydown.enter)="match.matchId && onMatchClick(match.matchId, $event)"
             (keydown.space)="match.matchId && onMatchClick(match.matchId, $event); $event.preventDefault()">
-            <div class="match-status" *ngIf="match.status">{{ statusLabel(match.status) }}</div>
+            <div class="match-status" *ngIf="match.status || match.seriesScore">
+              <span *ngIf="match.seriesScore" class="series-score">{{ match.seriesScore }}</span>
+              {{ statusLabel(match.status) }}
+            </div>
             <div
               class="team-row"
               [class.bye]="match.teamA.isBye"

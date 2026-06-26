@@ -18,7 +18,17 @@ import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-mo
 import { NotificationService } from '../../Services/notification.service';
 import { getFairBracketSize, formatTeamCapacity, MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
 import { buildGroupPreviewPlans, countRoundRobinMatches } from '../../Utils/group.util';
-import { CS2_MAPS } from '../../Utils/maps';
+import { DEFAULT_MAP_POOL, getMapLabel, CS2_MAPS } from '../../Utils/maps';
+import {
+  LeagueSeriesMapSettingsComponent,
+} from '../../Components/league-series-map-settings/league-series-map-settings.component';
+import {
+  buildMapSettingsPayload,
+  getMapSeriesScopeHint,
+  getSeriesFormatLabel,
+  validateLeagueMapSettings,
+  type LeagueSeriesFormat,
+} from '../../Utils/series-map.util';
 
 interface ConfirmConfig {
   title: string;
@@ -48,6 +58,7 @@ interface ConfirmConfig {
     LeagueScheduleComponent,
     LeagueActivityComponent,
     ConfirmModalComponent,
+    LeagueSeriesMapSettingsComponent,
   ],
   templateUrl: './league-details.component.html',
   styleUrls: ['./league-details.component.css'],
@@ -293,6 +304,95 @@ export class LeagueDetailsComponent implements OnInit {
     return this.league?.format === 'group_stage';
   }
 
+  get isOneVsOneFormat(): boolean {
+    return this.league?.format === 'one_vs_one';
+  }
+
+  get hasLeagueMatches(): boolean {
+    return (this.league?.matches?.length ?? 0) > 0;
+  }
+
+  oneVsOneTeam1Id = '';
+  oneVsOneTeam2Id = '';
+  oneVsOnePlayer1Id = '';
+  oneVsOnePlayer2Id = '';
+  oneVsOneSetupLoading = false;
+  editMapSettings = false;
+  editMapPool: string[] = [...DEFAULT_MAP_POOL];
+  editSeriesFormat: LeagueSeriesFormat = 'bo1';
+  editMapVetoEnabled = true;
+  savingMapSettings = false;
+  getMapLabel = getMapLabel;
+
+  get isBo3League(): boolean {
+    return this.league?.seriesFormat === 'bo3';
+  }
+
+  get oneVsOneSeriesMatches(): Match[] {
+    return (this.league?.matches ?? [])
+      .filter((m) => m.seriesGameNumber != null)
+      .sort((a, b) => (a.seriesGameNumber ?? 0) - (b.seriesGameNumber ?? 0));
+  }
+
+  get oneVsOneSeriesMapWins(): { team1: number; team2: number } {
+    const matches = this.oneVsOneSeriesMatches.filter((m) => m.status === 'completed' && m.winnerId);
+    const team1Id = this.league?.matches?.[0]?.team1?.id;
+    if (!team1Id) return { team1: 0, team2: 0 };
+    let team1 = 0;
+    let team2 = 0;
+    for (const m of matches) {
+      if (m.winnerId === team1Id) team1++;
+      else team2++;
+    }
+    return { team1, team2 };
+  }
+
+  get canEditMapSettings(): boolean {
+    return this.isAdmin && !this.isArchived && !this.hasLeagueMatches;
+  }
+
+  get seriesFormatLabel(): string {
+    return getSeriesFormatLabel(this.isBo3League ? 'bo3' : 'bo1');
+  }
+
+  get mapSeriesScopeHint(): string {
+    return getMapSeriesScopeHint({
+      isOneVsOne: this.isOneVsOneFormat,
+      isGroupStage: this.isGroupStageFormat,
+    });
+  }
+
+  openMapSettingsEditor(): void {
+    if (!this.league) return;
+    this.editMapPool = [...(this.league.mapPool?.length ? this.league.mapPool : DEFAULT_MAP_POOL)];
+    this.editSeriesFormat = this.league.seriesFormat === 'bo3' ? 'bo3' : 'bo1';
+    this.editMapVetoEnabled = this.league.mapVetoEnabled !== false;
+    this.editMapSettings = true;
+  }
+
+  saveMapSettings(): void {
+    if (!this.leagueId || !this.canEditMapSettings) return;
+    const error = validateLeagueMapSettings(this.editMapPool, this.editSeriesFormat);
+    if (error) {
+      this.notify.error(error);
+      return;
+    }
+    this.savingMapSettings = true;
+    const payload = buildMapSettingsPayload(this.editSeriesFormat, this.editMapVetoEnabled, this.editMapPool);
+    this.leagueService.updateLeague(this.leagueId, payload).subscribe({
+      next: (league) => {
+        this.league = league;
+        this.savingMapSettings = false;
+        this.editMapSettings = false;
+        this.notify.success('Configurações de mapas salvas.');
+      },
+      error: (err) => {
+        this.savingMapSettings = false;
+        this.apiError(err, 'Erro ao salvar configurações de mapas.');
+      },
+    });
+  }
+
   get isSingleGroupFormat(): boolean {
     return this.isGroupStageFormat && (this.league?.groupCount ?? 2) === 1;
   }
@@ -530,6 +630,42 @@ export class LeagueDetailsComponent implements OnInit {
         this.editMaxTeams = false;
       },
       error: (err) => this.apiError(err, 'Erro ao atualizar limite de times')
+    });
+  }
+
+  get oneVsOneTeam1Players() {
+    return this.league?.teams.find((t) => t.id === this.oneVsOneTeam1Id)?.players ?? [];
+  }
+
+  get oneVsOneTeam2Players() {
+    return this.league?.teams.find((t) => t.id === this.oneVsOneTeam2Id)?.players ?? [];
+  }
+
+  setupOneVsOneMatch(): void {
+    if (!this.leagueId || !this.oneVsOneTeam1Id || !this.oneVsOneTeam2Id || !this.oneVsOnePlayer1Id || !this.oneVsOnePlayer2Id) {
+      this.notify.error('Selecione os dois times e um jogador de cada.');
+      return;
+    }
+    this.oneVsOneSetupLoading = true;
+    this.leagueService.setupOneVsOne(this.leagueId, {
+      team1Id: this.oneVsOneTeam1Id,
+      team2Id: this.oneVsOneTeam2Id,
+      team1PlayerUserId: this.oneVsOnePlayer1Id,
+      team2PlayerUserId: this.oneVsOnePlayer2Id,
+    }).subscribe({
+      next: (res) => {
+        this.oneVsOneSetupLoading = false;
+        this.leagueService.getLeagueById(this.leagueId!).subscribe({
+          next: (league) => {
+            this.league = league;
+            this.router.navigate(['/match', res.matchId]);
+          },
+        });
+      },
+      error: (err) => {
+        this.oneVsOneSetupLoading = false;
+        this.apiError(err, 'Erro ao criar partida 1x1.');
+      },
     });
   }
 

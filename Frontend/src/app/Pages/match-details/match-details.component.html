@@ -8,7 +8,14 @@
       <div class="match-meta">
         <span class="badge status-{{ match.status }}">{{ getStatusLabel(match.status) }}</span>
         <span class="badge badge-orange" *ngIf="match.round">{{ getRoundLabel(match.round) }}</span>
-        <span class="meta" *ngIf="match.map">Mapa: {{ match.map }}</span>
+        <span class="meta" *ngIf="showSeriesPanel">
+          Série BO3: <strong>{{ seriesMapWins }}</strong> mapas
+        </span>
+        <span class="meta" *ngIf="match.seriesGameNumber">Mapa {{ match.seriesGameNumber }} da série</span>
+        <span class="meta" *ngIf="match.map">Mapa: {{ match.mapLabel || getMapLabel(match.map) }}</span>
+        <span class="meta" *ngIf="match.team1StartingSide">
+          Lados: {{ match.team1.name }} ({{ match.team1StartingSide | uppercase }}) · {{ match.team2.name }} ({{ match.team2StartingSide | uppercase }})
+        </span>
         <span class="meta" *ngIf="match.scheduledAt && match.status !== 'completed'">
           Agendado para: <strong>{{ match.scheduledAt | date:'medium' }}</strong>
         </span>
@@ -35,6 +42,90 @@
         </ng-container>
       </div>
       <app-demo-status-loader *ngIf="pollingDemo" [block]="true" status="processing"></app-demo-status-loader>
+    </div>
+
+    <nav *ngIf="match && !loading && showSeriesPanel && seriesGames.length > 1" class="gc-card series-game-nav" aria-label="Mapas da série">
+      <p class="form-label">Navegar entre mapas</p>
+      <div class="series-game-nav-buttons">
+        <a
+          *ngFor="let g of seriesGames"
+          [routerLink]="['/match', g.id]"
+          class="btn btn-small"
+          [class.btn-primary]="isCurrentSeriesGame(g.id)"
+          [class.btn-secondary]="!isCurrentSeriesGame(g.id)">
+          Mapa {{ g.seriesGameNumber }}
+          <span *ngIf="g.map"> · {{ getMapLabel(g.map) }}</span>
+        </a>
+      </div>
+    </nav>
+
+    <app-series-map-veto
+      *ngIf="match && !loading && showSeriesPanel"
+      [match]="match"
+      [series]="match.series?.series ?? null"
+      [seriesMatches]="match.series?.matches ?? []"
+      [canAct]="!!match.permissions?.canRegisterResult"
+      [myCaptainTeamIds]="myCaptainTeamIds"
+      (seriesUpdated)="onVetoUpdated()">
+    </app-series-map-veto>
+
+    <app-match-map-veto
+      *ngIf="match && !loading && showMatchVeto"
+      [match]="match"
+      [veto]="match.mapVeto ?? null"
+      [enabled]="!!match.mapVetoEnabled"
+      [canAct]="!!match.permissions?.canRegisterResult"
+      [myCaptainTeamIds]="myCaptainTeamIds"
+      (vetoUpdated)="onVetoUpdated()">
+    </app-match-map-veto>
+
+    <div *ngIf="match?.lineup?.length" class="gc-card mt-4">
+      <h2 class="section-title">Jogadores da partida</h2>
+      <ul class="gc-list">
+        <li *ngFor="let p of match!.lineup!" class="gc-list-item">
+          <span>{{ p.playerName }}</span>
+          <span class="meta">{{ p.teamId === match!.team1.id ? match!.team1.name : match!.team2.name }}</span>
+        </li>
+      </ul>
+    </div>
+
+    <div *ngIf="match && !loading" class="gc-card mt-4">
+      <h2 class="section-title">Imagens da partida</h2>
+      <div class="match-images-upload">
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" (change)="onImageSelected($event)" [disabled]="imageUploading" />
+        <input type="text" class="input-field" placeholder="Legenda (opcional)" [(ngModel)]="imageCaption" [disabled]="imageUploading" />
+      </div>
+      <div class="match-images-grid" *ngIf="match.images?.length; else noMatchImages">
+        <figure *ngFor="let img of match.images" class="match-image-item">
+          <img [src]="img.imageUrl" [alt]="img.caption || 'Imagem da partida'" />
+          <figcaption *ngIf="img.caption">{{ img.caption }}</figcaption>
+          <button type="button" class="btn btn-ghost btn-small" (click)="deleteImage(img.id)">Remover</button>
+        </figure>
+      </div>
+      <ng-template #noMatchImages>
+        <p class="meta">Nenhuma imagem anexada ainda.</p>
+      </ng-template>
+    </div>
+
+    <div *ngIf="match?.highlights?.length" class="gc-card mt-4">
+      <h2 class="section-title">Destaques da partida</h2>
+      <p class="meta mb-4">Melhores jogadas detectadas na demo. Use "Baixar spec" para ticks de clipe (HLAE/demo tools). Vídeo MP4 exige renderização externa com FFmpeg/GOTV.</p>
+      <ul class="gc-list">
+        <li *ngFor="let h of match!.highlights!" class="gc-list-item">
+          <div>
+            <strong>{{ h.playerName }}</strong>
+            <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
+            <p class="meta">{{ h.description }} · Round {{ h.round }}</p>
+          </div>
+          <button
+            *ngIf="h.clipStartTick != null && h.clipEndTick != null"
+            type="button"
+            class="btn btn-secondary btn-small"
+            (click)="downloadHighlightClip(h.id)">
+            Baixar spec
+          </button>
+        </li>
+      </ul>
     </div>
 
     <div *ngIf="match?.demos && match!.demos!.length > 0 && !loading" class="gc-card mt-4">

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { computeWalkoverWinners, getFeederPositions } from './bracket';
+import { createPlayoffSlot, resolveBracketSlotWinner } from './playoffMatchFactory';
 
 type Tx = Prisma.TransactionClient;
 
@@ -30,18 +31,14 @@ export async function advanceBracketFromRound(
   const totalRounds = Math.log2(maxTeams);
   if (round >= totalRounds) return 0;
 
-  const matches = await tx.match.findMany({
-    where: { leagueId, round, phase: 'PLAYOFF' },
+  const league = await tx.league.findUnique({
+    where: { id: leagueId },
+    select: { seriesFormat: true, mapPool: true, mapVetoEnabled: true },
   });
+  if (!league) return 0;
 
   const persistedWalkovers = await loadWalkoverWinners(tx, leagueId, maxTeams);
   const mergedWalkovers = new Map<number, string>([...persistedWalkovers, ...walkoverWinners]);
-
-  const winnerAt = (pos: number): string | null => {
-    const m = matches.find((x) => x.bracketPosition === pos);
-    if (m?.status === 'COMPLETED' && m.winnerId) return m.winnerId;
-    return mergedWalkovers.get(pos) ?? null;
-  };
 
   const nextRound = round + 1;
   const nextMatchCount = maxTeams / Math.pow(2, nextRound);
@@ -49,30 +46,41 @@ export async function advanceBracketFromRound(
 
   for (let pos = 1; pos <= nextMatchCount; pos++) {
     const [feederA, feederB] = getFeederPositions(pos * 2);
-    const w1 = winnerAt(feederA);
-    const w2 = winnerAt(feederB);
+    const w1 = await resolveBracketSlotWinner(tx, leagueId, round, feederA, mergedWalkovers.get(feederA) ?? null);
+    const w2 = await resolveBracketSlotWinner(tx, leagueId, round, feederB, mergedWalkovers.get(feederB) ?? null);
     if (!w1 || !w2) continue;
 
     const existing = await tx.match.findFirst({
       where: { leagueId, round: nextRound, bracketPosition: pos, phase: 'PLAYOFF' },
+      orderBy: { seriesGameNumber: 'asc' },
     });
 
     if (existing) {
-      await tx.match.update({
-        where: { id: existing.id },
-        data: { team1Id: w1, team2Id: w2, status: 'SCHEDULED', winnerId: null },
-      });
-    } else {
-      await tx.match.create({
-        data: {
+      if (existing.seriesId) {
+        await tx.match.deleteMany({ where: { seriesId: existing.seriesId } });
+        await tx.matchSeries.delete({ where: { id: existing.seriesId } });
+        await createPlayoffSlot(tx, league, {
           leagueId,
           team1Id: w1,
           team2Id: w2,
           round: nextRound,
           bracketPosition: pos,
           phase: 'PLAYOFF',
-          status: 'SCHEDULED',
-        },
+        });
+      } else {
+        await tx.match.update({
+          where: { id: existing.id },
+          data: { team1Id: w1, team2Id: w2, status: 'SCHEDULED', winnerId: null },
+        });
+      }
+    } else {
+      await createPlayoffSlot(tx, league, {
+        leagueId,
+        team1Id: w1,
+        team2Id: w2,
+        round: nextRound,
+        bracketPosition: pos,
+        phase: 'PLAYOFF',
       });
       created++;
     }

@@ -46,6 +46,10 @@ import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMembe
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import { afterMatchCreated, initializeMatchMapVeto, upsertMatchLineup } from '../lib/mapVetoService';
+import { getMapLabel, parseMapPool, validateMapPoolForSeriesFormat } from '../lib/cs2Maps';
+import { createPlayoffSlot } from '../lib/playoffMatchFactory';
+import { createMatchSeries } from '../lib/matchSeriesService';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -70,6 +74,16 @@ const matchWithTeamsSelect = {
   team1: { select: { id: true, name: true, tag: true } },
   team2: { select: { id: true, name: true, tag: true } },
   winner: { select: { id: true, name: true, tag: true } },
+  series: {
+    select: {
+      id: true,
+      format: true,
+      team1MapWins: true,
+      team2MapWins: true,
+      winnerId: true,
+      status: true,
+    },
+  },
 } as const;
 
 async function getMatchIdsWithGeneralDemo(leagueId: string): Promise<Set<string>> {
@@ -107,7 +121,14 @@ async function getLeagueWithDetails(leagueId: string) {
       },
       matches: {
         include: matchWithTeamsSelect,
-        orderBy: [{ phase: 'asc' }, { round: 'asc' }, { groupRound: 'asc' }, { bracketPosition: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [
+          { phase: 'asc' },
+          { round: 'asc' },
+          { groupRound: 'asc' },
+          { bracketPosition: 'asc' },
+          { seriesGameNumber: 'asc' },
+          { createdAt: 'asc' },
+        ],
       },
     },
   });
@@ -232,6 +253,13 @@ function formatLeague(
     round: m.round,
     bracketPosition: m.bracketPosition,
     map: m.map,
+    mapLabel: m.map ? getMapLabel(m.map) : null,
+    seriesId: m.seriesId,
+    seriesGameNumber: m.seriesGameNumber,
+    seriesStatus: m.series?.status?.toLowerCase() ?? null,
+    seriesWinnerId: m.series?.winnerId ?? null,
+    team1MapWins: m.series?.team1MapWins ?? null,
+    team2MapWins: m.series?.team2MapWins ?? null,
     team1Rounds: m.team1Rounds,
     team2Rounds: m.team2Rounds,
     scheduledAt: m.scheduledAt,
@@ -299,6 +327,9 @@ function formatLeague(
     scheduleTimezone: league.scheduleTimezone,
     scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
     scheduleWeekOverrides: weekOverrides,
+    mapPool: parseMapPool(league.mapPool),
+    mapVetoEnabled: league.mapVetoEnabled,
+    seriesFormat: league.seriesFormat.toLowerCase(),
     groups,
     teams: league.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
     matches: league.matches.map(formatMatch),
@@ -472,7 +503,55 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const leagueFormat = format?.toUpperCase() === 'GROUP_STAGE' ? 'GROUP_STAGE' : 'SINGLE_ELIMINATION';
+    const leagueFormat =
+      format?.toUpperCase() === 'ONE_VS_ONE'
+        ? 'ONE_VS_ONE'
+        : format?.toUpperCase() === 'GROUP_STAGE'
+          ? 'GROUP_STAGE'
+          : 'SINGLE_ELIMINATION';
+
+    if (leagueFormat === 'ONE_VS_ONE') {
+      const mapPool = parseMapPool(req.body?.mapPool);
+      const seriesFormat =
+        String(req.body?.seriesFormat ?? 'BO1').toUpperCase() === 'BO3' ? 'BO3' : 'BO1';
+      const poolError = validateMapPoolForSeriesFormat(mapPool, seriesFormat);
+      if (poolError) {
+        res.status(400).json({ error: poolError });
+        return;
+      }
+      const mapVetoEnabled = seriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
+
+      const league = await prisma.league.create({
+        data: {
+          name,
+          description: description || '',
+          maxTeams: 2,
+          registrationOpen: registrationOpen === true,
+          format: 'ONE_VS_ONE',
+          groupCount: 1,
+          advancePerGroup: 1,
+          homeAndAway: false,
+          matchesPerMatchDay: 0,
+          mapVetoEnabled,
+          mapPool,
+          seriesFormat,
+          ownerId: req.user!.userId,
+          startDate: startDate ? new Date(startDate) : null,
+          endDate: endDate ? new Date(endDate) : null,
+          status:
+            req.user!.role === 'ADMIN' && status?.toUpperCase()
+              ? status.toUpperCase()
+              : 'UPCOMING',
+        },
+      });
+      const full = await getLeagueWithDetails(league.id);
+      setAuditContext(req, audit.of('league.create', 'League', league.id, {
+        after: { name: league.name, format: league.format },
+      }));
+      res.status(201).json(formatLeague(full!));
+      return;
+    }
+
     const groups = leagueFormat === 'GROUP_STAGE' && isValidGroupCount(groupCount) ? Number(groupCount) : 2;
     const advance =
       leagueFormat === 'GROUP_STAGE' && isValidAdvancePerGroup(advancePerGroup, groups)
@@ -480,6 +559,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         : 2;
 
     const registrationCap = parseRegistrationCap(maxTeams);
+    const resolvedMapPool = parseMapPool(req.body?.mapPool);
+    const resolvedSeriesFormat =
+      String(req.body?.seriesFormat ?? 'BO1').toUpperCase() === 'BO3' ? 'BO3' : 'BO1';
+    const poolError = validateMapPoolForSeriesFormat(resolvedMapPool, resolvedSeriesFormat);
+    if (poolError) {
+      res.status(400).json({ error: poolError });
+      return;
+    }
+    const resolvedMapVeto =
+      resolvedSeriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
 
     const groupStageOptions =
       leagueFormat === 'GROUP_STAGE'
@@ -505,6 +594,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         advancePerGroup: advance,
         homeAndAway: groupStageOptions.homeAndAway,
         matchesPerMatchDay: groupStageOptions.matchesPerMatchDay,
+        mapPool: resolvedMapPool,
+        seriesFormat: resolvedSeriesFormat,
+        mapVetoEnabled: resolvedMapVeto,
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -533,7 +625,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay } = req.body;
+    const { name, description, startDate, endDate, status, maxTeams, registrationOpen, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, mapPool, seriesFormat, mapVetoEnabled } = req.body;
 
     const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
 
@@ -583,7 +675,35 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         res.status(400).json({ error: 'Jogos por dia inválido. Use entre 0 e 16.' });
         return;
       }
+      if (mapPool !== undefined || seriesFormat !== undefined) {
+        const nextFormat =
+          seriesFormat !== undefined
+            ? String(seriesFormat).toUpperCase() === 'BO3'
+              ? 'BO3'
+              : 'BO1'
+            : check.league.seriesFormat;
+        const nextPool =
+          mapPool !== undefined ? parseMapPool(mapPool) : parseMapPool(check.league.mapPool);
+        const poolError = validateMapPoolForSeriesFormat(nextPool, nextFormat);
+        if (poolError) {
+          res.status(400).json({ error: poolError });
+          return;
+        }
+      }
     }
+
+    const effectiveSeriesFormat =
+      seriesFormat !== undefined
+        ? String(seriesFormat).toUpperCase() === 'BO3'
+          ? 'BO3'
+          : 'BO1'
+        : undefined;
+    const effectiveMapVeto =
+      effectiveSeriesFormat === 'BO3'
+        ? true
+        : mapVetoEnabled !== undefined
+          ? mapVetoEnabled !== false
+          : undefined;
 
     await prisma.league.update({
       where: { id: req.params.id },
@@ -601,6 +721,11 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         ...(existingMatches === 0 && matchesPerMatchDay !== undefined && isValidMatchesPerMatchDay(matchesPerMatchDay) && {
           matchesPerMatchDay: Number(matchesPerMatchDay),
         }),
+        ...(existingMatches === 0 && mapPool !== undefined && { mapPool: parseMapPool(mapPool) }),
+        ...(existingMatches === 0 && effectiveSeriesFormat !== undefined && {
+          seriesFormat: effectiveSeriesFormat,
+        }),
+        ...(effectiveMapVeto !== undefined && { mapVetoEnabled: effectiveMapVeto }),
       },
     });
 
@@ -1352,6 +1477,14 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
       }
     });
 
+    const groupMatches = await prisma.match.findMany({
+      where: { leagueId: req.params.id },
+      select: { id: true, team1Id: true, team2Id: true },
+    });
+    for (const m of groupMatches) {
+      await afterMatchCreated(m.id, m.team1Id, m.team2Id, req.params.id);
+    }
+
     const full = await getLeagueWithDetails(req.params.id);
     setAuditContext(req, audit.of('league.groups.generate', 'League', req.params.id, {
       metadata: { totalMatches, groupCount: check.league.groupCount },
@@ -1432,6 +1565,18 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
         return;
       }
 
+      const primaryMatches = await prisma.match.findMany({
+        where: {
+          leagueId: req.params.id,
+          phase: 'PLAYOFF',
+          OR: [{ seriesId: null }, { seriesGameNumber: 1 }],
+        },
+        select: { id: true, team1Id: true, team2Id: true },
+      });
+      for (const m of primaryMatches) {
+        await afterMatchCreated(m.id, m.team1Id, m.team2Id, req.params.id);
+      }
+
       const full = await getLeagueWithDetails(req.params.id);
       setAuditContext(req, audit.of('league.bracket.generate', 'League', req.params.id, {
         metadata: { bracketSize: result.bracketSize, round1Matches: result.round1Matches },
@@ -1473,11 +1618,13 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
     ]);
 
     const bracketSize = getFairBracketSize(ranked.length);
+    const leagueConfig = check.league;
+
     const pairings = getFirstRoundPairings(bracketSize);
     const seedToTeam = new Map<number, (typeof ranked)[0]>();
     ranked.forEach((lt, i) => seedToTeam.set(i + 1, lt));
 
-    const matchCreates: Parameters<typeof prisma.match.create>[0][] = [];
+    const playoffSlots: { team1Id: string; team2Id: string; bracketPosition: number }[] = [];
     const walkoverWinners = new Map<number, string>();
     let walkovers = 0;
 
@@ -1500,26 +1647,25 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
       }
 
       if (teamA && teamB) {
-        matchCreates.push({
-          data: {
-            leagueId: req.params.id,
-            team1Id: teamA.teamId,
-            team2Id: teamB.teamId,
-            round: 1,
-            bracketPosition: pos,
-            phase: 'PLAYOFF',
-            status: 'SCHEDULED',
-          },
+        playoffSlots.push({
+          team1Id: teamA.teamId,
+          team2Id: teamB.teamId,
+          bracketPosition: pos,
         });
       }
     });
 
     let advancedMatches = 0;
     await prisma.$transaction(async (tx) => {
-      if (matchCreates.length > 0) {
-        for (const data of matchCreates) {
-          await tx.match.create(data);
-        }
+      for (const slot of playoffSlots) {
+        await createPlayoffSlot(tx, leagueConfig, {
+          leagueId: req.params.id,
+          team1Id: slot.team1Id,
+          team2Id: slot.team2Id,
+          round: 1,
+          bracketPosition: slot.bracketPosition,
+          phase: 'PLAYOFF',
+        });
       }
       advancedMatches = await advanceBracketFromRound(
         tx,
@@ -1534,15 +1680,26 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
       });
     });
 
+    const primaryMatches = await prisma.match.findMany({
+      where: {
+        leagueId: req.params.id,
+        OR: [{ seriesId: null }, { seriesGameNumber: 1 }],
+      },
+      select: { id: true, team1Id: true, team2Id: true },
+    });
+    for (const m of primaryMatches) {
+      await afterMatchCreated(m.id, m.team1Id, m.team2Id, req.params.id);
+    }
+
     const full = await getLeagueWithDetails(req.params.id);
     setAuditContext(req, audit.of('league.bracket.generate', 'League', req.params.id, {
-      metadata: { bracketSize, round1Matches: matchCreates.length, walkovers },
+      metadata: { bracketSize, round1Matches: playoffSlots.length, walkovers },
     }));
     res.json({
       ...formatLeague(full!),
       bracketInfo: {
         bracketSize,
-        round1Matches: matchCreates.length,
+        round1Matches: playoffSlots.length,
         walkovers,
         advancedMatches,
         seedingBy: ranked.some((t) => t.wins + t.losses + t.draws > 0) ? 'record' : 'manual',
@@ -1551,6 +1708,107 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao gerar chaveamento' });
+  }
+});
+
+router.post('/:id/one-vs-one/setup', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+    if (check.league.format !== 'ONE_VS_ONE') {
+      res.status(400).json({ error: 'Esta liga não é do formato 1x1.' });
+      return;
+    }
+
+    const existingMatches = await prisma.match.count({ where: { leagueId: req.params.id } });
+    if (existingMatches > 0) {
+      res.status(400).json({ error: 'A partida 1x1 desta liga já foi criada.' });
+      return;
+    }
+
+    const { team1Id, team2Id, team1PlayerUserId, team2PlayerUserId, scheduledAt } = req.body ?? {};
+    if (!team1Id || !team2Id || !team1PlayerUserId || !team2PlayerUserId) {
+      res.status(400).json({
+        error: 'Informe os dois times e um jogador de cada time para a partida.',
+      });
+      return;
+    }
+    if (team1Id === team2Id) {
+      res.status(400).json({ error: 'Os times devem ser diferentes.' });
+      return;
+    }
+
+    for (const teamId of [team1Id, team2Id]) {
+      const inLeague = await prisma.leagueTeam.findUnique({
+        where: { leagueId_teamId: { leagueId: req.params.id, teamId } },
+      });
+      if (!inLeague) {
+        await prisma.leagueTeam.create({
+          data: { leagueId: req.params.id, teamId, seed: teamId === team1Id ? 1 : 2 },
+        });
+      }
+    }
+
+    const members = await prisma.teamMember.findMany({
+      where: {
+        OR: [
+          { teamId: team1Id, userId: team1PlayerUserId },
+          { teamId: team2Id, userId: team2PlayerUserId },
+        ],
+      },
+    });
+    const okT1 = members.some((m) => m.teamId === team1Id && m.userId === team1PlayerUserId);
+    const okT2 = members.some((m) => m.teamId === team2Id && m.userId === team2PlayerUserId);
+    if (!okT1 || !okT2) {
+      res.status(400).json({ error: 'Jogadores devem pertencer aos times selecionados.' });
+      return;
+    }
+
+    const scheduled = scheduledAt ? new Date(scheduledAt) : null;
+    if (scheduledAt && Number.isNaN(scheduled!.getTime())) {
+      res.status(400).json({ error: 'Data de agendamento inválida.' });
+      return;
+    }
+
+    const leagueFull = check.league;
+    const mapPool = parseMapPool(leagueFull.mapPool);
+    const seriesFormat = leagueFull.seriesFormat ?? 'BO1';
+
+    const { seriesId, matchIds } = await createMatchSeries({
+      leagueId: req.params.id,
+      team1Id,
+      team2Id,
+      format: seriesFormat,
+      mapPool,
+      mapVetoEnabled: leagueFull.mapVetoEnabled,
+      phase: 'PLAYOFF',
+      round: 1,
+      bracketPosition: 1,
+      scheduledAt: scheduled,
+    });
+
+    for (const matchId of matchIds) {
+      await upsertMatchLineup(matchId, team1Id, team2Id, team1PlayerUserId, team2PlayerUserId);
+    }
+
+    const primaryMatchId = matchIds[0];
+
+    await prisma.league.update({
+      where: { id: req.params.id },
+      data: { status: 'ONGOING', registrationOpen: false, bracketSize: 2 },
+    });
+
+    setAuditContext(req, audit.withParent('league.one_vs_one.setup', 'League', req.params.id, 'Match', primaryMatchId, {
+      after: { team1Id, team2Id, team1PlayerUserId, team2PlayerUserId, seriesId, seriesFormat },
+    }));
+
+    res.status(201).json({ matchId: primaryMatchId, seriesId, matchIds, seriesFormat: seriesFormat.toLowerCase() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao configurar partida 1x1' });
   }
 });
 
@@ -1607,6 +1865,8 @@ router.post('/:id/matches', authMiddleware, async (req: AuthRequest, res: Respon
         team2: { select: { id: true, name: true, tag: true } },
       },
     });
+
+    await afterMatchCreated(match.id, team1Id, team2Id, req.params.id);
 
     setAuditContext(req, audit.withParent('league.match.create', 'Match', match.id, 'League', req.params.id, {
       after: { team1Id, team2Id, round: match.round },

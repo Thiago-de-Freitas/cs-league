@@ -42,6 +42,12 @@
   margin-left: auto;
 }
 
+.series-score {
+  margin-right: 0.35rem;
+  color: var(--gc-orange);
+  font-weight: 700;
+}
+
 .bracket-hint-locked {
   color: var(--gc-green);
 }
