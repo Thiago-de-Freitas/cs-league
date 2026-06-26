@@ -278,7 +278,7 @@
             <div class="highlight-card-accent" [ngClass]="getHighlightTypeAccent(h.type)"></div>
             <div class="highlight-card-content">
               <div class="highlight-card-row">
-                <div class="highlight-round-badge" aria-label="Round {{ h.round }}">
+                <div class="highlight-round-badge" [attr.aria-label]="'Round ' + h.round">
                   <span class="highlight-round-label">RD</span>
                   <span class="highlight-round-num">{{ h.round }}</span>
                 </div>
