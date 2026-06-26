@@ -22,6 +22,8 @@ CS2_EXE_PATH = os.environ.get("CS2_EXE_PATH", "").strip()
 BACKEND_INTERNAL_URL = os.environ.get("BACKEND_INTERNAL_URL", "").rstrip("/")
 INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 
+HIGHLIGHT_RENDER_QUEUE = "highlight:render:queue"
+
 
 def get_highlight_clips_dir() -> Path:
     if HIGHLIGHT_CLIPS_PATH:

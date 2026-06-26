@@ -56,6 +56,8 @@ const corsOrigins = (corsOriginEnv || 'http://localhost:4200')
   .filter(Boolean);
 
 const app = express();
+// Parser JSON antes das rotas /api/internal/* (worker envia destaques via POST JSON).
+app.use(express.json({ limit: '1mb' }));
 const publicPath = path.join(__dirname, '../public');
 
 function isApiHealthPath(req: express.Request): boolean {
@@ -461,8 +463,6 @@ app.use('/api', (req, res, next) => {
 
 app.use(securityHeaders);
 app.use(requestContextMiddleware);
-
-app.use(express.json({ limit: '1mb' }));
 
 ensureUploadStorageDirectories();
 const uploadStorageStatus = getUploadStorageStatus();

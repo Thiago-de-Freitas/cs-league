@@ -19,6 +19,7 @@ if (-not $env:INTERNAL_SERVICE_KEY) {
 }
 
 Set-Location $PSScriptRoot
+$env:PYTHONUNBUFFERED = "1"
 Write-Host ("Worker CS League - DATABASE_URL=" + $env:DATABASE_URL)
 Write-Host ("DEMO_STORAGE_PATH=" + $env:DEMO_STORAGE_PATH)
 python worker.py

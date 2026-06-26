@@ -19,6 +19,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "demos:clean": "tsx scripts/clean-demos.ts",
+    "test:e2e:demos": "tsx scripts/test-demo-highlights-e2e.ts",
     "test": "tsx --test src/**/*.test.ts",
     "worker:dev": "powershell -ExecutionPolicy Bypass -File ../Worker/run-dev.ps1"
   },
