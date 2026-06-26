@@ -41,7 +41,7 @@ import {
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
-import { releasePickupPlayers } from '../lib/pickupLeague';
+import { releasePickupPlayers, PICKUP_LEAGUE_FIXED_TEAM_COUNT } from '../lib/pickupLeague';
 import { roundDifference } from '../lib/matchResult';
 import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
@@ -535,11 +535,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       }
       const mapVetoEnabled = seriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
 
-      const pickupTeamCount = isValidPickupTeamCount(Number(req.body?.pickupTeamCount))
-        ? Number(req.body.pickupTeamCount)
-        : isValidPickupTeamCount(Number(maxTeams))
-          ? Number(maxTeams)
-          : 2;
+      const pickupTeamCount = PICKUP_LEAGUE_FIXED_TEAM_COUNT;
       const pickupPlayersPerTeam = isValidPickupPlayersPerTeam(Number(req.body?.pickupPlayersPerTeam))
         ? Number(req.body.pickupPlayersPerTeam)
         : 5;
@@ -1588,6 +1584,13 @@ router.post('/:id/bracket/generate', authMiddleware, async (req: AuthRequest, re
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
       res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.format === 'ONE_VS_ONE') {
+      res.status(400).json({
+        error: 'Ligas individuais não usam chaveamento. Inicie o confronto na seção de jogadores.',
+      });
       return;
     }
 

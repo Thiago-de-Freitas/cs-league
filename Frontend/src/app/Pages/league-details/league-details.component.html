@@ -28,10 +28,12 @@
         *ngIf="leagueId"
         [leagueId]="leagueId"
         [disabled]="isArchived"
-        (stateChanged)="onPickupStateChanged()">
+        [hasMatches]="hasLeagueMatches"
+        (stateChanged)="onPickupStateChanged()"
+        (matchStarted)="onPickupMatchStarted($event)">
       </app-league-pickup-manager>
-      <p class="admin-hint" *ngIf="!isArchived">
-        Após balancear os times, use <strong>Gerar chaveamento</strong> na administração para criar as partidas.
+      <p class="admin-hint" *ngIf="!isArchived && !hasLeagueMatches">
+        Configure os dois times, convide jogadores e clique em <strong>Iniciar confronto</strong> quando estiver pronto.
       </p>
     </div>
 
@@ -88,14 +90,15 @@
 
       <div class="admin-stats">
         <div class="admin-stat">
-          <span class="admin-stat-label">Times inscritos</span>
-          <span class="admin-stat-value">{{ teamCapacityLabel }}</span>
-          <button type="button" class="admin-stat-link" *ngIf="!isArchived" (click)="openMaxTeamsEditor()">
+          <span class="admin-stat-label">{{ isOneVsOneFormat ? 'Confronto' : 'Times inscritos' }}</span>
+          <span class="admin-stat-value">{{ isOneVsOneFormat ? oneVsOneTeamsLabel : teamCapacityLabel }}</span>
+          <button type="button" class="admin-stat-link" *ngIf="!isArchived && !isOneVsOneFormat" (click)="openMaxTeamsEditor()">
             {{ editMaxTeams ? 'Fechar' : 'Alterar limite' }}
           </button>
+          <span class="admin-stat-note" *ngIf="isOneVsOneFormat">2 times fixos · formato 1x1</span>
         </div>
 
-        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat">
+        <div class="admin-stat" *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat && !isOneVsOneFormat">
           <span class="admin-stat-label">Chaveamento previsto</span>
           <span class="admin-stat-value">{{ previewBracketSize }} slots</span>
           <span class="admin-stat-note">{{ league.teams.length }} time(s) · BYEs para favoritos se necessário</span>
@@ -245,7 +248,7 @@
           <button
             type="button"
             class="btn btn-success"
-            *ngIf="!isGroupStageFormat"
+            *ngIf="!isGroupStageFormat && !isOneVsOneFormat"
             (click)="generateBracket()"
             [disabled]="generatingBracket || league.teams.length < 2">
             {{ generatingBracket ? 'Gerando...' : (hasBracketGenerated ? 'Regenerar chaveamento' : 'Gerar chaveamento') }}
@@ -280,9 +283,11 @@
         </div>
       </div>
 
-      <p *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat" class="admin-footnote">
-        <span *ngIf="isOneVsOneFormat">Balanceie os times na seção de jogadores e clique em <strong>Gerar chaveamento</strong>.</span>
-        <span *ngIf="!isOneVsOneFormat">Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.</span>
+      <p *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat && !isOneVsOneFormat" class="admin-footnote">
+        <span>Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.</span>
+      </p>
+      <p *ngIf="isOneVsOneFormat && !hasLeagueMatches && !isArchived" class="admin-footnote">
+        Convide jogadores, balanceie os elencos e inicie o confronto na seção <strong>Jogadores e times da liga</strong>.
       </p>
       <p *ngIf="isSingleGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
         Configure o <strong>Calendário</strong>, adicione pelo menos 3 times e clique em <strong>Gerar confrontos</strong>.
@@ -344,6 +349,7 @@
       <!-- Eliminatória direta (inclui liga individual) -->
       <ng-container *ngIf="!isGroupStageFormat">
         <app-league-bracket
+          *ngIf="!isOneVsOneFormat || hasLeagueMatches"
           [teams]="league.teams"
           [bracketSize]="league.bracketSize ?? null"
           [matches]="league.matches || []"
@@ -371,8 +377,8 @@
         </div>
       </ng-container>
 
-      <p *ngIf="isOneVsOneFormat && !hasLeagueMatches && !isAdmin" class="confrontos-empty">
-        O organizador ainda está montando os times desta liga.
+      <p *ngIf="isOneVsOneFormat && !hasLeagueMatches" class="confrontos-empty">
+        {{ isAdmin ? 'Inicie o confronto na seção Jogadores e times da liga.' : 'O organizador ainda está montando os times desta liga.' }}
       </p>
 
       <!-- Formato com fase de grupos -->

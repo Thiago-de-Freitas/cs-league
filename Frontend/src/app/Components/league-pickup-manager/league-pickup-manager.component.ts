@@ -1,8 +1,9 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { LeagueService } from '../../Services/league.service';
-import { PickupLeagueState, PickupPlayer, User } from '../../Models/interfaces';
+import { PickupLeagueState, PickupPlayer, PickupSquad, User } from '../../Models/interfaces';
 import { UserSearchPickerComponent } from '../user-search-picker/user-search-picker.component';
 import { NotificationService } from '../../Services/notification.service';
 import {
@@ -11,6 +12,8 @@ import {
   formatPickupBalanceModesLabel,
   normalizePickupBalanceModes,
 } from '../../Utils/pickup-balance.util';
+
+type SquadDraft = { id: string; name: string; tag: string };
 
 @Component({
   selector: 'app-league-pickup-manager',
@@ -22,22 +25,30 @@ import {
 export class LeaguePickupManagerComponent implements OnInit {
   @Input({ required: true }) leagueId!: string;
   @Input() disabled = false;
+  @Input() hasMatches = false;
   @Output() stateChanged = new EventEmitter<void>();
+  @Output() matchStarted = new EventEmitter<string>();
+
+  readonly fixedTeamCount = 2;
 
   state: PickupLeagueState | null = null;
   loading = true;
   balancing = false;
   savingSettings = false;
+  savingSquads = false;
+  startingMatch = false;
 
-  teamCount = 2;
   playersPerTeam = 5;
   balanceModes: PickupBalanceMode[] = ['rating'];
+  squadDrafts: SquadDraft[] = [];
+  inviteTeamId = '';
 
   readonly balanceModeOptions = PICKUP_BALANCE_MODE_OPTIONS;
 
   constructor(
     private leagueService: LeagueService,
-    private notify: NotificationService
+    private notify: NotificationService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -51,6 +62,12 @@ export class LeaguePickupManagerComponent implements OnInit {
   get totalPlayers(): number {
     if (!this.state) return 0;
     return this.state.pool.length + this.state.squads.reduce((sum, s) => sum + s.players.length, 0);
+  }
+
+  get canStartMatch(): boolean {
+    if (!this.state || this.hasMatches || this.disabled) return false;
+    if (this.state.squads.length < this.fixedTeamCount) return false;
+    return this.state.squads.every((squad) => squad.players.length > 0);
   }
 
   get assignedPlayerIds(): Set<string> {
@@ -79,9 +96,16 @@ export class LeaguePickupManagerComponent implements OnInit {
 
   private applyState(state: PickupLeagueState): void {
     this.state = state;
-    this.teamCount = state.teamCount;
     this.playersPerTeam = state.playersPerTeam;
     this.balanceModes = normalizePickupBalanceModes(state.balanceModes ?? state.balanceMode);
+    this.squadDrafts = state.squads.map((squad) => ({
+      id: squad.id,
+      name: squad.name,
+      tag: squad.tag,
+    }));
+    if (!this.inviteTeamId && state.squads[0]) {
+      this.inviteTeamId = state.squads[0].id;
+    }
   }
 
   isBalanceModeSelected(mode: PickupBalanceMode): boolean {
@@ -111,13 +135,34 @@ export class LeaguePickupManagerComponent implements OnInit {
       this.notify.info('Jogador já está na liga.');
       return;
     }
-    this.leagueService.addPickupPlayer(this.leagueId, user.id).subscribe({
+    const teamId = this.inviteTeamId || null;
+    this.leagueService.addPickupPlayer(this.leagueId, user.id, teamId).subscribe({
       next: (state) => {
         this.applyState(state);
         this.stateChanged.emit();
         this.notify.success(`${user.displayName} adicionado à liga.`);
       },
       error: (err) => this.notify.error(err.error?.error || 'Erro ao adicionar jogador.'),
+    });
+  }
+
+  saveSquads(): void {
+    if (this.squadDrafts.length !== this.fixedTeamCount) {
+      this.notify.error('Configure os dois times da liga.');
+      return;
+    }
+    this.savingSquads = true;
+    this.leagueService.updatePickupSquads(this.leagueId, this.squadDrafts).subscribe({
+      next: (state) => {
+        this.applyState(state);
+        this.savingSquads = false;
+        this.stateChanged.emit();
+        this.notify.success('Times atualizados.');
+      },
+      error: (err) => {
+        this.savingSquads = false;
+        this.notify.error(err.error?.error || 'Erro ao salvar times.');
+      },
     });
   }
 
@@ -146,7 +191,6 @@ export class LeaguePickupManagerComponent implements OnInit {
     this.savingSettings = true;
     this.leagueService
       .updatePickupSettings(this.leagueId, {
-        teamCount: this.teamCount,
         playersPerTeam: this.playersPerTeam,
         balanceModes: this.balanceModes,
       })
@@ -167,7 +211,6 @@ export class LeaguePickupManagerComponent implements OnInit {
     this.balancing = true;
     this.leagueService
       .balancePickupLeague(this.leagueId, {
-        teamCount: this.teamCount,
         playersPerTeam: this.playersPerTeam,
         balanceModes: this.balanceModes,
       })
@@ -185,6 +228,24 @@ export class LeaguePickupManagerComponent implements OnInit {
       });
   }
 
+  startMatch(): void {
+    this.startingMatch = true;
+    this.leagueService.startPickupMatch(this.leagueId).subscribe({
+      next: (result) => {
+        this.applyState(result.state);
+        this.startingMatch = false;
+        this.stateChanged.emit();
+        this.matchStarted.emit(result.matchId);
+        this.notify.success('Confronto iniciado!');
+        this.router.navigate(['/match', result.matchId]);
+      },
+      error: (err) => {
+        this.startingMatch = false;
+        this.notify.error(err.error?.error || 'Erro ao iniciar confronto.');
+      },
+    });
+  }
+
   formatStat(value: number | null, suffix = ''): string {
     if (value == null) return '—';
     return `${value}${suffix}`;
@@ -194,7 +255,7 @@ export class LeaguePickupManagerComponent implements OnInit {
     return player.userId;
   }
 
-  trackSquad(_index: number, squad: { id: string }): string {
+  trackSquad(_index: number, squad: PickupSquad | SquadDraft): string {
     return squad.id;
   }
 }

@@ -53,7 +53,6 @@ export class CreateLeagueModalComponent {
       homeAndAway: [false],
       matchesPerMatchDay: [2],
       maxTeams: [''],
-      pickupTeamCount: [2],
       pickupPlayersPerTeam: [5],
       registrationOpen: [false],
     });
@@ -144,7 +143,7 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupTeamCount, pickupPlayersPerTeam } = this.form.value;
+    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupPlayersPerTeam } = this.form.value;
     const capRaw = String(maxTeams ?? '').trim();
     let registrationCap: number | null = null;
     if (capRaw && format !== 'one_vs_one') {
@@ -157,13 +156,7 @@ export class CreateLeagueModalComponent {
     }
 
     if (format === 'one_vs_one') {
-      const teams = Number(pickupTeamCount);
       const perTeam = Number(pickupPlayersPerTeam);
-      if (!Number.isInteger(teams) || teams < 2 || teams > 16) {
-        this.loading = false;
-        this.errorMessage = 'Número de times deve ser entre 2 e 16.';
-        return;
-      }
       if (!Number.isInteger(perTeam) || perTeam < 1 || perTeam > 5) {
         this.loading = false;
         this.errorMessage = 'Jogadores por time deve ser entre 1 e 5.';
@@ -216,7 +209,6 @@ export class CreateLeagueModalComponent {
       advancePerGroup: apiAdvance,
       homeAndAway: apiHomeAndAway,
       matchesPerMatchDay: apiMatchesPerDay,
-      pickupTeamCount: format === 'one_vs_one' ? Number(pickupTeamCount) || 2 : undefined,
       pickupPlayersPerTeam: format === 'one_vs_one' ? Number(pickupPlayersPerTeam) || 5 : undefined,
       pickupBalanceModes: format === 'one_vs_one' ? this.pickupBalanceModes : undefined,
       ...mapSettingsPayload,

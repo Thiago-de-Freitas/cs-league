@@ -199,9 +199,9 @@ export class LeagueService {
     return this.http.get<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup`);
   }
 
-  addPickupPlayer(leagueId: string, userId: string): Observable<PickupLeagueState> {
+  addPickupPlayer(leagueId: string, userId: string, teamId?: string | null): Observable<PickupLeagueState> {
     return this.http
-      .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/players`, { userId })
+      .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/players`, { userId, teamId: teamId ?? null })
       .pipe(this.afterLeagueMutation());
   }
 
@@ -219,7 +219,7 @@ export class LeagueService {
 
   balancePickupLeague(
     leagueId: string,
-    data: { teamCount: number; playersPerTeam: number; balanceModes: string[] }
+    data: { playersPerTeam: number; balanceModes: string[] }
   ): Observable<PickupLeagueState> {
     return this.http
       .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/balance`, data)
@@ -228,8 +228,26 @@ export class LeagueService {
 
   updatePickupSettings(
     leagueId: string,
-    data: { teamCount?: number; playersPerTeam?: number; balanceModes?: string[] }
+    data: { playersPerTeam?: number; balanceModes?: string[] }
   ): Observable<PickupLeagueState> {
     return this.http.patch<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/settings`, data);
+  }
+
+  updatePickupSquads(
+    leagueId: string,
+    squads: Array<{ id: string; name: string; tag: string }>
+  ): Observable<PickupLeagueState> {
+    return this.http
+      .patch<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/squads`, { squads })
+      .pipe(this.afterLeagueMutation());
+  }
+
+  startPickupMatch(leagueId: string): Observable<{ matchId: string; seriesId: string; matchIds: string[]; state: PickupLeagueState }> {
+    return this.http
+      .post<{ matchId: string; seriesId: string; matchIds: string[]; state: PickupLeagueState }>(
+        `${this.apiUrl}/${leagueId}/pickup/start`,
+        {}
+      )
+      .pipe(this.afterLeagueMutation());
   }
 }

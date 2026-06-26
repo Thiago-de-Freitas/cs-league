@@ -1,25 +1,63 @@
 <div class="pickup-manager" *ngIf="!loading; else loadingTpl">
   <p class="admin-hint">
-    Convide jogadores individualmente. Eles serão alocados em <strong>times temporários</strong> que existem só nesta liga
-    e não aparecem no restante do sistema. Balanceie automaticamente ou ajuste manualmente cada jogador.
+    Liga individual em confronto <strong>1x1</strong> com dois times exclusivos desta liga.
+    Convide jogadores, balanceie automaticamente ou ajuste manualmente cada elenco.
   </p>
 
-  <div class="pickup-add" *ngIf="!disabled">
-    <app-user-search-picker
-      label="Convidar jogador"
-      placeholder="Buscar por nome, e-mail ou Steam ID..."
-      actionLabel="Convidar"
-      [disabled]="disabled"
-      (userPick)="onPlayerPicked($event)">
-    </app-user-search-picker>
+  <div class="pickup-squads-setup" *ngIf="!disabled && !hasMatches && squadDrafts.length > 0">
+    <h3 class="pickup-subtitle">Times do confronto</h3>
+    <p class="form-hint pickup-squads-hint">Dois times obrigatórios. Eles existem apenas nesta liga.</p>
+    <div class="pickup-squad-forms">
+      <div *ngFor="let squad of squadDrafts; let i = index; trackBy: trackSquad" class="pickup-squad-form gc-card">
+        <span class="form-label">Time {{ i + 1 }}</span>
+        <div class="pickup-squad-fields">
+          <input
+            class="input-field"
+            [(ngModel)]="squad.name"
+            [attr.id]="'pickup-squad-name-' + i"
+            placeholder="Nome do time"
+            maxlength="80">
+          <input
+            class="input-field pickup-squad-tag"
+            [(ngModel)]="squad.tag"
+            [attr.id]="'pickup-squad-tag-' + i"
+            placeholder="TAG"
+            maxlength="8">
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-secondary" [disabled]="savingSquads" (click)="saveSquads()">
+      {{ savingSquads ? 'Salvando...' : 'Salvar nomes dos times' }}
+    </button>
   </div>
 
-  <div class="pickup-settings" *ngIf="!disabled">
+  <div class="pickup-add" *ngIf="!disabled && !hasMatches">
+    <div class="pickup-add-grid">
+      <div class="form-group">
+        <label class="form-label" for="pickup-invite-team">Time ao convidar</label>
+        <select id="pickup-invite-team" class="input-field" [(ngModel)]="inviteTeamId">
+          <option value="">Sem time (pool)</option>
+          <option *ngFor="let squad of state?.squads" [value]="squad.id">{{ squad.name }}</option>
+        </select>
+      </div>
+      <div class="pickup-add-search">
+        <app-user-search-picker
+          label="Convidar jogador"
+          placeholder="Buscar por nome, e-mail ou Steam ID..."
+          actionLabel="Convidar"
+          [disabled]="disabled"
+          (userPick)="onPlayerPicked($event)">
+        </app-user-search-picker>
+      </div>
+    </div>
+  </div>
+
+  <div class="pickup-settings" *ngIf="!disabled && !hasMatches">
     <h3 class="pickup-subtitle">Balanceamento</h3>
     <div class="pickup-settings-grid">
       <div class="form-group">
-        <label class="form-label" for="pickup-team-count">Número de times</label>
-        <input id="pickup-team-count" type="number" class="input-field" [(ngModel)]="teamCount" min="2" max="16">
+        <label class="form-label">Confronto</label>
+        <p class="pickup-fixed-value">2 times · 1x1</p>
       </div>
       <div class="form-group">
         <label class="form-label" for="pickup-pp-team">Jogadores por time</label>
@@ -41,6 +79,7 @@
       </div>
       <p class="form-hint pickup-criteria-selected">Selecionados: {{ balanceModesLabel }}</p>
     </div>
+
     <div class="pickup-actions">
       <button type="button" class="btn btn-secondary" [disabled]="savingSettings" (click)="saveSettings()">
         {{ savingSettings ? 'Salvando...' : 'Salvar configurações' }}
@@ -48,9 +87,16 @@
       <button
         type="button"
         class="btn btn-primary"
-        [disabled]="balancing || totalPlayers < teamCount"
+        [disabled]="balancing || totalPlayers < fixedTeamCount"
         (click)="balanceTeams()">
         {{ balancing ? 'Balanceando...' : 'Balancear times automaticamente' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-success"
+        [disabled]="startingMatch || !canStartMatch"
+        (click)="startMatch()">
+        {{ startingMatch ? 'Iniciando...' : 'Iniciar confronto' }}
       </button>
     </div>
     <p class="form-hint" *ngIf="state?.balancedAt">
@@ -68,7 +114,7 @@
   </div>
 
   <div class="pickup-squads" *ngIf="state && state.squads.length > 0">
-    <h3 class="pickup-subtitle">Times da liga</h3>
+    <h3 class="pickup-subtitle">Elencos</h3>
     <div class="pickup-squad-grid">
       <div *ngFor="let squad of state.squads; trackBy: trackSquad" class="gc-card pickup-squad-card">
         <div class="pickup-squad-header">
@@ -103,7 +149,7 @@
       ADR {{ formatStat(player.adr) }} · HS {{ formatStat(player.hsPercent, '%') }} · Rating {{ formatStat(player.rating) }}
     </span>
   </div>
-  <div class="pickup-player-actions" *ngIf="!disabled">
+  <div class="pickup-player-actions" *ngIf="!disabled && !hasMatches">
     <select
       class="input-field pickup-move-select"
       [ngModel]="player.teamId || ''"

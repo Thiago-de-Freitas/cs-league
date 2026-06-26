@@ -5,10 +5,12 @@ import {
   assignPlayerToSquad,
   balancePickupLeague,
   getPickupLeagueState,
+  PICKUP_LEAGUE_FIXED_TEAM_COUNT,
+  startPickupLeagueMatch,
+  updatePickupSquads,
 } from '../lib/pickupLeague';
 import {
   isValidPickupPlayersPerTeam,
-  isValidPickupTeamCount,
   parsePickupBalanceMode,
   parsePickupBalanceModesFromApi,
 } from '../lib/pickupBalance';
@@ -61,6 +63,18 @@ router.post('/:id/pickup/players', authMiddleware, async (req: AuthRequest, res:
       return;
     }
 
+    const teamIdRaw = req.body?.teamId;
+    const teamId =
+      teamIdRaw == null || teamIdRaw === '' ? null : String(teamIdRaw).trim();
+
+    if (teamId) {
+      const team = await prisma.team.findFirst({ where: { id: teamId, leagueId: req.params.id } });
+      if (!team) {
+        res.status(400).json({ error: 'Time inválido para esta liga.' });
+        return;
+      }
+    }
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -76,8 +90,12 @@ router.post('/:id/pickup/players', authMiddleware, async (req: AuthRequest, res:
     }
 
     await prisma.leaguePlayerEntry.create({
-      data: { leagueId: req.params.id, userId },
+      data: { leagueId: req.params.id, userId, teamId },
     });
+
+    if (teamId) {
+      await assignPlayerToSquad(req.params.id, userId, teamId);
+    }
 
     setAuditContext(req, audit.withParent('league.pickup.player_add', 'LeaguePlayerEntry', userId, 'League', req.params.id));
     const state = await getPickupLeagueState(req.params.id);
@@ -162,35 +180,29 @@ router.post('/:id/pickup/balance', authMiddleware, async (req: AuthRequest, res:
       return;
     }
 
-    const teamCount = Number(req.body?.teamCount ?? check.league.pickupTeamCount ?? 2);
     const playersPerTeam = Number(req.body?.playersPerTeam ?? check.league.pickupPlayersPerTeam ?? 5);
     const balanceModes = parsePickupBalanceModesFromApi(
       req.body?.balanceModes ?? req.body?.balanceMode ?? check.league.pickupBalanceModes ?? check.league.pickupBalanceMode
     );
 
-    if (!isValidPickupTeamCount(teamCount)) {
-      res.status(400).json({ error: 'Número de times deve ser entre 2 e 16.' });
-      return;
-    }
     if (!isValidPickupPlayersPerTeam(playersPerTeam)) {
       res.status(400).json({ error: 'Jogadores por time deve ser entre 1 e 5.' });
       return;
     }
 
     const playerCount = await prisma.leaguePlayerEntry.count({ where: { leagueId: req.params.id } });
-    if (playerCount < teamCount) {
+    if (playerCount < PICKUP_LEAGUE_FIXED_TEAM_COUNT) {
       res.status(400).json({ error: 'Adicione mais jogadores antes de balancear os times.' });
       return;
     }
 
     await balancePickupLeague(req.params.id, check.league.ownerId, {
-      teamCount,
       playersPerTeam,
       balanceModes,
     });
 
     setAuditContext(req, audit.of('league.pickup.balance', 'League', req.params.id, {
-      metadata: { teamCount, playersPerTeam, balanceModes },
+      metadata: { teamCount: PICKUP_LEAGUE_FIXED_TEAM_COUNT, playersPerTeam, balanceModes },
     }));
     const state = await getPickupLeagueState(req.params.id);
     res.json(state);
@@ -209,19 +221,18 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
     }
 
     const data: {
-      pickupTeamCount?: number;
       pickupPlayersPerTeam?: number;
       pickupBalanceMode?: ReturnType<typeof parsePickupBalanceMode>;
       pickupBalanceModes?: ReturnType<typeof parsePickupBalanceModesFromApi>;
+      pickupTeamCount?: number;
     } = {};
 
     if (req.body?.teamCount !== undefined) {
       const teamCount = Number(req.body.teamCount);
-      if (!isValidPickupTeamCount(teamCount)) {
-        res.status(400).json({ error: 'Número de times deve ser entre 2 e 16.' });
+      if (teamCount !== PICKUP_LEAGUE_FIXED_TEAM_COUNT) {
+        res.status(400).json({ error: 'Ligas individuais usam exatamente 2 times (1x1).' });
         return;
       }
-      data.pickupTeamCount = teamCount;
     }
     if (req.body?.playersPerTeam !== undefined) {
       const playersPerTeam = Number(req.body.playersPerTeam);
@@ -242,6 +253,8 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
       return;
     }
 
+    data.pickupTeamCount = PICKUP_LEAGUE_FIXED_TEAM_COUNT;
+
     await prisma.league.update({ where: { id: req.params.id }, data });
 
     const state = await getPickupLeagueState(req.params.id);
@@ -249,6 +262,59 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
   } catch (err) {
     console.error('PATCH /api/leagues/:id/pickup/settings', err);
     res.status(500).json({ error: 'Erro ao salvar configurações.' });
+  }
+});
+
+router.patch('/:id/pickup/squads', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    const squads = Array.isArray(req.body?.squads) ? req.body.squads : [];
+    await updatePickupSquads(req.params.id, squads);
+
+    setAuditContext(req, audit.of('league.pickup.squads_update', 'League', req.params.id, {
+      metadata: { squads: squads.map((s: { id: string; name: string; tag: string }) => ({ id: s.id, name: s.name, tag: s.tag })) },
+    }));
+    const state = await getPickupLeagueState(req.params.id);
+    res.json(state);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('Time') || msg.includes('Informe')) {
+      res.status(400).json({ error: msg });
+      return;
+    }
+    console.error('PATCH /api/leagues/:id/pickup/squads', err);
+    res.status(500).json({ error: 'Erro ao salvar times da liga.' });
+  }
+});
+
+router.post('/:id/pickup/start', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    const result = await startPickupLeagueMatch(req.params.id);
+
+    setAuditContext(req, audit.of('league.pickup.start', 'League', req.params.id, {
+      metadata: result,
+    }));
+    const state = await getPickupLeagueState(req.params.id);
+    res.status(201).json({ ...result, state });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('jogador') || msg.includes('confronto') || msg.includes('times')) {
+      res.status(400).json({ error: msg });
+      return;
+    }
+    console.error('POST /api/leagues/:id/pickup/start', err);
+    res.status(500).json({ error: 'Erro ao iniciar confronto.' });
   }
 });
 

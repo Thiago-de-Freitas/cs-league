@@ -11,6 +11,11 @@ import { calcRating } from './rankings';
 import { getAverageAdrBySteamIds } from './teamMemberStats';
 import { getPlayerPositionLabel, type PlayerPosition } from './playerPosition';
 import { publicUploadUrlForResponse } from './uploadAssets';
+import { createMatchSeries } from './matchSeriesService';
+import { afterMatchCreated } from './mapVetoService';
+import { parseMapPool } from './cs2Maps';
+
+export const PICKUP_LEAGUE_FIXED_TEAM_COUNT = 2;
 
 export type PickupPlayerView = {
   id: string;
@@ -155,6 +160,7 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
   const league = await prisma.league.findUnique({
     where: { id: leagueId },
     select: {
+      ownerId: true,
       pickupTeamCount: true,
       pickupPlayersPerTeam: true,
       pickupBalanceMode: true,
@@ -163,6 +169,8 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
     },
   });
   if (!league) throw new Error('Liga não encontrada');
+
+  await ensureEphemeralSquads(leagueId, league.ownerId, PICKUP_LEAGUE_FIXED_TEAM_COUNT);
 
   const [entries, squads] = await Promise.all([
     prisma.leaguePlayerEntry.findMany({
@@ -214,7 +222,7 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
   const balanceModesApi = serializePickupBalanceModesForApi(balanceModesInternal);
 
   return {
-    teamCount: league.pickupTeamCount ?? 2,
+    teamCount: PICKUP_LEAGUE_FIXED_TEAM_COUNT,
     playersPerTeam: league.pickupPlayersPerTeam,
     balanceMode: balanceModesApi[0] ?? 'rating',
     balanceModes: balanceModesApi,
@@ -341,14 +349,15 @@ export async function balancePickupLeague(
     );
   });
 
-  const squads = await ensureEphemeralSquads(leagueId, ownerId, options.teamCount);
   const balanceModes = resolveStoredPickupBalanceModes(options.balanceModes, options.balanceMode ?? 'RATING');
   const assignments = balancePlayersIntoTeams(
     players,
-    options.teamCount,
+    PICKUP_LEAGUE_FIXED_TEAM_COUNT,
     options.playersPerTeam,
     balanceModes
   );
+
+  const squads = await ensureEphemeralSquads(leagueId, ownerId, PICKUP_LEAGUE_FIXED_TEAM_COUNT);
 
   await prisma.leaguePlayerEntry.updateMany({
     where: { leagueId },
@@ -381,13 +390,99 @@ export async function balancePickupLeague(
   await prisma.league.update({
     where: { id: leagueId },
     data: {
-      pickupTeamCount: options.teamCount,
+      pickupTeamCount: PICKUP_LEAGUE_FIXED_TEAM_COUNT,
       pickupPlayersPerTeam: options.playersPerTeam,
       pickupBalanceMode: balanceModes[0] ?? 'RATING',
       pickupBalanceModes: balanceModes,
       pickupBalancedAt: new Date(),
     },
   });
+}
+
+export async function updatePickupSquads(
+  leagueId: string,
+  squads: Array<{ id: string; name: string; tag: string }>
+): Promise<void> {
+  if (squads.length !== PICKUP_LEAGUE_FIXED_TEAM_COUNT) {
+    throw new Error(`Informe exatamente ${PICKUP_LEAGUE_FIXED_TEAM_COUNT} times.`);
+  }
+
+  for (const squad of squads) {
+    const name = String(squad.name ?? '').trim();
+    const tag = String(squad.tag ?? '').trim().toUpperCase();
+    if (!name || name.length > 80) throw new Error('Nome do time inválido.');
+    if (!tag || tag.length > 8) throw new Error('Tag do time inválida.');
+
+    const team = await prisma.team.findFirst({ where: { id: squad.id, leagueId } });
+    if (!team) throw new Error('Time não pertence a esta liga.');
+
+    await prisma.team.update({
+      where: { id: squad.id },
+      data: { name, tag },
+    });
+  }
+}
+
+export async function startPickupLeagueMatch(leagueId: string): Promise<{ matchId: string; seriesId: string; matchIds: string[] }> {
+  const league = await prisma.league.findUnique({
+    where: { id: leagueId },
+    select: {
+      ownerId: true,
+      format: true,
+      mapPool: true,
+      mapVetoEnabled: true,
+      seriesFormat: true,
+    },
+  });
+  if (!league) throw new Error('Liga não encontrada.');
+  if (league.format !== 'ONE_VS_ONE') throw new Error('Esta liga não é individual.');
+
+  const existingMatches = await prisma.match.count({ where: { leagueId } });
+  if (existingMatches > 0) throw new Error('O confronto desta liga já foi iniciado.');
+
+  const squads = await ensureEphemeralSquads(leagueId, league.ownerId, PICKUP_LEAGUE_FIXED_TEAM_COUNT);
+  if (squads.length < PICKUP_LEAGUE_FIXED_TEAM_COUNT) {
+    throw new Error('Configure os dois times antes de iniciar o confronto.');
+  }
+
+  const [team1, team2] = squads;
+  const rosterCounts = await Promise.all(
+    squads.map((squad) =>
+      prisma.leaguePlayerEntry.count({ where: { leagueId, teamId: squad.id } })
+    )
+  );
+  if (rosterCounts.some((count) => count < 1)) {
+    throw new Error('Cada time precisa de pelo menos um jogador antes de iniciar o confronto.');
+  }
+
+  const mapPool = parseMapPool(league.mapPool);
+  const { seriesId, matchIds } = await createMatchSeries({
+    leagueId,
+    team1Id: team1!.id,
+    team2Id: team2!.id,
+    format: league.seriesFormat ?? 'BO1',
+    mapPool,
+    mapVetoEnabled: league.mapVetoEnabled,
+    phase: 'PLAYOFF',
+    round: 1,
+    bracketPosition: 1,
+  });
+
+  for (const matchId of matchIds) {
+    await afterMatchCreated(matchId, team1!.id, team2!.id, leagueId);
+  }
+
+  await prisma.league.update({
+    where: { id: leagueId },
+    data: {
+      status: 'ONGOING',
+      registrationOpen: false,
+      bracketSize: PICKUP_LEAGUE_FIXED_TEAM_COUNT,
+      pickupTeamCount: PICKUP_LEAGUE_FIXED_TEAM_COUNT,
+    },
+  });
+
+  return { matchId: matchIds[0]!, seriesId, matchIds };
 }
 
 export async function releasePickupPlayers(leagueId: string): Promise<void> {

@@ -150,7 +150,17 @@ export class LeagueDetailsComponent implements OnInit {
 
   get teamCapacityLabel(): string {
     if (!this.league) return '';
+    if (this.isOneVsOneFormat) {
+      const count = this.league.teams.length;
+      return `${count} / 2 times`;
+    }
     return formatTeamCapacity(this.league.teams.length, this.league.maxTeams);
+  }
+
+  get oneVsOneTeamsLabel(): string {
+    if (!this.league?.teams?.length) return 'Aguardando times';
+    const names = this.league.teams.slice(0, 2).map((team) => team.name);
+    return names.length === 2 ? `${names[0]} vs ${names[1]}` : names.join(', ');
   }
 
   get previewBracketSize(): number {
@@ -191,6 +201,7 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   get hasTournamentStarted(): boolean {
+    if (this.isOneVsOneFormat) return this.hasLeagueMatches;
     if (this.isGroupStageFormat) return this.hasGroupPhaseGenerated;
     return this.hasBracketGenerated;
   }
@@ -216,6 +227,16 @@ export class LeagueDetailsComponent implements OnInit {
     if (!this.leagueId) return;
     this.leagueService.getLeagueById(this.leagueId).subscribe({
       next: (league) => (this.league = league),
+    });
+  }
+
+  onPickupMatchStarted(_matchId: string): void {
+    if (!this.leagueId) return;
+    this.leagueService.getLeagueById(this.leagueId).subscribe({
+      next: (league) => {
+        this.league = league;
+        this.syncConfrontosTab();
+      },
     });
   }
 

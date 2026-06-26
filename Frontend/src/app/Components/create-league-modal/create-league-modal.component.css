@@ -21,3 +21,13 @@
 .pickup-criteria-option input {
   accent-color: var(--gc-orange);
 }
+
+.pickup-fixed-value {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  color: var(--gc-text);
+  font-weight: 600;
+}
