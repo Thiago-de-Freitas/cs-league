@@ -56,6 +56,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'admin-players',
+    loadComponent: () =>
+      import('./Pages/admin-players/admin-players.component').then((m) => m.AdminPlayersComponent),
+    canActivate: [authGuard],
+  },
+  {
     path: 'admin-audit',
     loadComponent: () =>
       import('./Pages/admin-audit/admin-audit.component').then((m) => m.AdminAuditComponent),

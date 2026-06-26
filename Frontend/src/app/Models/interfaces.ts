@@ -437,6 +437,27 @@ export interface TeamRankingEntry {
   leagues: number;
 }
 
+export interface AdminUserEntry {
+  id: string;
+  email: string;
+  displayName: string;
+  steamId: string | null;
+  avatarUrl: string | null;
+  position: string | null;
+  positionLabel: string | null;
+  role: 'USER' | 'ADMIN' | string;
+  createdAt: string;
+  teamCount: number;
+}
+
+export interface AdminUsersPage {
+  users: AdminUserEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface AuditEvent {
   id: string;
   occurredAt: string;

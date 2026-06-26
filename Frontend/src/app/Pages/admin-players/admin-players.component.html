@@ -1,0 +1,117 @@
+<div class="page-container">
+  <div class="page-inner admin-players-inner">
+    <div class="gc-card-header list-page-header">
+      <div>
+        <h1 class="page-title">Jogadores</h1>
+        <p class="page-subtitle list-page-subtitle">Listagem de usuários cadastrados no sistema</p>
+      </div>
+    </div>
+
+    <div class="gc-card filters-card">
+      <div class="filters-row">
+        <div class="form-group">
+          <label class="form-label" for="player-search">Buscar</label>
+          <input
+            id="player-search"
+            class="input-field"
+            [(ngModel)]="searchQuery"
+            placeholder="Nome, email ou Steam ID"
+            (keyup.enter)="applyFilters()" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="position-filter">Posição</label>
+          <select id="position-filter" class="input-field" [(ngModel)]="positionFilter">
+            <option value="">Todas</option>
+            <option *ngFor="let pos of positionOptions" [value]="pos">{{ formatPosition(pos) }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="role-filter">Perfil</label>
+          <select id="role-filter" class="input-field" [(ngModel)]="roleFilter">
+            <option *ngFor="let role of roleOptions" [value]="role.value">{{ role.label }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="page-size">Por página</label>
+          <select
+            id="page-size"
+            class="input-field"
+            [(ngModel)]="pageSize"
+            (ngModelChange)="onPageSizeChange()">
+            <option *ngFor="let size of pageSizeOptions" [ngValue]="size">{{ size }}</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">Filtrar</button>
+      </div>
+    </div>
+
+    <div class="gc-card">
+      <div class="players-list-header">
+        <h2 class="section-title">Cadastrados</h2>
+        <span class="meta players-range" *ngIf="!loading">{{ rangeLabel }}</span>
+      </div>
+
+      <div *ngIf="loading" class="meta">Carregando...</div>
+
+      <ul class="gc-list" *ngIf="!loading && users.length > 0">
+        <li *ngFor="let user of users" class="gc-list-item player-row">
+          <div class="player-avatar" [class.has-image]="avatarSrc(user)">
+            <img
+              *ngIf="avatarSrc(user) as src"
+              [src]="src"
+              [alt]="user.displayName"
+              class="player-avatar-img"
+              (error)="onAvatarError(user.id)">
+            <span *ngIf="!avatarSrc(user)" class="player-avatar-fallback">
+              {{ user.displayName.charAt(0).toUpperCase() }}
+            </span>
+          </div>
+
+          <div class="player-body">
+            <div class="player-name-row">
+              <a
+                *ngIf="getProfileLink(user) as link; else plainName"
+                [routerLink]="link"
+                class="player-name player-name-link">
+                {{ user.displayName }}
+              </a>
+              <ng-template #plainName>
+                <span class="player-name">{{ user.displayName }}</span>
+              </ng-template>
+              <span *ngIf="user.position" class="badge badge-gray">{{ getPositionLabel(user) }}</span>
+              <span class="badge" [class.badge-orange]="user.role === 'ADMIN'" [class.badge-gray]="user.role !== 'ADMIN'">
+                {{ getRoleLabel(user.role) }}
+              </span>
+            </div>
+            <div class="meta player-meta">
+              <span>{{ user.email }}</span>
+              <span *ngIf="user.steamId">Steam: {{ user.steamId }}</span>
+              <span>{{ user.teamCount }} time(s)</span>
+              <span>Desde {{ formatDate(user.createdAt) }}</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+
+      <p class="meta" *ngIf="!loading && users.length === 0">Nenhum jogador encontrado.</p>
+
+      <nav *ngIf="!loading && totalPages > 1" class="players-pagination" aria-label="Paginação de jogadores">
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="page <= 1"
+          (click)="goToPage(page - 1)">
+          Anterior
+        </button>
+        <span class="players-page-label">Página {{ page }} de {{ totalPages }}</span>
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="page >= totalPages"
+          (click)="goToPage(page + 1)">
+          Próxima
+        </button>
+      </nav>
+    </div>
+  </div>
+</div>

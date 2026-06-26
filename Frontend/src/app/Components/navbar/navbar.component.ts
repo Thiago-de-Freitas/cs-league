@@ -34,6 +34,7 @@ import { AuthService } from '../../Services/auth.service';
             <li><a routerLink="/demo-upload" routerLinkActive="active" (click)="closeMenu()">Demos</a></li>
             <li><a routerLink="/profile" routerLinkActive="active" (click)="closeMenu()">Perfil</a></li>
             @if (auth.isSystemAdmin()) {
+              <li><a routerLink="/admin-players" routerLinkActive="active" (click)="closeMenu()">Jogadores</a></li>
               <li><a routerLink="/admin-audit" routerLinkActive="active" (click)="closeMenu()">Auditoria</a></li>
             }
             <li>
