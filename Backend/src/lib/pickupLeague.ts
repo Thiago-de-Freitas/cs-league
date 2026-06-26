@@ -312,7 +312,7 @@ export async function balancePickupLeague(
   leagueId: string,
   ownerId: string,
   options: {
-    teamCount: number;
+    teamCount?: number;
     playersPerTeam: number;
     balanceMode?: PickupBalanceMode;
     balanceModes?: PickupBalanceMode[];
