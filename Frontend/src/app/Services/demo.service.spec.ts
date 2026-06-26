@@ -72,4 +72,23 @@ describe('DemoService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(new Blob(['mp4'], { type: 'video/mp4' }));
   });
+
+  it('getHighlightProgress consulta progresso da demo', () => {
+    service.getHighlightProgress('demo-1').subscribe((progress) => {
+      expect(progress.percent).toBe(45);
+      expect(progress.phase).toBe('saving');
+    });
+    const req = httpMock.expectOne('/api/demos/demo-1/highlights/progress');
+    expect(req.request.method).toBe('GET');
+    req.flush({ percent: 45, phase: 'saving', message: 'Salvando destaques...' });
+  });
+
+  it('generateHighlights enfileira extração na demo', () => {
+    service.generateHighlights('demo-1').subscribe((res) => {
+      expect(res.ok).toBeTrue();
+    });
+    const req = httpMock.expectOne('/api/demos/demo-1/highlights/generate');
+    expect(req.request.method).toBe('POST');
+    req.flush({ ok: true, message: 'Geração enfileirada' });
+  });
 });

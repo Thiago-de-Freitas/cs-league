@@ -45,4 +45,13 @@ describe('highlight-generate-pending.util', () => {
     expect(hasHighlightVideoRendering(highlights)).toBeTrue();
     expect(isHighlightGenerationComplete(highlights, pending)).toBeFalse();
   });
+
+  it('createHighlightSnapshot captura ids e contagem', () => {
+    const snapshot = createHighlightSnapshot([
+      { id: 'h1' } as MatchHighlight,
+      { id: 'h2' } as MatchHighlight,
+    ]);
+    expect(snapshot.snapshotCount).toBe(2);
+    expect(snapshot.snapshotIds).toEqual(['h1', 'h2']);
+  });
 });

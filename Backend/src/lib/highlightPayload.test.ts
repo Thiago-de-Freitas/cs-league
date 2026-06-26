@@ -40,6 +40,21 @@ describe('highlightPayload', () => {
     assert.equal(filtered[0].playerName, 'Eu');
     assert.equal(filterHighlightsForPersonalDemo(highlights, '').length, 0);
   });
+
+  it('filterHighlightsForPersonalDemo compara Steam ID normalizado', () => {
+    const highlights = [
+      { steamId: '76561198000000000.0', playerName: 'Eu' },
+      { steamId: '76561198999999999', playerName: 'Outro' },
+    ];
+    const filtered = filterHighlightsForPersonalDemo(highlights, '76561198000000000');
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].playerName, 'Eu');
+  });
+
+  it('mapHighlightPayload normaliza steamId do worker', () => {
+    const mapped = mapHighlightPayload({ steamId: '76561198000000000.0', round: 1, playerName: 'P', type: 'ACE', description: 'x' });
+    assert.equal(mapped.steamId, '76561198000000000');
+  });
 });
 
 describe('highlightStorage', () => {

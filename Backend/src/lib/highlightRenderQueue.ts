@@ -21,7 +21,7 @@ export interface HighlightRenderJob {
   round: number;
 }
 
-function readRenderableClipTicks(
+export function readRenderableClipTicks(
   clipStartTick: number | null | undefined,
   clipEndTick: number | null | undefined
 ): { clipStartTick: number; clipEndTick: number } | null {

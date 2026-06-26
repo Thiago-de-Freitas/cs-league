@@ -97,6 +97,12 @@ export async function markHighlightRenderQueued(
   });
 }
 
+export function computeHighlightRenderPercent(renderCompleted: number, renderTotal: number): number {
+  const total = Math.max(renderTotal, renderCompleted);
+  const ratio = total > 0 ? renderCompleted / total : 1;
+  return Math.min(100, Math.round(55 + ratio * 45));
+}
+
 export async function bumpHighlightRenderProgress(
   scope: HighlightProgressScope,
   parentId: string,
@@ -113,8 +119,7 @@ export async function bumpHighlightRenderProgress(
 
   const renderCompleted = current.renderCompleted + 1;
   const renderTotal = Math.max(current.renderTotal, renderCompleted);
-  const renderRatio = renderTotal > 0 ? renderCompleted / renderTotal : 1;
-  const percent = Math.min(100, Math.round(55 + renderRatio * 45));
+  const percent = computeHighlightRenderPercent(renderCompleted, renderTotal);
 
   await setHighlightProgress(scope, parentId, {
     percent,
