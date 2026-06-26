@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -143,6 +144,12 @@ router.get('/personal/highlights', authMiddleware, async (req: AuthRequest, res:
       ),
     });
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && (err.code === 'P2021' || err.code === 'P2022')) {
+      res.status(503).json({
+        error: 'Banco desatualizado: execute as migrações do backend (prisma migrate deploy).',
+      });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: 'Erro ao listar destaques pessoais' });
   }

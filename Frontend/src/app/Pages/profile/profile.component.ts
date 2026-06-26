@@ -42,7 +42,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   personalDemos: Demo[] = [];
   demosLoading = true;
   personalHighlights: PersonalHighlightEntry[] = [];
-  highlightsLoading = true;
+  highlightsLoading = false;
+  highlightsLoadError = '';
   showUploadModal = false;
   reprocessingId: string | null = null;
   deletingId: string | null = null;
@@ -100,8 +101,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     this.loadStatsOverview();
     this.loadPersonalDemos();
-    this.loadPersonalHighlights();
     this.loadDemoQueueHealth();
+    if (this.activeTab === 'highlights') {
+      this.loadPersonalHighlights();
+    }
   }
 
   ngOnDestroy(): void {
@@ -124,15 +127,29 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   loadPersonalHighlights(): void {
     this.highlightsLoading = true;
+    this.highlightsLoadError = '';
     this.demoService.listPersonalHighlights().subscribe({
       next: (response) => {
         this.personalHighlights = response.highlights;
         this.highlightsLoading = false;
         this.setupHighlightsPolling();
       },
-      error: () => {
+      error: (err) => {
         this.highlightsLoading = false;
-        this.notify.error('Erro ao carregar destaques.');
+        this.personalHighlights = [];
+        const apiMessage = typeof err?.error?.error === 'string' ? err.error.error : '';
+        if (err?.status === 0) {
+          this.highlightsLoadError = 'Não foi possível conectar à API. Verifique se o backend está rodando.';
+        } else if (err?.status === 404) {
+          this.highlightsLoadError = 'Destaques indisponíveis nesta versão da API. Faça o deploy do backend mais recente.';
+        } else if (err?.status === 503 && apiMessage) {
+          this.highlightsLoadError = apiMessage;
+        } else {
+          this.highlightsLoadError = apiMessage || 'Erro ao carregar destaques.';
+        }
+        if (this.activeTab === 'highlights') {
+          this.notify.error(this.highlightsLoadError);
+        }
       },
     });
   }

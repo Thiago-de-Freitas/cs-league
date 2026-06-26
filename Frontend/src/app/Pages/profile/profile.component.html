@@ -246,7 +246,9 @@
 
         <div *ngIf="highlightsLoading" class="loading">Carregando destaques...</div>
 
-        <div *ngIf="!highlightsLoading && !hasPersonalHighlights" class="highlights-empty">
+        <p *ngIf="!highlightsLoading && highlightsLoadError" class="error-message">{{ highlightsLoadError }}</p>
+
+        <div *ngIf="!highlightsLoading && !highlightsLoadError && !hasPersonalHighlights" class="highlights-empty">
           <p class="meta">Nenhum destaque gerado ainda.</p>
           <p class="meta">Envie uma demo pessoal e use "Gerar destaques" na página da demo.</p>
           <button type="button" class="btn btn-primary btn-small mt-4" (click)="setTab('demos')">Ver demos</button>
