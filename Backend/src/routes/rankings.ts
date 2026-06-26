@@ -37,8 +37,12 @@ router.get('/players', authMiddleware, async (req: AuthRequest, res: Response) =
 
     const page = parsePage(req.query.page);
     const pageSize = parsePageSize(req.query.limit ?? req.query.pageSize);
+    const includePersonal =
+      req.query.includePersonal === 'true' ||
+      req.query.includePersonal === '1' ||
+      req.query.includePersonal === true;
 
-    const result = await getPlayerRankings({ leagueId, position, page, pageSize });
+    const result = await getPlayerRankings({ leagueId, position, page, pageSize, includePersonal });
     res.json(result);
   } catch (err) {
     console.error(err);

@@ -12,6 +12,7 @@ export type PlayerRankingQuery = {
   position?: RankingPositionFilter;
   page?: number;
   pageSize?: PlayerRankingPageSize;
+  includePersonal?: boolean;
 };
 
 export type PlayerRankingsPage = {
@@ -36,7 +37,7 @@ export class RankingsService {
   }
 
   private playerCacheKey(query: PlayerRankingQuery = {}): string {
-    return `${query.leagueId || ''}|${query.position || ''}|${query.page ?? 1}|${query.pageSize ?? 10}`;
+    return `${query.leagueId || ''}|${query.position || ''}|${query.page ?? 1}|${query.pageSize ?? 10}|${query.includePersonal ? '1' : '0'}`;
   }
 
   private buildPlayerRankingsParams(query: PlayerRankingQuery = {}): string {
@@ -45,6 +46,7 @@ export class RankingsService {
     params.set('limit', String(query.pageSize ?? 10));
     if (query.leagueId) params.set('leagueId', query.leagueId);
     if (query.position) params.set('position', query.position);
+    if (query.includePersonal) params.set('includePersonal', 'true');
     return `?${params.toString()}`;
   }
 

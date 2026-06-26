@@ -96,6 +96,19 @@ export function filterStatsByPosition(
   return rows.filter((row) => statRowMatchesPositionFilter(row, filter, memberships));
 }
 
+export function filterPersonalStatsByPosition(
+  rows: LeaguePlayerStatRow[],
+  filter: RankingPositionFilter | undefined,
+  positionBySteam: Map<string, PlayerPosition | null>
+): LeaguePlayerStatRow[] {
+  if (!filter) return rows;
+  if (filter === CAPTAIN_RANKING_FILTER) return [];
+  return rows.filter((row) => {
+    if (!row.steamId?.trim()) return false;
+    return positionBySteam.get(row.steamId) === filter;
+  });
+}
+
 /** ADR e stats derivados da média por jogo de liga; ignora demos pessoais no caller. */
 export function aggregatePlayerRankingsByLeagueMatches(
   stats: LeaguePlayerStatRow[],
@@ -286,6 +299,7 @@ export type PlayerRankingOptions = {
   position?: RankingPositionFilter;
   page?: number;
   pageSize?: number;
+  includePersonal?: boolean;
 };
 
 export const PLAYER_RANKING_PAGE_SIZES = [10, 20, 30] as const;
@@ -313,7 +327,7 @@ function parsePlayerRankingPageSize(value: unknown, fallback: (typeof PLAYER_RAN
 }
 
 export async function getPlayerRankings(options: PlayerRankingOptions = {}): Promise<PlayerRankingsPageResult> {
-  const { leagueId, position } = options;
+  const { leagueId, position, includePersonal = false } = options;
   const page = parsePlayerRankingPage(options.page);
   const pageSize = parsePlayerRankingPageSize(options.pageSize);
 
@@ -340,7 +354,7 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
     take: 8000,
   });
 
-  const rawRows: LeaguePlayerStatRow[] = stats
+  const leagueRows: LeaguePlayerStatRow[] = stats
     .filter((stat) => stat.demo.matchId && stat.demo.match)
     .map((stat) => ({
       steamId: stat.steamId,
@@ -355,20 +369,73 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
       kast: stat.kast,
     }));
 
-  const memberships = await loadMembershipsForStats(rawRows);
-  const rows = filterStatsByPosition(rawRows, position, memberships);
+  let personalRows: LeaguePlayerStatRow[] = [];
+  if (includePersonal) {
+    const personalStats = await prisma.matchPlayerStat.findMany({
+      where: {
+        demo: {
+          status: 'COMPLETED',
+          isPersonal: true,
+        },
+      },
+      select: {
+        steamId: true,
+        playerName: true,
+        kills: true,
+        deaths: true,
+        adr: true,
+        hsPercent: true,
+        kast: true,
+        demo: { select: { id: true } },
+      },
+      orderBy: { id: 'desc' },
+      take: 8000,
+    });
+
+    personalRows = personalStats.map((stat) => ({
+      steamId: stat.steamId,
+      playerName: stat.playerName,
+      matchId: `personal:${stat.demo.id}`,
+      team1Id: '',
+      team2Id: '',
+      kills: stat.kills,
+      deaths: stat.deaths,
+      adr: stat.adr,
+      hsPercent: stat.hsPercent,
+      kast: stat.kast,
+    }));
+  }
+
+  const memberships = await loadMembershipsForStats(leagueRows);
+  const filteredLeagueRows = filterStatsByPosition(leagueRows, position, memberships);
+
+  const personalSteamIds = [
+    ...new Set(personalRows.map((row) => row.steamId).filter((id): id is string => !!id?.trim())),
+  ];
+  const personalUsers = personalSteamIds.length
+    ? await prisma.user.findMany({
+        where: { steamId: { in: personalSteamIds } },
+        select: { steamId: true, position: true },
+      })
+    : [];
+  const positionBySteam = new Map(
+    personalUsers.map((user) => [user.steamId!, user.position] as const)
+  );
+  const filteredPersonalRows = filterPersonalStatsByPosition(personalRows, position, positionBySteam);
+  const rows = [...filteredLeagueRows, ...filteredPersonalRows];
 
   const steamIds = [...new Set(rows.map((r) => r.steamId).filter((id): id is string => !!id?.trim()))];
 
   const users = steamIds.length
     ? await prisma.user.findMany({
         where: { steamId: { in: steamIds } },
-        select: { id: true, steamId: true, displayName: true },
+        select: { id: true, steamId: true, displayName: true, position: true },
       })
     : [];
 
   const displayBySteam = new Map(users.map((u) => [u.steamId!, u.displayName]));
   const userIdBySteam = new Map(users.map((u) => [u.steamId!, u.id]));
+  const profilePositionBySteam = new Map(users.map((u) => [u.steamId!, u.position]));
 
   const allRanked = aggregatePlayerRankingsByLeagueMatches(rows, 0);
   const total = allRanked.length;
@@ -378,7 +445,9 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
   const pageSlice = allRanked.slice(skip, skip + pageSize);
 
   const ranked = pageSlice.map((entry, index) => {
-    const currentPosition = resolveCurrentPosition(entry.steamId, memberships);
+    const currentPosition =
+      resolveCurrentPosition(entry.steamId, memberships) ??
+      (entry.steamId ? profilePositionBySteam.get(entry.steamId) ?? null : null);
     return {
       rank: skip + index + 1,
       ...entry,

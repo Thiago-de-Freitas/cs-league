@@ -201,6 +201,17 @@
                   <option *ngFor="let size of rankingPageSizeOptions" [ngValue]="size">{{ size }}</option>
                 </select>
               </div>
+              <div class="form-group ranking-include-personal">
+                <label class="ranking-checkbox-label" for="ranking-include-personal">
+                  <input
+                    id="ranking-include-personal"
+                    type="checkbox"
+                    [(ngModel)]="rankingIncludePersonal"
+                    (ngModelChange)="onRankingIncludePersonalChange()">
+                  Incluir dados individuais
+                </label>
+                <p class="form-hint">Soma demos pessoais do perfil ao ranking de ligas.</p>
+              </div>
             </div>
           </div>
 

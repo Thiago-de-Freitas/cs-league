@@ -56,6 +56,15 @@ describe('RankingsService', () => {
     req.flush({ players: [], page: 2, pageSize: 20, total: 0, totalPages: 1 });
   });
 
+  it('getPlayerRankings can include personal demos', (done) => {
+    service.getPlayerRankings({ includePersonal: true }).subscribe((page) => {
+      expect(page.players).toEqual([]);
+      done();
+    });
+    const req = httpMock.expectOne('/api/rankings/players?page=1&limit=10&includePersonal=true');
+    req.flush({ players: [], page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  });
+
   it('getTeamRankings requests team ranking endpoint', (done) => {
     service.getTeamRankings().subscribe((rows) => {
       expect(rows).toEqual([]);

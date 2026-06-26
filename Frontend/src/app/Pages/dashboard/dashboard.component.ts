@@ -44,6 +44,7 @@ export class DashboardComponent implements OnInit {
   rankingPosition = '';
   rankingPage = 1;
   rankingPageSize: PlayerRankingPageSize = 10;
+  rankingIncludePersonal = false;
   rankingTotal = 0;
   rankingTotalPages = 1;
   readonly rankingPositionOptions = RANKING_POSITION_OPTIONS;
@@ -87,6 +88,7 @@ export class DashboardComponent implements OnInit {
       position,
       page: this.rankingPage,
       pageSize: this.rankingPageSize,
+      includePersonal: this.rankingIncludePersonal,
     };
     this.playerRankingsLoading = true;
     this.teamRankingsLoading = true;
@@ -131,6 +133,7 @@ export class DashboardComponent implements OnInit {
         position,
         page: this.rankingPage,
         pageSize: this.rankingPageSize,
+        includePersonal: this.rankingIncludePersonal,
       })
       .pipe(
         finalize(() => (this.playerRankingsLoading = false)),
@@ -175,6 +178,12 @@ export class DashboardComponent implements OnInit {
     this.loadPlayerRankings();
   }
 
+  onRankingIncludePersonalChange(): void {
+    this.rankingPage = 1;
+    this.rankingsService.invalidateAll();
+    this.loadPlayerRankings();
+  }
+
   goToRankingPage(page: number): void {
     if (page < 1 || page > this.rankingTotalPages || page === this.rankingPage || this.playerRankingsLoading) {
       return;
@@ -205,11 +214,15 @@ export class DashboardComponent implements OnInit {
   }
 
   get rankingPlayersSubtitle(): string {
+    const personalSuffix = this.rankingIncludePersonal
+      ? ' — inclui demos pessoais enviadas no perfil'
+      : ' — apenas demos oficiais de partidas de ligas';
+
     if (!this.rankingPosition) {
-      return 'ADR médio em jogos de ligas (demos oficiais das partidas)';
+      return `ADR médio nos jogos considerados${personalSuffix}`;
     }
     const option = this.rankingPositionOptions.find((item) => item.id === this.rankingPosition);
-    return `Ranking de ${option?.label ?? 'posição'} com base no ADR médio em jogos de ligas`;
+    return `Ranking de ${option?.label ?? 'posição'} por ADR médio${personalSuffix}`;
   }
 
   getPlayerProfileLink(player: PlayerRankingEntry): string[] | null {

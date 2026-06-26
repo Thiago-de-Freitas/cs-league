@@ -2,7 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { DashboardComponent } from './dashboard.component';
-import { LeagueService } from '../../Services/league.service';import { TeamService } from '../../Services/team.service';
+import { LeagueService } from '../../Services/league.service';
+import { TeamService } from '../../Services/team.service';
 import { RankingsService } from '../../Services/rankings.service';
 import { AuthService } from '../../Services/auth.service';
 
@@ -15,7 +16,7 @@ describe('DashboardComponent', () => {
   let authServiceSpy: jasmine.SpyObj<AuthService>;
 
   beforeEach(async () => {
-    rankingsServiceSpy = jasmine.createSpyObj('RankingsService', ['getPlayerRankings', 'getTeamRankings']);
+    rankingsServiceSpy = jasmine.createSpyObj('RankingsService', ['getPlayerRankings', 'getTeamRankings', 'invalidateAll']);
     leagueServiceSpy = jasmine.createSpyObj('LeagueService', ['getLeagues', 'getOpenLeagues']);
     teamServiceSpy = jasmine.createSpyObj('TeamService', ['getTeams', 'getPendingInvites']);
     authServiceSpy = jasmine.createSpyObj('AuthService', [], { currentUser$: of({ displayName: 'Tester' }) });
@@ -50,6 +51,7 @@ describe('DashboardComponent', () => {
       position: undefined,
       page: 1,
       pageSize: 10,
+      includePersonal: false,
     });
     expect(component.rankingTotal).toBe(42);
     expect(component.rankingTotalPages).toBe(5);
@@ -167,6 +169,22 @@ describe('DashboardComponent', () => {
     expect(component.paginatedLeagues.length).toBe(10);
     component.goToLeaguesPage(1);
     expect(component.paginatedLeagues[0].id).toBe('l10');
+  });
+
+  it('onRankingIncludePersonalChange recarrega com demos pessoais', () => {
+    component.rankingIncludePersonal = true;
+    component.onRankingIncludePersonalChange();
+    expect(rankingsServiceSpy.invalidateAll).toHaveBeenCalled();
+    expect(rankingsServiceSpy.getPlayerRankings).toHaveBeenCalledWith(
+      jasmine.objectContaining({ includePersonal: true, page: 1 })
+    );
+  });
+
+  it('rankingPlayersSubtitle menciona demos pessoais quando ativo', () => {
+    component.rankingIncludePersonal = true;
+    expect(component.rankingPlayersSubtitle).toContain('demos pessoais');
+    component.rankingIncludePersonal = false;
+    expect(component.rankingPlayersSubtitle).toContain('demos oficiais');
   });
 
   it('layout remodelado não exibe card de análise de demos', () => {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   aggregatePlayerRankingsByLeagueMatches,
   calcRating,
+  filterPersonalStatsByPosition,
   filterStatsByPosition,
   membershipKey,
   resolvePlayerTeamId,
@@ -133,5 +134,73 @@ describe('aggregatePlayerRankingsByLeagueMatches', () => {
     assert.equal(ranked[1].playerName, 'Alpha');
     assert.equal(ranked[1].matches, 2);
     assert.equal(ranked[1].adr, 75);
+  });
+
+  it('inclui demos pessoais no agregado quando presentes nas linhas', () => {
+    const ranked = aggregatePlayerRankingsByLeagueMatches(
+      [
+        {
+          steamId: 'steam-league',
+          playerName: 'League',
+          matchId: 'm1',
+          team1Id: 't1',
+          team2Id: 't2',
+          kills: 20,
+          deaths: 10,
+          adr: 70,
+          hsPercent: 40,
+          kast: 70,
+        },
+        {
+          steamId: 'steam-personal',
+          playerName: 'Personal',
+          matchId: 'personal:d1',
+          team1Id: '',
+          team2Id: '',
+          kills: 25,
+          deaths: 15,
+          adr: 95,
+          hsPercent: 50,
+          kast: 75,
+        },
+      ],
+      10
+    );
+
+    assert.equal(ranked[0].steamId, 'steam-personal');
+    assert.equal(ranked[0].adr, 95);
+    assert.equal(ranked[1].steamId, 'steam-league');
+  });
+});
+
+describe('filterPersonalStatsByPosition', () => {
+  const personalRow = (steamId: string): LeaguePlayerStatRow => ({
+    steamId,
+    playerName: steamId,
+    matchId: `personal:${steamId}`,
+    team1Id: '',
+    team2Id: '',
+    kills: 10,
+    deaths: 5,
+    adr: 80,
+    hsPercent: 40,
+    kast: 70,
+  });
+
+  it('filtra demos pessoais pela posição cadastrada no perfil', () => {
+    const rows = [personalRow('awp-user'), personalRow('rifler-user')];
+    const positions = new Map([
+      ['awp-user', 'AWP' as const],
+      ['rifler-user', 'RIFLER' as const],
+    ]);
+
+    const filtered = filterPersonalStatsByPosition(rows, 'AWP', positions);
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].steamId, 'awp-user');
+  });
+
+  it('exclui demos pessoais do filtro de capitão', () => {
+    const filtered = filterPersonalStatsByPosition([personalRow('awp-user')], 'CAPTAIN', new Map());
+    assert.equal(filtered.length, 0);
   });
 });
