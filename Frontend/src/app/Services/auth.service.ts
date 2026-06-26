@@ -75,7 +75,7 @@ export class AuthService {
     return this.meCache;
   }
 
-  updateProfile(data: { displayName?: string; steamId?: string }): Observable<User> {
+  updateProfile(data: { displayName?: string; steamId?: string | null; position?: string | null }): Observable<User> {
     return this.http.patch<User>(`${this.apiUrl}/me`, data).pipe(
       tap((user) => this.applyUserUpdate(user))
     );

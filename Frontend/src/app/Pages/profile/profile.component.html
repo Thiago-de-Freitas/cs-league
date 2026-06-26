@@ -13,6 +13,10 @@
         <span class="sidebar-label">Steam ID</span>
         <span class="sidebar-value">{{ steamId }}</span>
       </div>
+      <div class="sidebar-steam">
+        <span class="sidebar-label">Posição no CS</span>
+        <span class="sidebar-value">{{ positionLabel }}</span>
+      </div>
       <p class="sidebar-hint" *ngIf="!steamId">Configure o Steam ID para analisar demos pessoais.</p>
 
       <div class="sidebar-summary" *ngIf="summary">
@@ -264,6 +268,14 @@
             <label for="steamId" class="form-label">Steam ID</label>
             <input type="text" id="steamId" formControlName="steamId" class="input-field" placeholder="76561198...">
             <p class="form-hint">Usado para extrair suas estatísticas nas demos pessoais.</p>
+          </div>
+          <div class="form-group">
+            <label for="position" class="form-label">Posição no CS</label>
+            <select id="position" formControlName="position" class="input-field">
+              <option value="">Sem posição definida</option>
+              <option *ngFor="let pos of positionOptions" [value]="pos">{{ formatPosition(pos) }}</option>
+            </select>
+            <p class="form-hint">Aparece no roster dos seus times e nos rankings por posição.</p>
           </div>
           <button type="button" class="btn btn-ghost w-full mb-4" (click)="connectSteam()">Conectar Steam (em breve)</button>
           <button type="submit" class="btn btn-primary w-full">Salvar Alterações</button>

@@ -6,7 +6,6 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
-import { parsePlayerPositionOptional, type PlayerPosition } from '../lib/playerPosition';
 import { getAverageAdrBySteamIds } from '../lib/teamMemberStats';
 import {
   deleteLegacyUploadFile,
@@ -40,7 +39,7 @@ async function getTeamWithDetails(teamId: string) {
       owner: { select: { id: true, displayName: true, email: true } },
       members: {
         include: {
-          user: { select: { id: true, displayName: true, email: true, steamId: true } },
+          user: { select: { id: true, displayName: true, email: true, steamId: true, position: true } },
         },
       },
       invites: {
@@ -96,7 +95,7 @@ function formatTeam(team: NonNullable<Awaited<ReturnType<typeof getTeamWithDetai
       IGN: m.user.displayName,
       role: m.role,
       memberTag: m.memberTag,
-      position: m.position,
+      position: m.user.position,
       email: m.user.email,
       steamId: m.user.steamId,
     })),
@@ -127,8 +126,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           select: {
             role: true,
             memberTag: true,
-            position: true,
-            user: { select: { id: true, displayName: true, steamId: true } },
+            user: { select: { id: true, displayName: true, steamId: true, position: true } },
           },
         },
         leagueTeams: {
@@ -162,7 +160,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           IGN: m.user.displayName,
           role: m.role,
           memberTag: m.memberTag,
-          position: m.position,
+          position: m.user.position,
           steamId: m.user.steamId,
           adr: adrSummary?.adr ?? null,
           matches: adrSummary?.matches ?? 0,
@@ -581,9 +579,12 @@ router.patch('/:id/members/:userId', authMiddleware, async (req: AuthRequest, re
 
     const roleProvided = Object.prototype.hasOwnProperty.call(req.body, 'role');
     const memberTagProvided = Object.prototype.hasOwnProperty.call(req.body, 'memberTag');
-    const positionProvided = Object.prototype.hasOwnProperty.call(req.body, 'position');
-    if (!roleProvided && !memberTagProvided && !positionProvided) {
-      res.status(400).json({ error: 'Informe role, memberTag e/ou position' });
+    if (Object.prototype.hasOwnProperty.call(req.body, 'position')) {
+      res.status(400).json({ error: 'A posição é definida pelo próprio jogador no perfil da conta.' });
+      return;
+    }
+    if (!roleProvided && !memberTagProvided) {
+      res.status(400).json({ error: 'Informe role e/ou memberTag' });
       return;
     }
 
@@ -599,12 +600,6 @@ router.patch('/:id/members/:userId', authMiddleware, async (req: AuthRequest, re
       return;
     }
 
-    const position = positionProvided ? parsePlayerPositionOptional(req.body.position) : undefined;
-    if (positionProvided && position === undefined) {
-      res.status(400).json({ error: 'position inválida' });
-      return;
-    }
-
     const member = await prisma.teamMember.findUnique({
       where: { teamId_userId: { teamId: req.params.id, userId: req.params.userId } },
     });
@@ -616,11 +611,9 @@ router.patch('/:id/members/:userId', authMiddleware, async (req: AuthRequest, re
     const updateData: {
       role?: 'CAPTAIN' | 'MEMBER';
       memberTag?: string | null;
-      position?: PlayerPosition | null;
     } = {};
     if (role) updateData.role = role;
     if (memberTagProvided) updateData.memberTag = memberTag ?? null;
-    if (positionProvided) updateData.position = position ?? null;
 
     await prisma.$transaction(async (tx) => {
       if (role === 'CAPTAIN') {

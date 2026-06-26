@@ -4,6 +4,7 @@ export interface User {
   displayName: string;
   steamId?: string | null;
   avatarUrl?: string | null;
+  position?: string | null;
   role: 'USER' | 'ADMIN';
   createdAt?: string;
 }

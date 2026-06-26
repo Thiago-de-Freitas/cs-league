@@ -48,6 +48,7 @@
       </div>
 
       <h2 class="section-title mt-4">Roster</h2>
+      <p class="meta roster-position-hint">Cada jogador define a própria posição (AWP, Lurker, etc.) em Perfil → Configurações.</p>
       <ul class="gc-list roster-list">
         <li *ngFor="let member of team.players" class="gc-list-item roster-item">
           <div class="roster-item-main">
@@ -55,31 +56,10 @@
             <span class="badge" [class.badge-orange]="member.role === 'CAPTAIN'" [class.badge-gray]="member.role !== 'CAPTAIN'">
               {{ formatMemberRole(member.role) }}
             </span>
-            <span *ngIf="member.position && !canManageRoster" class="badge badge-gray member-tag-badge">
+            <span *ngIf="member.position" class="badge badge-gray member-tag-badge">
               {{ formatPosition(member.position) }}
             </span>
-          </div>
-          <div class="roster-item-tag" *ngIf="canManageRoster">
-            <label class="form-label roster-tag-label" [for]="'member-position-' + member.id">Posição no CS</label>
-            <div class="roster-tag-row">
-              <select
-                [id]="'member-position-' + member.id"
-                class="input-field roster-tag-input"
-                [(ngModel)]="positionDrafts[member.id]"
-                [disabled]="rosterBusyUserId === member.id">
-                <option value="">Sem posição</option>
-                <option *ngFor="let position of positionOptions" [value]="position">
-                  {{ formatPosition(position) }}
-                </option>
-              </select>
-              <button
-                type="button"
-                class="btn btn-secondary btn-small"
-                (click)="saveMemberPosition(member.id)"
-                [disabled]="rosterBusyUserId === member.id">
-                Salvar posição
-              </button>
-            </div>
+            <span *ngIf="!member.position" class="meta roster-role-empty">Sem posição</span>
           </div>
           <div class="roster-item-actions" *ngIf="canManageRoster">
             <button
@@ -111,19 +91,15 @@
 
       <div *ngIf="canManageRoster" class="invite-section mt-4">
         <h2 class="section-title">Adicionar jogador</h2>
-        <p class="meta mb-4">Busque qualquer usuário do sistema e adicione diretamente ao roster.</p>
-        <input
-          type="text"
-          [(ngModel)]="searchQuery"
-          (ngModelChange)="onSearchUsers()"
-          class="input-field"
-          placeholder="Buscar por nome ou email...">
-        <ul *ngIf="searchResults.length > 0" class="gc-list mt-2">
-          <li *ngFor="let user of searchResults" class="gc-list-item">
-            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
-            <button class="btn btn-primary btn-small" (click)="addUserToTeam(user)">Adicionar</button>
-          </li>
-        </ul>
+        <p class="meta mb-4">Busque por nome, email ou Steam ID. A posição exibida vem do perfil de cada jogador.</p>
+        <app-user-search-picker
+          inputId="team-roster-user-search"
+          placeholder="Buscar jogador..."
+          actionLabel="Adicionar"
+          [excludeUserIds]="rosterUserIds"
+          [disabled]="!!rosterBusyUserId"
+          (userPick)="addUserToTeam($event)">
+        </app-user-search-picker>
         <p *ngIf="inviteMsg" class="success-message mt-2">{{ inviteMsg }}</p>
         <p *ngIf="inviteError" class="error-message mt-2">{{ inviteError }}</p>
 

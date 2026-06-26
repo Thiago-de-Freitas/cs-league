@@ -110,6 +110,7 @@ model User {
   displayName  String
   steamId      String?
   avatarUrl    String?
+  position     PlayerPosition?
   role         UserRole @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -146,7 +147,6 @@ model TeamMember {
   userId     String
   role       TeamMemberRole  @default(MEMBER)
   memberTag  String?
-  position   PlayerPosition?
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

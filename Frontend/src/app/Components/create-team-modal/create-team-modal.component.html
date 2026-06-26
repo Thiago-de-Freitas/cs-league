@@ -44,22 +44,21 @@
 
       <div class="invite-section">
         <h3 class="section-subtitle-small">Convidar Membros</h3>
-        <input type="text" [(ngModel)]="searchUserQuery" (ngModelChange)="onSearchUsers()" [ngModelOptions]="{standalone: true}"
-          class="input-field"
-          placeholder="Buscar usuário por nome...">
-
-        <ul *ngIf="searchResults.length > 0" class="search-results-list">
-          <li *ngFor="let user of searchResults" class="search-result-item">
-            <span>{{ user.displayName }} <span class="meta">({{ user.email }})</span></span>
-            <button type="button" (click)="inviteUser(user)" class="btn btn-primary btn-small">Convidar</button>
-          </li>
-        </ul>
+        <app-user-search-picker
+          inputId="create-team-user-search"
+          placeholder="Buscar por nome, email ou Steam ID..."
+          actionLabel="Convidar"
+          [excludeUserIds]="invitedUserIds"
+          [disabled]="loading"
+          (userPick)="inviteUser($event)">
+        </app-user-search-picker>
 
         <div *ngIf="invitedMembers.length > 0" class="invited-section">
           <h4 class="form-label">Membros Convidados</h4>
           <ul class="invited-members-list">
             <li *ngFor="let member of invitedMembers" class="invited-member-item">
               <span>{{ member.displayName }}</span>
+              <span *ngIf="member.position" class="badge badge-gray">{{ formatPosition(member.position) }}</span>
               <button type="button" (click)="removeInvitedUser(member)" class="btn-remove">Remover</button>
             </li>
           </ul>

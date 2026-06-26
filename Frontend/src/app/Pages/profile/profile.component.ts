@@ -10,6 +10,7 @@ import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/inte
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
+import { PLAYER_POSITIONS, getPlayerPositionLabel } from '../../Utils/player-positions';
 
 type ProfileTab = 'stats' | 'demos' | 'settings';
 
@@ -25,6 +26,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   userName = '';
   email = '';
   steamId = '';
+  position = '';
+  readonly positionOptions = PLAYER_POSITIONS;
   avatarUrl: string | null = null;
   role = '';
   successMsg = '';
@@ -55,6 +58,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.profileForm = this.fb.group({
       displayName: ['', Validators.required],
       steamId: [''],
+      position: [''],
     });
   }
 
@@ -71,12 +75,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.userName = user.displayName;
         this.email = user.email;
         this.steamId = user.steamId || '';
+        this.position = user.position || '';
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
         this.role = user.role;
         this.profileForm.patchValue({
           displayName: user.displayName,
           steamId: user.steamId || '',
+          position: user.position || '',
         });
       },
       error: () => {
@@ -248,13 +254,27 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.avatarBroken = true;
   }
 
+  get positionLabel(): string {
+    return getPlayerPositionLabel(this.position) || 'Não definida';
+  }
+
+  formatPosition(position: string): string {
+    return getPlayerPositionLabel(position);
+  }
+
   onUpdateProfile(): void {
     if (!this.profileForm.valid) return;
 
-    this.authService.updateProfile(this.profileForm.value).subscribe({
+    const { displayName, steamId, position } = this.profileForm.value;
+    this.authService.updateProfile({
+      displayName,
+      steamId,
+      position: position?.trim() || null,
+    }).subscribe({
       next: (user) => {
         this.userName = user.displayName;
         this.steamId = user.steamId || '';
+        this.position = user.position || '';
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
         this.successMsg = 'Perfil atualizado com sucesso!';

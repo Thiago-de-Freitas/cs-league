@@ -64,8 +64,7 @@ const teamWithRosterSelect = {
     select: {
       role: true,
       memberTag: true,
-      position: true,
-      user: { select: { id: true, displayName: true, steamId: true } },
+      user: { select: { id: true, displayName: true, steamId: true, position: true } },
     },
   },
 } as const;
@@ -168,10 +167,9 @@ function formatTeamFromLeagueTeam(
     logoUrl: string | null;
     ownerId: string;
     members: {
-      user: { id: string; displayName: string; steamId: string | null };
+      user: { id: string; displayName: string; steamId: string | null; position: string | null };
       role: string;
       memberTag: string | null;
-      position: string | null;
     }[];
   };
   wins: number;
@@ -194,7 +192,7 @@ function formatTeamFromLeagueTeam(
       IGN: m.user.displayName,
       role: m.role,
       memberTag: m.memberTag,
-      position: m.position,
+      position: m.user.position,
       adr: adrSummary?.adr ?? null,
       matches: adrSummary?.matches ?? 0,
     };

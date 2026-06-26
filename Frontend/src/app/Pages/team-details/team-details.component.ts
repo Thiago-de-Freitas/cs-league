@@ -6,14 +6,15 @@ import { TeamService } from '../../Services/team.service';
 import { AuthService } from '../../Services/auth.service';
 import { Team, TeamInvite, User } from '../../Models/interfaces';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
+import { UserSearchPickerComponent } from '../../Components/user-search-picker/user-search-picker.component';
 import { NotificationService } from '../../Services/notification.service';
-import { PLAYER_POSITIONS, getPlayerPositionLabel } from '../../Utils/player-positions';
+import { getPlayerPositionLabel } from '../../Utils/player-positions';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
   selector: 'app-team-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ConfirmModalComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ConfirmModalComponent, UserSearchPickerComponent],
   templateUrl: './team-details.component.html',
   styleUrls: ['./team-details.component.css']
 })
@@ -26,10 +27,6 @@ export class TeamDetailsComponent implements OnInit {
   isOwner = false;
   isSystemAdmin = false;
   rosterBusyUserId: string | null = null;
-  positionDrafts: Record<string, string> = {};
-  readonly positionOptions = PLAYER_POSITIONS;
-  searchQuery = '';
-  searchResults: User[] = [];
   inviteMsg = '';
   inviteError = '';
   deletingTeam = false;
@@ -62,7 +59,6 @@ export class TeamDetailsComponent implements OnInit {
         this.team = team;
         this.isOwner = this.authService.isTeamOwner(team.ownerId || '');
         this.isSystemAdmin = this.authService.isSystemAdmin();
-        this.syncPositionDrafts();
         this.teamLogoBroken = false;
         this.loading = false;
       },
@@ -77,29 +73,12 @@ export class TeamDetailsComponent implements OnInit {
     });
   }
 
-  onSearchUsers(): void {
-    if (this.searchQuery.length < 2) {
-      this.searchResults = [];
-      return;
-    }
-    this.teamService.searchUsers(this.searchQuery).subscribe({
-      next: (users) => {
-        const memberIds = new Set(this.team?.players.map((p) => p.id) || []);
-        this.searchResults = users.filter((u) => !memberIds.has(u.id));
-      }
-    });
+  get rosterUserIds(): string[] {
+    return this.team?.players.map((p) => p.id) ?? [];
   }
 
   get canManageRoster(): boolean {
     return this.isOwner;
-  }
-
-  private syncPositionDrafts(): void {
-    const drafts: Record<string, string> = {};
-    for (const player of this.team?.players ?? []) {
-      drafts[player.id] = player.position ?? '';
-    }
-    this.positionDrafts = drafts;
   }
 
   formatMemberRole(role: string): string {
@@ -126,15 +105,16 @@ export class TeamDetailsComponent implements OnInit {
   addUserToTeam(user: User): void {
     if (!this.teamId) return;
     this.inviteError = '';
+    this.inviteMsg = '';
+    this.rosterBusyUserId = user.id;
     this.teamService.addMember(this.teamId, user.id).subscribe({
       next: (team) => {
         this.team = team;
-        this.syncPositionDrafts();
+        this.rosterBusyUserId = null;
         this.inviteMsg = `${user.displayName} adicionado ao time`;
-        this.searchResults = this.searchResults.filter((u) => u.id !== user.id);
-        this.searchQuery = '';
       },
       error: (err) => {
+        this.rosterBusyUserId = null;
         this.inviteError = err.error?.error || 'Erro ao adicionar jogador';
       },
     });
@@ -146,7 +126,6 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.updateMemberRole(this.teamId, userId, 'CAPTAIN').subscribe({
       next: (team) => {
         this.team = team;
-        this.syncPositionDrafts();
         this.rosterBusyUserId = null;
         this.notify.success('Capitão atualizado.', 'Roster');
       },
@@ -163,32 +142,12 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.updateMemberRole(this.teamId, userId, 'MEMBER').subscribe({
       next: (team) => {
         this.team = team;
-        this.syncPositionDrafts();
         this.rosterBusyUserId = null;
         this.notify.success('Capitania removida.', 'Roster');
       },
       error: (err) => {
         this.rosterBusyUserId = null;
         this.notify.error(err.error?.error || 'Erro ao remover capitania.');
-      },
-    });
-  }
-
-  saveMemberPosition(userId: string): void {
-    if (!this.teamId || !this.canManageRoster) return;
-    const raw = this.positionDrafts[userId] ?? '';
-    const position = raw.trim() || null;
-    this.rosterBusyUserId = userId;
-    this.teamService.updateMember(this.teamId, userId, { position }).subscribe({
-      next: (team) => {
-        this.team = team;
-        this.syncPositionDrafts();
-        this.rosterBusyUserId = null;
-        this.notify.success(position ? 'Posição atualizada.' : 'Posição removida.', 'Roster');
-      },
-      error: (err) => {
-        this.rosterBusyUserId = null;
-        this.notify.error(err.error?.error || 'Erro ao atualizar posição.');
       },
     });
   }

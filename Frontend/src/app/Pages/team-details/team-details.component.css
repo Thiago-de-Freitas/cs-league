@@ -81,6 +81,10 @@
   gap: 0.75rem;
 }
 
+.roster-position-hint {
+  margin: -0.25rem 0 0.75rem;
+}
+
 .roster-item-main {
   display: flex;
   flex-wrap: wrap;

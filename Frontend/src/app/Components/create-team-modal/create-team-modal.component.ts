@@ -4,6 +4,8 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } 
 import { forkJoin } from 'rxjs';
 import { TeamService } from '../../Services/team.service';
 import { Team, User } from '../../Models/interfaces';
+import { UserSearchPickerComponent } from '../user-search-picker/user-search-picker.component';
+import { getPlayerPositionLabel } from '../../Utils/player-positions';
 
 export interface TeamCreatedEvent {
   team: Team;
@@ -13,7 +15,7 @@ export interface TeamCreatedEvent {
 @Component({
   selector: 'app-create-team-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, UserSearchPickerComponent],
   templateUrl: './create-team-modal.component.html',
   styleUrls: ['./create-team-modal.component.css']
 })
@@ -22,8 +24,6 @@ export class CreateTeamModalComponent {
   @Output() created = new EventEmitter<TeamCreatedEvent>();
 
   form: FormGroup;
-  searchUserQuery = '';
-  searchResults: User[] = [];
   invitedMembers: User[] = [];
   errorMessage = '';
   loading = false;
@@ -51,26 +51,18 @@ export class CreateTeamModalComponent {
     }
   }
 
-  onSearchUsers(): void {
-    if (this.searchUserQuery.length > 2) {
-      this.teamService.searchUsers(this.searchUserQuery).subscribe({
-        next: (users) => {
-          this.searchResults = users.filter(
-            (u) => !this.invitedMembers.some((m) => m.id === u.id)
-          );
-        }
-      });
-    } else {
-      this.searchResults = [];
-    }
+  get invitedUserIds(): string[] {
+    return this.invitedMembers.map((m) => m.id);
   }
 
   inviteUser(user: User): void {
     if (!this.invitedMembers.some((m) => m.id === user.id)) {
       this.invitedMembers.push(user);
-      this.searchResults = this.searchResults.filter((r) => r.id !== user.id);
-      this.searchUserQuery = '';
     }
+  }
+
+  formatPosition(position: string | null | undefined): string {
+    return getPlayerPositionLabel(position);
   }
 
   removeInvitedUser(user: User): void {

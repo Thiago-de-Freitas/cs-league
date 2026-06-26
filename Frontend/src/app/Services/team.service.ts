@@ -103,7 +103,7 @@ export class TeamService {
   updateMember(
     teamId: string,
     userId: string,
-    data: { role?: 'CAPTAIN' | 'MEMBER'; memberTag?: string | null; position?: string | null }
+    data: { role?: 'CAPTAIN' | 'MEMBER'; memberTag?: string | null }
   ): Observable<Team> {
     return this.http.patch<Team>(`${this.apiUrl}/${teamId}/members/${userId}`, data).pipe(
       tap(() => this.invalidateTeams())

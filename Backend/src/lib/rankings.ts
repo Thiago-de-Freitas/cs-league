@@ -249,8 +249,7 @@ async function loadMembershipsForStats(
     select: {
       teamId: true,
       role: true,
-      position: true,
-      user: { select: { steamId: true } },
+      user: { select: { steamId: true, position: true } },
     },
   });
 
@@ -259,7 +258,7 @@ async function loadMembershipsForStats(
     const steamId = member.user.steamId?.trim();
     if (!steamId) continue;
     memberships.set(membershipKey(steamId, member.teamId), {
-      position: member.position,
+      position: member.user.position,
       role: member.role,
     });
   }

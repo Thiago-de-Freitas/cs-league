@@ -5,6 +5,7 @@ import path from 'path';
 import { promisify } from 'node:util';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
+import { parsePlayerPositionOptional } from '../lib/playerPosition';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimit';
 import {
@@ -45,6 +46,7 @@ function sanitizeUser(user: {
   displayName: string;
   steamId: string | null;
   avatarUrl: string | null;
+  position: string | null;
   role: string;
   createdAt: Date;
 }) {
@@ -54,6 +56,7 @@ function sanitizeUser(user: {
     displayName: user.displayName,
     steamId: user.steamId,
     avatarUrl: publicUploadUrlForResponse(user.avatarUrl),
+    position: user.position?.toLowerCase() ?? null,
     role: user.role,
     createdAt: user.createdAt,
   };
@@ -171,8 +174,8 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { displayName, steamId } = req.body;
-    const data: { displayName?: string; steamId?: string | null } = {};
+    const { displayName, steamId, position } = req.body;
+    const data: { displayName?: string; steamId?: string | null; position?: import('@prisma/client').PlayerPosition | null } = {};
 
     if (displayName !== undefined) {
       if (typeof displayName !== 'string' || !displayName.trim() || displayName.length > MAX_DISPLAY_NAME_LENGTH) {
@@ -190,6 +193,15 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       data.steamId = steamId === null ? null : steamId.trim() || null;
     }
 
+    if (position !== undefined) {
+      const parsed = parsePlayerPositionOptional(position);
+      if (parsed === undefined) {
+        res.status(400).json({ error: 'Posição inválida' });
+        return;
+      }
+      data.position = parsed;
+    }
+
     if (Object.keys(data).length === 0) {
       res.status(400).json({ error: 'Nenhum campo válido para atualizar' });
       return;
@@ -200,7 +212,7 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       data,
     });
     setAuditContext(req, audit.of('user.profile.update', 'User', user.id, {
-      after: { displayName: user.displayName, steamId: user.steamId },
+      after: { displayName: user.displayName, steamId: user.steamId, position: user.position },
     }));
     res.json(sanitizeUser(user));
   } catch (err) {
