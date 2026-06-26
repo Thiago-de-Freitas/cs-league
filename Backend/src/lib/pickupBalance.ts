@@ -3,6 +3,8 @@ import { calcRating } from './rankings';
 
 export type PickupBalanceMode = 'RATING' | 'ADR' | 'HS_PERCENT' | 'POSITION_MIX';
 
+export type PickupBalanceModeApi = 'rating' | 'adr' | 'hs_percent' | 'position_mix';
+
 export type PickupPlayerInput = {
   userId: string;
   position: PlayerPosition | null;
@@ -18,6 +20,20 @@ export type PickupAssignment = {
 
 const POSITION_PRIORITY: PlayerPosition[] = ['AWP', 'IGL', 'ENTRY', 'LURKER', 'RIFLER', 'SUPPORT', 'FLEX'];
 
+const API_TO_INTERNAL: Record<PickupBalanceModeApi, PickupBalanceMode> = {
+  rating: 'RATING',
+  adr: 'ADR',
+  hs_percent: 'HS_PERCENT',
+  position_mix: 'POSITION_MIX',
+};
+
+const INTERNAL_TO_API: Record<PickupBalanceMode, PickupBalanceModeApi> = {
+  RATING: 'rating',
+  ADR: 'adr',
+  HS_PERCENT: 'hs_percent',
+  POSITION_MIX: 'position_mix',
+};
+
 function scorePlayer(player: PickupPlayerInput, mode: PickupBalanceMode): number {
   switch (mode) {
     case 'ADR':
@@ -31,18 +47,33 @@ function scorePlayer(player: PickupPlayerInput, mode: PickupBalanceMode): number
   }
 }
 
-/** Snake draft por score; POSITION_MIX distribui posições antes de preencher por rating. */
+function compositeScore(player: PickupPlayerInput, modes: PickupBalanceMode[]): number {
+  const numericModes = modes.filter((mode) => mode !== 'POSITION_MIX');
+  if (numericModes.length === 0) return player.rating;
+  const scores = numericModes.map((mode) => scorePlayer(player, mode));
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+}
+
+function comparePlayers(a: PickupPlayerInput, b: PickupPlayerInput, modes: PickupBalanceMode[]): number {
+  const scoreDiff = compositeScore(b, modes) - compositeScore(a, modes);
+  if (scoreDiff !== 0) return scoreDiff;
+  return b.rating - a.rating;
+}
+
+/** Snake draft; POSITION_MIX distribui posições antes de preencher por score composto. */
 export function balancePlayersIntoTeams(
   players: PickupPlayerInput[],
   teamCount: number,
   playersPerTeam: number,
-  mode: PickupBalanceMode
+  modes: PickupBalanceMode | PickupBalanceMode[]
 ): PickupAssignment[] {
   if (teamCount < 1 || playersPerTeam < 1 || players.length === 0) return [];
 
+  const resolvedModes = normalizePickupBalanceModesInternal(modes);
+  const usePositionMix = resolvedModes.includes('POSITION_MIX');
   const buckets: PickupPlayerInput[][] = Array.from({ length: teamCount }, () => []);
 
-  if (mode === 'POSITION_MIX') {
+  if (usePositionMix) {
     const byPosition = new Map<PlayerPosition | 'UNKNOWN', PickupPlayerInput[]>();
     for (const player of players) {
       const key = player.position ?? 'UNKNOWN';
@@ -52,7 +83,7 @@ export function balancePlayersIntoTeams(
     }
 
     for (const list of byPosition.values()) {
-      list.sort((a, b) => b.rating - a.rating);
+      list.sort((a, b) => comparePlayers(a, b, resolvedModes));
     }
 
     const positionOrder = [
@@ -72,7 +103,7 @@ export function balancePlayersIntoTeams(
       }
     }
   } else {
-    const sorted = [...players].sort((a, b) => scorePlayer(b, mode) - scorePlayer(a, mode));
+    const sorted = [...players].sort((a, b) => comparePlayers(a, b, resolvedModes));
     let direction = 1;
     let index = 0;
     for (const player of sorted) {
@@ -114,11 +145,56 @@ export function buildDefaultPlayerStats(
 }
 
 export function parsePickupBalanceMode(value: unknown): PickupBalanceMode {
-  const raw = String(value ?? 'RATING').toUpperCase();
-  if (raw === 'ADR' || raw === 'HS_PERCENT' || raw === 'POSITION_MIX' || raw === 'RATING') {
-    return raw;
+  return normalizePickupBalanceModesInternal(value)[0] ?? 'RATING';
+}
+
+export function parsePickupBalanceModes(value: unknown): PickupBalanceMode[] {
+  return normalizePickupBalanceModesInternal(value);
+}
+
+export function serializePickupBalanceModeForApi(mode: PickupBalanceMode): PickupBalanceModeApi {
+  return INTERNAL_TO_API[mode];
+}
+
+export function serializePickupBalanceModesForApi(modes: PickupBalanceMode[]): PickupBalanceModeApi[] {
+  return normalizePickupBalanceModesInternal(modes).map(serializePickupBalanceModeForApi);
+}
+
+function normalizePickupBalanceModesInternal(value: unknown): PickupBalanceMode[] {
+  const rawList = Array.isArray(value)
+    ? value
+  : typeof value === 'string' && value.includes(',')
+    ? value.split(',').map((part) => part.trim())
+    : value == null
+      ? []
+      : [value];
+
+  const modes = rawList
+    .map((item) => {
+      const raw = String(item ?? '').trim().toLowerCase();
+      if (raw === 'adr') return 'ADR' as const;
+      if (raw === 'hs_percent') return 'HS_PERCENT' as const;
+      if (raw === 'position_mix') return 'POSITION_MIX' as const;
+      if (raw === 'rating') return 'RATING' as const;
+      const upper = String(item ?? '').trim().toUpperCase();
+      if (upper === 'ADR' || upper === 'HS_PERCENT' || upper === 'POSITION_MIX' || upper === 'RATING') {
+        return upper as PickupBalanceMode;
+      }
+      return null;
+    })
+    .filter((mode): mode is PickupBalanceMode => mode != null)
+    .filter((mode, index, list) => list.indexOf(mode) === index);
+
+  return modes.length > 0 ? modes : ['RATING'];
+}
+
+export function parsePickupBalanceModesFromApi(value: unknown): PickupBalanceMode[] {
+  if (Array.isArray(value)) {
+    return normalizePickupBalanceModesInternal(
+      value.map((item) => API_TO_INTERNAL[String(item).toLowerCase() as PickupBalanceModeApi] ?? item)
+    );
   }
-  return 'RATING';
+  return normalizePickupBalanceModesInternal(value);
 }
 
 export function isValidPickupTeamCount(count: unknown): count is number {

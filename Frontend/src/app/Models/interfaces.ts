@@ -88,6 +88,7 @@ export interface League {
   pickupTeamCount?: number | null;
   pickupPlayersPerTeam?: number;
   pickupBalanceMode?: 'rating' | 'adr' | 'hs_percent' | 'position_mix' | string;
+  pickupBalanceModes?: PickupBalanceMode[];
   pickupBalancedAt?: string | null;
 }
 
@@ -121,6 +122,7 @@ export interface PickupLeagueState {
   teamCount: number;
   playersPerTeam: number;
   balanceMode: PickupBalanceMode;
+  balanceModes: PickupBalanceMode[];
   balancedAt: string | null;
   pool: PickupPlayer[];
   squads: PickupSquad[];

@@ -68,14 +68,17 @@
         <input id="pickup-players-per-team" type="number" class="input-field" formControlName="pickupPlayersPerTeam" min="1" max="5">
       </div>
 
-      <div class="form-group" *ngIf="isOneVsOne">
-        <label class="form-label" for="pickup-balance-mode">Balanceamento padrão</label>
-        <select id="pickup-balance-mode" class="input-field" formControlName="pickupBalanceMode">
-          <option value="rating">Rating geral</option>
-          <option value="adr">ADR médio</option>
-          <option value="hs_percent">% de headshot</option>
-          <option value="position_mix">Posições (AWP, lurker…)</option>
-        </select>
+      <div class="form-group pickup-criteria-group" *ngIf="isOneVsOne">
+        <span class="form-label">Balanceamento padrão</span>
+        <div class="pickup-criteria-options">
+          <label *ngFor="let option of balanceModeOptions" class="pickup-criteria-option">
+            <input
+              type="checkbox"
+              [checked]="isPickupBalanceModeSelected(option.value)"
+              (change)="togglePickupBalanceMode(option.value, $event)">
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
       </div>
 
       <div class="form-group" *ngIf="showMapSeriesOptions">

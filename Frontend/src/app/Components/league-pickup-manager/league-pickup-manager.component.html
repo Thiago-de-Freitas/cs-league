@@ -25,12 +25,21 @@
         <label class="form-label" for="pickup-pp-team">Jogadores por time</label>
         <input id="pickup-pp-team" type="number" class="input-field" [(ngModel)]="playersPerTeam" min="1" max="5">
       </div>
-      <div class="form-group">
-        <label class="form-label" for="pickup-mode">Critério</label>
-        <select id="pickup-mode" class="input-field" [(ngModel)]="balanceMode">
-          <option *ngFor="let mode of balanceModes" [value]="mode.value">{{ mode.label }}</option>
-        </select>
+    </div>
+
+    <div class="form-group pickup-criteria-group">
+      <span class="form-label">Critérios de balanceamento</span>
+      <p class="form-hint pickup-criteria-hint">Selecione um ou mais critérios. Com vários, usamos a média dos valores numéricos.</p>
+      <div class="pickup-criteria-options">
+        <label *ngFor="let option of balanceModeOptions" class="pickup-criteria-option">
+          <input
+            type="checkbox"
+            [checked]="isBalanceModeSelected(option.value)"
+            (change)="toggleBalanceMode(option.value, $event)">
+          <span>{{ option.label }}</span>
+        </label>
       </div>
+      <p class="form-hint pickup-criteria-selected">Selecionados: {{ balanceModesLabel }}</p>
     </div>
     <div class="pickup-actions">
       <button type="button" class="btn btn-secondary" [disabled]="savingSettings" (click)="saveSettings()">

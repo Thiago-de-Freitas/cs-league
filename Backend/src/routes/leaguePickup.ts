@@ -10,6 +10,7 @@ import {
   isValidPickupPlayersPerTeam,
   isValidPickupTeamCount,
   parsePickupBalanceMode,
+  parsePickupBalanceModesFromApi,
 } from '../lib/pickupBalance';
 import { setAuditContext, audit } from '../lib/audit';
 
@@ -163,7 +164,9 @@ router.post('/:id/pickup/balance', authMiddleware, async (req: AuthRequest, res:
 
     const teamCount = Number(req.body?.teamCount ?? check.league.pickupTeamCount ?? 2);
     const playersPerTeam = Number(req.body?.playersPerTeam ?? check.league.pickupPlayersPerTeam ?? 5);
-    const balanceMode = parsePickupBalanceMode(req.body?.balanceMode ?? check.league.pickupBalanceMode);
+    const balanceModes = parsePickupBalanceModesFromApi(
+      req.body?.balanceModes ?? req.body?.balanceMode ?? check.league.pickupBalanceModes ?? check.league.pickupBalanceMode
+    );
 
     if (!isValidPickupTeamCount(teamCount)) {
       res.status(400).json({ error: 'Número de times deve ser entre 2 e 16.' });
@@ -183,11 +186,11 @@ router.post('/:id/pickup/balance', authMiddleware, async (req: AuthRequest, res:
     await balancePickupLeague(req.params.id, check.league.ownerId, {
       teamCount,
       playersPerTeam,
-      balanceMode,
+      balanceModes,
     });
 
     setAuditContext(req, audit.of('league.pickup.balance', 'League', req.params.id, {
-      metadata: { teamCount, playersPerTeam, balanceMode },
+      metadata: { teamCount, playersPerTeam, balanceModes },
     }));
     const state = await getPickupLeagueState(req.params.id);
     res.json(state);
@@ -209,6 +212,7 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
       pickupTeamCount?: number;
       pickupPlayersPerTeam?: number;
       pickupBalanceMode?: ReturnType<typeof parsePickupBalanceMode>;
+      pickupBalanceModes?: ReturnType<typeof parsePickupBalanceModesFromApi>;
     } = {};
 
     if (req.body?.teamCount !== undefined) {
@@ -227,8 +231,10 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
       }
       data.pickupPlayersPerTeam = playersPerTeam;
     }
-    if (req.body?.balanceMode !== undefined) {
-      data.pickupBalanceMode = parsePickupBalanceMode(req.body.balanceMode);
+    if (req.body?.balanceModes !== undefined || req.body?.balanceMode !== undefined) {
+      const balanceModes = parsePickupBalanceModesFromApi(req.body?.balanceModes ?? req.body?.balanceMode);
+      data.pickupBalanceModes = balanceModes;
+      data.pickupBalanceMode = balanceModes[0] ?? 'RATING';
     }
 
     if (Object.keys(data).length === 0) {

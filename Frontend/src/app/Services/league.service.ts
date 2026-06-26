@@ -79,6 +79,7 @@ export class LeagueService {
     pickupTeamCount?: number;
     pickupPlayersPerTeam?: number;
     pickupBalanceMode?: string;
+    pickupBalanceModes?: string[];
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data).pipe(this.afterLeagueMutation());
   }
@@ -218,7 +219,7 @@ export class LeagueService {
 
   balancePickupLeague(
     leagueId: string,
-    data: { teamCount: number; playersPerTeam: number; balanceMode: string }
+    data: { teamCount: number; playersPerTeam: number; balanceModes: string[] }
   ): Observable<PickupLeagueState> {
     return this.http
       .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/balance`, data)
@@ -227,7 +228,7 @@ export class LeagueService {
 
   updatePickupSettings(
     leagueId: string,
-    data: { teamCount?: number; playersPerTeam?: number; balanceMode?: string }
+    data: { teamCount?: number; playersPerTeam?: number; balanceModes?: string[] }
   ): Observable<PickupLeagueState> {
     return this.http.patch<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/settings`, data);
   }

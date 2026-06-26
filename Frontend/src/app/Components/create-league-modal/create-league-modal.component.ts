@@ -13,6 +13,10 @@ import {
 } from '../../Utils/series-map.util';
 import { LeagueSeriesMapSettingsComponent } from '../league-series-map-settings/league-series-map-settings.component';
 import { DEFAULT_MAP_POOL } from '../../Utils/maps';
+import {
+  PICKUP_BALANCE_MODE_OPTIONS,
+  PickupBalanceMode,
+} from '../../Utils/pickup-balance.util';
 
 @Component({
   selector: 'app-create-league-modal',
@@ -33,6 +37,8 @@ export class CreateLeagueModalComponent {
   mapPool: string[] = [...DEFAULT_MAP_POOL];
   seriesFormat: LeagueSeriesFormat = 'bo1';
   mapVetoEnabled = true;
+  pickupBalanceModes: PickupBalanceMode[] = ['rating'];
+  readonly balanceModeOptions = PICKUP_BALANCE_MODE_OPTIONS;
 
   constructor(
     private fb: FormBuilder,
@@ -49,7 +55,6 @@ export class CreateLeagueModalComponent {
       maxTeams: [''],
       pickupTeamCount: [2],
       pickupPlayersPerTeam: [5],
-      pickupBalanceMode: ['rating'],
       registrationOpen: [false],
     });
   }
@@ -87,6 +92,25 @@ export class CreateLeagueModalComponent {
     return this.isSingleGroup ? 3 : this.isMultiGroup ? 4 : MIN_LEAGUE_TEAMS;
   }
 
+  isPickupBalanceModeSelected(mode: PickupBalanceMode): boolean {
+    return this.pickupBalanceModes.includes(mode);
+  }
+
+  togglePickupBalanceMode(mode: PickupBalanceMode, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.checked) {
+      if (!this.pickupBalanceModes.includes(mode)) {
+        this.pickupBalanceModes = [...this.pickupBalanceModes, mode];
+      }
+      return;
+    }
+    if (this.pickupBalanceModes.length <= 1) {
+      input.checked = true;
+      return;
+    }
+    this.pickupBalanceModes = this.pickupBalanceModes.filter((item) => item !== mode);
+  }
+
   onBackdropClick(event: MouseEvent): void {
     if ((event.target as HTMLElement).classList.contains('gc-modal-backdrop')) {
       this.close();
@@ -120,7 +144,7 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupTeamCount, pickupPlayersPerTeam, pickupBalanceMode } = this.form.value;
+    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupTeamCount, pickupPlayersPerTeam } = this.form.value;
     const capRaw = String(maxTeams ?? '').trim();
     let registrationCap: number | null = null;
     if (capRaw && format !== 'one_vs_one') {
@@ -194,7 +218,7 @@ export class CreateLeagueModalComponent {
       matchesPerMatchDay: apiMatchesPerDay,
       pickupTeamCount: format === 'one_vs_one' ? Number(pickupTeamCount) || 2 : undefined,
       pickupPlayersPerTeam: format === 'one_vs_one' ? Number(pickupPlayersPerTeam) || 5 : undefined,
-      pickupBalanceMode: format === 'one_vs_one' ? pickupBalanceMode : undefined,
+      pickupBalanceModes: format === 'one_vs_one' ? this.pickupBalanceModes : undefined,
       ...mapSettingsPayload,
     }).subscribe({
       next: (league) => {

@@ -1,1 +1,23 @@
 /* Herda estilos globais de modal e formulário */
+
+.pickup-criteria-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.55rem;
+}
+
+.pickup-criteria-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  color: var(--gc-text);
+  cursor: pointer;
+}
+
+.pickup-criteria-option input {
+  accent-color: var(--gc-orange);
+}

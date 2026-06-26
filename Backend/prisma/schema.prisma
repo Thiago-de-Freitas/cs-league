@@ -204,7 +204,8 @@ model League {
   seriesFormat      SeriesFormat @default(BO1)
   pickupTeamCount      Int?
   pickupPlayersPerTeam Int          @default(5)
-  pickupBalanceMode    PickupBalanceMode @default(RATING)
+  pickupBalanceMode    PickupBalanceMode   @default(RATING)
+  pickupBalanceModes   PickupBalanceMode[] @default([RATING])
   pickupBalancedAt     DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt

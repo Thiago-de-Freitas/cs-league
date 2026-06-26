@@ -54,7 +54,7 @@ import { createMatchSeries } from '../lib/matchSeriesService';
 import {
   isValidPickupPlayersPerTeam,
   isValidPickupTeamCount,
-  parsePickupBalanceMode,
+  parsePickupBalanceModesFromApi,
 } from '../lib/pickupBalance';
 import leaguePickupRoutes from './leaguePickup';
 
@@ -339,6 +339,10 @@ function formatLeague(
     pickupTeamCount: league.pickupTeamCount,
     pickupPlayersPerTeam: league.pickupPlayersPerTeam,
     pickupBalanceMode: league.pickupBalanceMode?.toLowerCase() ?? 'rating',
+    pickupBalanceModes: (league.pickupBalanceModes?.length
+      ? league.pickupBalanceModes
+      : [league.pickupBalanceMode ?? 'RATING']
+    ).map((mode) => mode.toLowerCase()),
     pickupBalancedAt: league.pickupBalancedAt,
     groups,
     teams: league.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
@@ -539,7 +543,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       const pickupPlayersPerTeam = isValidPickupPlayersPerTeam(Number(req.body?.pickupPlayersPerTeam))
         ? Number(req.body.pickupPlayersPerTeam)
         : 5;
-      const pickupBalanceMode = parsePickupBalanceMode(req.body?.pickupBalanceMode);
+      const pickupBalanceModes = parsePickupBalanceModesFromApi(req.body?.pickupBalanceModes ?? req.body?.pickupBalanceMode);
 
       const league = await prisma.league.create({
         data: {
@@ -557,7 +561,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           seriesFormat,
           pickupTeamCount,
           pickupPlayersPerTeam,
-          pickupBalanceMode,
+          pickupBalanceMode: pickupBalanceModes[0] ?? 'RATING',
+          pickupBalanceModes,
           ownerId: req.user!.userId,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,

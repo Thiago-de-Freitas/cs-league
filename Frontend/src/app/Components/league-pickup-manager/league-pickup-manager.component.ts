@@ -2,9 +2,15 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LeagueService } from '../../Services/league.service';
-import { PickupBalanceMode, PickupLeagueState, PickupPlayer, User } from '../../Models/interfaces';
+import { PickupLeagueState, PickupPlayer, User } from '../../Models/interfaces';
 import { UserSearchPickerComponent } from '../user-search-picker/user-search-picker.component';
 import { NotificationService } from '../../Services/notification.service';
+import {
+  PICKUP_BALANCE_MODE_OPTIONS,
+  PickupBalanceMode,
+  formatPickupBalanceModesLabel,
+  normalizePickupBalanceModes,
+} from '../../Utils/pickup-balance.util';
 
 @Component({
   selector: 'app-league-pickup-manager',
@@ -25,14 +31,9 @@ export class LeaguePickupManagerComponent implements OnInit {
 
   teamCount = 2;
   playersPerTeam = 5;
-  balanceMode: PickupBalanceMode = 'rating';
+  balanceModes: PickupBalanceMode[] = ['rating'];
 
-  readonly balanceModes: { value: PickupBalanceMode; label: string }[] = [
-    { value: 'rating', label: 'Rating geral' },
-    { value: 'adr', label: 'ADR médio' },
-    { value: 'hs_percent', label: '% de headshot' },
-    { value: 'position_mix', label: 'Posições (AWP, lurker…)' },
-  ];
+  readonly balanceModeOptions = PICKUP_BALANCE_MODE_OPTIONS;
 
   constructor(
     private leagueService: LeagueService,
@@ -41,6 +42,10 @@ export class LeaguePickupManagerComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadState();
+  }
+
+  get balanceModesLabel(): string {
+    return formatPickupBalanceModesLabel(this.balanceModes);
   }
 
   get totalPlayers(): number {
@@ -62,10 +67,7 @@ export class LeaguePickupManagerComponent implements OnInit {
     this.loading = true;
     this.leagueService.getPickupState(this.leagueId).subscribe({
       next: (state) => {
-        this.state = state;
-        this.teamCount = state.teamCount;
-        this.playersPerTeam = state.playersPerTeam;
-        this.balanceMode = state.balanceMode;
+        this.applyState(state);
         this.loading = false;
       },
       error: (err) => {
@@ -75,6 +77,35 @@ export class LeaguePickupManagerComponent implements OnInit {
     });
   }
 
+  private applyState(state: PickupLeagueState): void {
+    this.state = state;
+    this.teamCount = state.teamCount;
+    this.playersPerTeam = state.playersPerTeam;
+    this.balanceModes = normalizePickupBalanceModes(state.balanceModes ?? state.balanceMode);
+  }
+
+  isBalanceModeSelected(mode: PickupBalanceMode): boolean {
+    return this.balanceModes.includes(mode);
+  }
+
+  toggleBalanceMode(mode: PickupBalanceMode, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.checked) {
+      if (!this.balanceModes.includes(mode)) {
+        this.balanceModes = [...this.balanceModes, mode];
+      }
+      return;
+    }
+
+    if (this.balanceModes.length <= 1) {
+      input.checked = true;
+      this.notify.info('Selecione ao menos um critério.');
+      return;
+    }
+
+    this.balanceModes = this.balanceModes.filter((item) => item !== mode);
+  }
+
   onPlayerPicked(user: User): void {
     if (this.assignedPlayerIds.has(user.id)) {
       this.notify.info('Jogador já está na liga.');
@@ -82,7 +113,7 @@ export class LeaguePickupManagerComponent implements OnInit {
     }
     this.leagueService.addPickupPlayer(this.leagueId, user.id).subscribe({
       next: (state) => {
-        this.state = state;
+        this.applyState(state);
         this.stateChanged.emit();
         this.notify.success(`${user.displayName} adicionado à liga.`);
       },
@@ -93,7 +124,7 @@ export class LeaguePickupManagerComponent implements OnInit {
   removePlayer(player: PickupPlayer): void {
     this.leagueService.removePickupPlayer(this.leagueId, player.userId).subscribe({
       next: (state) => {
-        this.state = state;
+        this.applyState(state);
         this.stateChanged.emit();
       },
       error: (err) => this.notify.error(err.error?.error || 'Erro ao remover jogador.'),
@@ -104,7 +135,7 @@ export class LeaguePickupManagerComponent implements OnInit {
     const resolvedTeamId = teamId === '' ? null : teamId;
     this.leagueService.assignPickupPlayer(this.leagueId, player.userId, resolvedTeamId).subscribe({
       next: (state) => {
-        this.state = state;
+        this.applyState(state);
         this.stateChanged.emit();
       },
       error: (err) => this.notify.error(err.error?.error || 'Erro ao mover jogador.'),
@@ -117,11 +148,11 @@ export class LeaguePickupManagerComponent implements OnInit {
       .updatePickupSettings(this.leagueId, {
         teamCount: this.teamCount,
         playersPerTeam: this.playersPerTeam,
-        balanceMode: this.balanceMode,
+        balanceModes: this.balanceModes,
       })
       .subscribe({
         next: (state) => {
-          this.state = state;
+          this.applyState(state);
           this.savingSettings = false;
           this.notify.success('Configurações salvas.');
         },
@@ -138,11 +169,11 @@ export class LeaguePickupManagerComponent implements OnInit {
       .balancePickupLeague(this.leagueId, {
         teamCount: this.teamCount,
         playersPerTeam: this.playersPerTeam,
-        balanceMode: this.balanceMode,
+        balanceModes: this.balanceModes,
       })
       .subscribe({
         next: (state) => {
-          this.state = state;
+          this.applyState(state);
           this.balancing = false;
           this.stateChanged.emit();
           this.notify.success('Times balanceados com sucesso!');

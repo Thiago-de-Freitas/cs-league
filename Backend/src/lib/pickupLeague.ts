@@ -3,6 +3,8 @@ import {
   balancePlayersIntoTeams,
   buildDefaultPlayerStats,
   parsePickupBalanceMode,
+  parsePickupBalanceModes,
+  serializePickupBalanceModesForApi,
   type PickupBalanceMode,
 } from './pickupBalance';
 import { calcRating } from './rankings';
@@ -37,7 +39,8 @@ export type PickupSquadView = {
 export type PickupLeagueState = {
   teamCount: number;
   playersPerTeam: number;
-  balanceMode: PickupBalanceMode;
+  balanceMode: string;
+  balanceModes: string[];
   balancedAt: string | null;
   pool: PickupPlayerView[];
   squads: PickupSquadView[];
@@ -155,6 +158,7 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
       pickupTeamCount: true,
       pickupPlayersPerTeam: true,
       pickupBalanceMode: true,
+      pickupBalanceModes: true,
       pickupBalancedAt: true,
     },
   });
@@ -206,14 +210,26 @@ export async function getPickupLeagueState(leagueId: string): Promise<PickupLeag
     };
   });
 
+  const balanceModesInternal = resolveStoredPickupBalanceModes(league.pickupBalanceModes, league.pickupBalanceMode);
+  const balanceModesApi = serializePickupBalanceModesForApi(balanceModesInternal);
+
   return {
     teamCount: league.pickupTeamCount ?? 2,
     playersPerTeam: league.pickupPlayersPerTeam,
-    balanceMode: parsePickupBalanceMode(league.pickupBalanceMode),
+    balanceMode: balanceModesApi[0] ?? 'rating',
+    balanceModes: balanceModesApi,
     balancedAt: league.pickupBalancedAt?.toISOString() ?? null,
     pool,
     squads: squadViews,
   };
+}
+
+function resolveStoredPickupBalanceModes(
+  modes: PickupBalanceMode[] | null | undefined,
+  fallback: PickupBalanceMode | null | undefined
+): PickupBalanceMode[] {
+  if (modes && modes.length > 0) return parsePickupBalanceModes(modes);
+  return parsePickupBalanceModes(fallback ?? 'RATING');
 }
 
 export async function ensureEphemeralSquads(
@@ -295,7 +311,8 @@ export async function balancePickupLeague(
   options: {
     teamCount: number;
     playersPerTeam: number;
-    balanceMode: PickupBalanceMode;
+    balanceMode?: PickupBalanceMode;
+    balanceModes?: PickupBalanceMode[];
   }
 ): Promise<void> {
   const entries = await prisma.leaguePlayerEntry.findMany({
@@ -325,11 +342,12 @@ export async function balancePickupLeague(
   });
 
   const squads = await ensureEphemeralSquads(leagueId, ownerId, options.teamCount);
+  const balanceModes = resolveStoredPickupBalanceModes(options.balanceModes, options.balanceMode ?? 'RATING');
   const assignments = balancePlayersIntoTeams(
     players,
     options.teamCount,
     options.playersPerTeam,
-    options.balanceMode
+    balanceModes
   );
 
   await prisma.leaguePlayerEntry.updateMany({
@@ -365,7 +383,8 @@ export async function balancePickupLeague(
     data: {
       pickupTeamCount: options.teamCount,
       pickupPlayersPerTeam: options.playersPerTeam,
-      pickupBalanceMode: options.balanceMode,
+      pickupBalanceMode: balanceModes[0] ?? 'RATING',
+      pickupBalanceModes: balanceModes,
       pickupBalancedAt: new Date(),
     },
   });

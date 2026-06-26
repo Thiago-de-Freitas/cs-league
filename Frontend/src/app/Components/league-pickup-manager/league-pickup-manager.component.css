@@ -14,8 +14,42 @@
 
 .pickup-settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.pickup-criteria-group {
+  margin-top: 0.9rem;
+}
+
+.pickup-criteria-hint {
+  margin: 0.35rem 0 0.65rem;
+}
+
+.pickup-criteria-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.55rem;
+}
+
+.pickup-criteria-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+  color: var(--gc-text);
+  cursor: pointer;
+}
+
+.pickup-criteria-option input {
+  accent-color: var(--gc-orange);
+}
+
+.pickup-criteria-selected {
+  margin: 0.65rem 0 0;
 }
 
 .pickup-actions {
