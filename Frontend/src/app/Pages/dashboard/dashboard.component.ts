@@ -216,6 +216,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getPlayerProfileLink(player: PlayerRankingEntry): string[] | null {
+    if (player.userId) return ['/users', player.userId];
     if (!player.steamId?.trim()) return null;
     return ['/player', player.steamId];
   }

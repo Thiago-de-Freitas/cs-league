@@ -26,6 +26,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'users/:id',
+    loadComponent: () =>
+      import('./Pages/user-profile/user-profile.component').then((m) => m.UserProfileComponent),
+    canActivate: [authGuard],
+  },
+  {
     path: 'create-team',
     loadComponent: () =>
       import('./Pages/create-team/create-team.component').then((m) => m.CreateTeamComponent),
@@ -67,7 +73,7 @@ export const routes: Routes = [
       import('./Pages/admin-audit/admin-audit.component').then((m) => m.AdminAuditComponent),
     canActivate: [authGuard],
   },
-  { path: 'player/:steamId', component: PlayerProfileComponent },
+  { path: 'player/:steamId', component: PlayerProfileComponent, canActivate: [authGuard] },
   {
     path: 'demo/:id',
     loadComponent: () =>

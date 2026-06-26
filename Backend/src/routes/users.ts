@@ -11,6 +11,7 @@ import {
 } from '../lib/userModeration';
 import { audit, setAuditContext } from '../lib/audit';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
+import { getPublicUserProfile, findUserIdBySteamId } from '../lib/userPublicProfile';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -151,6 +152,84 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao listar jogadores' });
+  }
+});
+
+router.get('/search', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    if (q.length < 2) {
+      res.json([]);
+      return;
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        AND: [
+          { id: { not: req.user!.userId } },
+          { isActive: true },
+          {
+            OR: [
+              { bannedUntil: null },
+              { bannedUntil: { lte: new Date() } },
+            ],
+          },
+          {
+            OR: [
+              { displayName: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { steamId: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        steamId: true,
+        position: true,
+        avatarUrl: true,
+      },
+      orderBy: [{ displayName: 'asc' }],
+      take: 12,
+    });
+
+    res.json(formatUserSearchResults(users));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar usuários' });
+  }
+});
+
+router.get('/by-steam/:steamId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = await findUserIdBySteamId(req.params.steamId);
+    if (!userId) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+    res.json({ userId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao localizar jogador' });
+  }
+});
+
+router.get('/:id/profile', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const profile = await getPublicUserProfile(req.params.id, {
+      userId: req.user!.userId,
+      role: req.user!.role,
+    });
+    if (!profile) {
+      res.status(404).json({ error: 'Jogador não encontrado' });
+      return;
+    }
+    res.json(profile);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao carregar perfil do jogador' });
   }
 });
 
@@ -297,53 +376,6 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao excluir jogador' });
-  }
-});
-
-router.get('/search', authMiddleware, async (req: AuthRequest, res: Response) => {
-  try {
-    const q = String(req.query.q ?? '').trim();
-    if (q.length < 2) {
-      res.json([]);
-      return;
-    }
-
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          { id: { not: req.user!.userId } },
-          { isActive: true },
-          {
-            OR: [
-              { bannedUntil: null },
-              { bannedUntil: { lte: new Date() } },
-            ],
-          },
-          {
-            OR: [
-              { displayName: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-              { steamId: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-        ],
-      },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        steamId: true,
-        position: true,
-        avatarUrl: true,
-      },
-      orderBy: [{ displayName: 'asc' }],
-      take: 12,
-    });
-
-    res.json(formatUserSearchResults(users));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao buscar usuários' });
   }
 });
 

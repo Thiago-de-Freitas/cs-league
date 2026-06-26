@@ -359,11 +359,12 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
   const users = steamIds.length
     ? await prisma.user.findMany({
         where: { steamId: { in: steamIds } },
-        select: { steamId: true, displayName: true },
+        select: { id: true, steamId: true, displayName: true },
       })
     : [];
 
   const displayBySteam = new Map(users.map((u) => [u.steamId!, u.displayName]));
+  const userIdBySteam = new Map(users.map((u) => [u.steamId!, u.id]));
 
   const allRanked = aggregatePlayerRankingsByLeagueMatches(rows, 0);
   const total = allRanked.length;
@@ -380,6 +381,7 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
       position: currentPosition,
       positionLabel: currentPosition ? getPlayerPositionLabel(currentPosition) : null,
       displayName: entry.steamId ? displayBySteam.get(entry.steamId) || null : null,
+      userId: entry.steamId ? userIdBySteam.get(entry.steamId) ?? null : null,
     };
   });
 

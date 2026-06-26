@@ -152,9 +152,8 @@ export class AdminPlayersComponent implements OnInit {
     return new Date(value).toLocaleString('pt-BR');
   }
 
-  getProfileLink(user: AdminUserEntry): string[] | null {
-    if (!user.steamId?.trim()) return null;
-    return ['/player', user.steamId];
+  getProfileLink(user: AdminUserEntry): string[] {
+    return ['/users', user.id];
   }
 
   canModerate(user: AdminUserEntry): boolean {

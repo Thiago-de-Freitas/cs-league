@@ -76,14 +76,10 @@
           <div class="player-body">
             <div class="player-name-row">
               <a
-                *ngIf="getProfileLink(user) as link; else plainName"
-                [routerLink]="link"
+                [routerLink]="getProfileLink(user)"
                 class="player-name player-name-link">
                 {{ user.displayName }}
               </a>
-              <ng-template #plainName>
-                <span class="player-name">{{ user.displayName }}</span>
-              </ng-template>
               <span *ngIf="user.position" class="badge badge-gray">{{ getPositionLabel(user) }}</span>
               <span class="badge" [class.badge-orange]="user.role === 'ADMIN'" [class.badge-gray]="user.role !== 'ADMIN'">
                 {{ getRoleLabel(user.role) }}

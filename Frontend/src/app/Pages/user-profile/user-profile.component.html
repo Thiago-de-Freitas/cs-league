@@ -1,0 +1,125 @@
+<div class="page-container profile-page">
+  <div class="profile-dashboard user-profile-dashboard">
+    <div *ngIf="loading" class="loading user-profile-loading">Carregando perfil...</div>
+    <div *ngIf="errorMsg && !loading" class="error-message user-profile-error">{{ errorMsg }}</div>
+
+    <ng-container *ngIf="profile && !loading">
+      <aside class="profile-sidebar gc-card">
+        <div class="sidebar-avatar-wrap">
+          <img
+            *ngIf="avatarSrc as src"
+            [src]="src"
+            [alt]="profile.displayName"
+            class="sidebar-avatar-img"
+            (error)="onAvatarError()">
+          <div *ngIf="!avatarSrc" class="sidebar-avatar">{{ profile.displayName.charAt(0).toUpperCase() }}</div>
+        </div>
+
+        <h1 class="sidebar-name">{{ profile.displayName }}</h1>
+        <p class="sidebar-email meta" *ngIf="profile.email">{{ profile.email }}</p>
+        <span class="badge badge-orange sidebar-role" *ngIf="profile.role === 'ADMIN'">Admin</span>
+
+        <div class="sidebar-steam" *ngIf="profile.steamId">
+          <span class="sidebar-label">Steam ID</span>
+          <span class="sidebar-value">{{ profile.steamId }}</span>
+        </div>
+
+        <div class="sidebar-steam">
+          <span class="sidebar-label">Posição no CS</span>
+          <span class="sidebar-value">{{ profile.positionLabel || 'Não definida' }}</span>
+        </div>
+
+        <div class="sidebar-steam">
+          <span class="sidebar-label">Membro desde</span>
+          <span class="sidebar-value">{{ formatDate(profile.createdAt) }}</span>
+        </div>
+
+        <div class="sidebar-summary" *ngIf="profile.leagueStats as stats">
+          <div class="sidebar-stat">
+            <span class="sidebar-stat-value">{{ stats.matches ?? stats.demos }}</span>
+            <span class="sidebar-stat-label">Jogos de liga</span>
+          </div>
+          <div class="sidebar-stat">
+            <span class="sidebar-stat-value">{{ stats.kills }}</span>
+            <span class="sidebar-stat-label">Kills totais</span>
+          </div>
+        </div>
+
+        <button
+          *ngIf="profile.isSelf"
+          type="button"
+          class="btn btn-primary w-full sidebar-btn"
+          (click)="goToEditProfile()">
+          Editar meu perfil
+        </button>
+      </aside>
+
+      <main class="profile-main">
+        <section class="gc-card user-profile-section">
+          <h2 class="section-title">Times</h2>
+          <p class="meta user-profile-section-subtitle">{{ profile.teamCount }} time(s) cadastrado(s)</p>
+
+          <ul class="gc-list" *ngIf="profile.teams.length > 0; else noTeams">
+            <li *ngFor="let team of profile.teams" class="gc-list-item user-team-row">
+              <div class="user-team-logo" [class.has-image]="teamLogoSrc(team.id, team.logoUrl)">
+                <img
+                  *ngIf="teamLogoSrc(team.id, team.logoUrl) as logo"
+                  [src]="logo"
+                  [alt]="team.name"
+                  (error)="onTeamLogoError(team.id)">
+                <span *ngIf="!teamLogoSrc(team.id, team.logoUrl)">{{ team.name.charAt(0).toUpperCase() }}</span>
+              </div>
+              <div class="user-team-body">
+                <a [routerLink]="['/team-details', team.id]" class="user-team-name">{{ team.name }}</a>
+                <span class="meta" *ngIf="team.tag">[{{ team.tag }}]</span>
+                <span class="badge badge-gray">{{ getRoleLabel(team.role) }}</span>
+              </div>
+            </li>
+          </ul>
+          <ng-template #noTeams>
+            <p class="meta">Este jogador ainda não participa de nenhum time.</p>
+          </ng-template>
+        </section>
+
+        <section class="gc-card user-profile-section" *ngIf="hasLeagueStats && profile.leagueStats as stats">
+          <h2 class="section-title">Estatísticas em ligas</h2>
+          <p class="meta user-profile-section-subtitle">
+            {{ stats.matches ?? stats.demos }} jogo(s) analisados em partidas oficiais
+          </p>
+
+          <div class="stats-grid user-profile-stats">
+            <div class="stat-box">
+              <span class="stat-label">Rating</span>
+              <span class="stat-value stat-highlight">{{ stats.rating }}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">K/D</span>
+              <span class="stat-value">{{ stats.kd }}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">ADR</span>
+              <span class="stat-value">{{ stats.adr }}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">HS%</span>
+              <span class="stat-value">{{ stats.hsPercent }}%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">KAST</span>
+              <span class="stat-value">{{ stats.kast }}%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">K / D</span>
+              <span class="stat-value">{{ stats.kills }} / {{ stats.deaths }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="gc-card user-profile-section" *ngIf="!hasLeagueStats">
+          <h2 class="section-title">Estatísticas em ligas</h2>
+          <p class="meta">Nenhuma partida de liga registrada para este jogador ainda.</p>
+        </section>
+      </main>
+    </ng-container>
+  </div>
+</div>

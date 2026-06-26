@@ -49,4 +49,14 @@ describe('UsersService', () => {
     expect(req.request.body).toEqual({ days: 14 });
     req.flush({ user: { id: 'u1' } });
   });
+
+  it('getUserProfile consulta endpoint público', (done) => {
+    service.getUserProfile('u1').subscribe((profile) => {
+      expect(profile.id).toBe('u1');
+      done();
+    });
+    const req = httpMock.expectOne('/api/users/u1/profile');
+    expect(req.request.method).toBe('GET');
+    req.flush({ id: 'u1', displayName: 'Player', teams: [], leagueStats: null, isSelf: false });
+  });
 });

@@ -400,6 +400,7 @@ export interface PlayerRankingEntry {
   playerName: string;
   displayName?: string | null;
   steamId?: string | null;
+  userId?: string | null;
   position?: string | null;
   positionLabel?: string | null;
   /** Quantidade de jogos de liga (demos oficiais de partida). */
@@ -462,6 +463,30 @@ export interface AdminUsersPage {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+export interface PublicUserTeam {
+  id: string;
+  name: string;
+  tag: string | null;
+  logoUrl: string | null;
+  role: string;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  displayName: string;
+  email?: string;
+  steamId: string | null;
+  avatarUrl: string | null;
+  position: string | null;
+  positionLabel: string | null;
+  role: string;
+  createdAt: string;
+  teamCount: number;
+  teams: PublicUserTeam[];
+  leagueStats: PlayerProfileStats | null;
+  isSelf: boolean;
 }
 
 export interface AuditEvent {

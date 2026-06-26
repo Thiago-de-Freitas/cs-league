@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RankingsService } from '../../Services/rankings.service';
+import { UsersService } from '../../Services/users.service';
 import { PlayerProfileStats } from '../../Models/interfaces';
 
 @Component({
@@ -19,7 +20,9 @@ export class PlayerProfileComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private rankingsService: RankingsService
+    private router: Router,
+    private rankingsService: RankingsService,
+    private usersService: UsersService
   ) {}
 
   ngOnInit(): void {
@@ -31,11 +34,26 @@ export class PlayerProfileComponent implements OnInit {
         return;
       }
       this.steamId = id;
-      this.loadProfile(id);
+      this.resolveProfileRoute(id);
     });
   }
 
-  loadProfile(steamId: string): void {
+  private resolveProfileRoute(steamId: string): void {
+    this.usersService.resolveUserIdBySteamId(steamId).subscribe({
+      next: (userId) => {
+        if (userId) {
+          this.router.navigate(['/users', userId], { replaceUrl: true });
+          return;
+        }
+        this.loadLegacyStatsProfile(steamId);
+      },
+      error: () => {
+        this.loadLegacyStatsProfile(steamId);
+      },
+    });
+  }
+
+  loadLegacyStatsProfile(steamId: string): void {
     this.loading = true;
     this.errorMsg = '';
     this.rankingsService.getPlayerProfile(steamId).subscribe({
@@ -44,7 +62,7 @@ export class PlayerProfileComponent implements OnInit {
         this.loading = false;
       },
       error: () => {
-        this.errorMsg = 'Jogador não encontrado nas estatísticas de ligas.';
+        this.errorMsg = 'Jogador não encontrado.';
         this.loading = false;
       },
     });

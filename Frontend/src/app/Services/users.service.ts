@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AdminUserEntry, AdminUsersPage } from '../Models/interfaces';
+import { AdminUserEntry, AdminUsersPage, PublicUserProfile } from '../Models/interfaces';
 
 export const ADMIN_USER_PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 export type AdminUserPageSize = (typeof ADMIN_USER_PAGE_SIZE_OPTIONS)[number];
@@ -48,5 +48,13 @@ export class UsersService {
 
   deleteUser(userId: string): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`${this.apiUrl}/${userId}`);
+  }
+
+  getUserProfile(userId: string): Observable<PublicUserProfile> {
+    return this.http.get<PublicUserProfile>(`${this.apiUrl}/${userId}/profile`);
+  }
+
+  resolveUserIdBySteamId(steamId: string): Observable<{ userId: string }> {
+    return this.http.get<{ userId: string }>(`${this.apiUrl}/by-steam/${encodeURIComponent(steamId)}`);
   }
 }

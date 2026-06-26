@@ -92,9 +92,8 @@ describe('AdminPlayersComponent', () => {
     );
   });
 
-  it('getProfileLink retorna rota quando há steamId', () => {
-    expect(component.getProfileLink(mockUser)).toEqual(['/player', '76561198000000001']);
-    expect(component.getProfileLink({ ...mockUser, steamId: null })).toBeNull();
+  it('getProfileLink retorna rota do usuário', () => {
+    expect(component.getProfileLink(mockUser)).toEqual(['/users', 'u1']);
   });
 
   it('canModerate bloqueia admin e próprio usuário', () => {
