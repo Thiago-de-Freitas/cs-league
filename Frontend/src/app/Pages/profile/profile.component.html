@@ -39,7 +39,7 @@
       <nav class="profile-tabs" aria-label="Seções do perfil">
         <button type="button" class="profile-tab" [class.active]="activeTab === 'stats'" (click)="setTab('stats')">Stats</button>
         <button type="button" class="profile-tab" [class.active]="activeTab === 'demos'" (click)="setTab('demos')">Demos</button>
-        <button type="button" class="profile-tab" [class.active]="activeTab === 'highlights'" (click)="setTab('highlights')">Destaques</button>
+        <button *ngIf="highlightsFeatureEnabled" type="button" class="profile-tab" [class.active]="activeTab === 'highlights'" (click)="setTab('highlights')">Destaques</button>
         <button type="button" class="profile-tab" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">Configurações</button>
       </nav>
 
@@ -229,7 +229,7 @@
       </section>
 
       <!-- HIGHLIGHTS -->
-      <section *ngIf="activeTab === 'highlights'" class="highlights-section gc-card highlights-panel">
+      <section *ngIf="highlightsFeatureEnabled && activeTab === 'highlights'" class="highlights-section gc-card highlights-panel">
         <header class="highlights-header">
           <div class="highlights-header-main">
             <h2 class="section-title">Destaques</h2>

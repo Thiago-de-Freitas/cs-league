@@ -28,6 +28,11 @@ INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 DEMO_QUEUE = "demo:queue"
 WORKER_HEARTBEAT_KEY = "demo:worker:heartbeat"
 WORKER_STORAGE_KEY = "demo:worker:files_on_disk"
+
+
+def highlights_feature_enabled() -> bool:
+    raw = os.environ.get("HIGHLIGHTS_FEATURE_ENABLED", "").strip().lower()
+    return raw in ("1", "true")
 WORKER_STORAGE_PATH_KEY = "demo:worker:storage_path"
 POLL_TIMEOUT = 5
 HEARTBEAT_TTL = 90
@@ -438,6 +443,8 @@ def save_and_extract_highlights(
     demo_id: str,
     meta: dict | None,
 ) -> None:
+    if not highlights_feature_enabled():
+        return
     is_personal = bool(meta and meta.get("is_personal"))
     uploader_steam = _normalize_steam_id(meta.get("uploader_steam_id") if meta else None)
     if is_personal and not uploader_steam:
@@ -464,6 +471,9 @@ HIGHLIGHT_EXTRACT_QUEUE = "highlight:extract:queue"
 
 
 def process_highlight_extract_job(payload: str) -> None:
+    if not highlights_feature_enabled():
+        print("[highlights] extração ignorada — feature desabilitada")
+        return
     job = json.loads(payload)
     demo_id = str(job.get("demoId", ""))
     file_path = str(job.get("filePath", ""))
@@ -873,6 +883,9 @@ def main():
             idle_ticks = 0
             queue_name, payload = result
             if queue_name == HIGHLIGHT_RENDER_QUEUE:
+                if not highlights_feature_enabled():
+                    print("[highlights] render ignorado — feature desabilitada")
+                    continue
                 print(f"Job de renderização recebido ({len(payload)} bytes)")
                 try:
                     process_highlight_render_job(payload)
@@ -880,6 +893,9 @@ def main():
                     print(f"[highlights] job de render inválido: {err}")
                 continue
             if queue_name == HIGHLIGHT_EXTRACT_QUEUE:
+                if not highlights_feature_enabled():
+                    print("[highlights] extração ignorada — feature desabilitada")
+                    continue
                 print(f"Job de extração de destaques recebido ({len(payload)} bytes)")
                 try:
                     process_highlight_extract_job(payload)

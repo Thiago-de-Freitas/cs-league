@@ -6,6 +6,7 @@ import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
+import { HIGHLIGHTS_FEATURE_ENABLED } from '../../Utils/feature-flags';
 import { Demo, Match, MatchHighlight, MatchPlayerStat } from '../../Models/interfaces';
 
 function mockMatch(overrides: Partial<Match> = {}): Match {
@@ -184,6 +185,10 @@ describe('MatchDetailsComponent', () => {
   it('canShowHighlightsSection exige demo concluída e não manual', () => {
     component.isDemoView = true;
     component.demo = { status: 'completed', isManual: false } as Demo;
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      expect(component.canShowHighlightsSection).toBeFalse();
+      return;
+    }
     expect(component.canShowHighlightsSection).toBeTrue();
     component.demo = { status: 'processing', isManual: false } as Demo;
     expect(component.canShowHighlightsSection).toBeFalse();
@@ -193,15 +198,20 @@ describe('MatchDetailsComponent', () => {
 
   it('generateHighlights enfileira extração na partida', () => {
     const notifySpy = TestBed.inject(NotificationService) as jasmine.SpyObj<NotificationService>;
+    component.match = mockMatch({
+      demos: [{ id: 'demo-1', status: 'completed', isManual: false } as Demo],
+    });
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      component.generateHighlights();
+      expect(matchServiceSpy.generateHighlights).not.toHaveBeenCalled();
+      return;
+    }
     matchServiceSpy.generateHighlights.and.returnValue(of({
       ok: true,
       demoId: 'demo-1',
       message: 'Geração enfileirada',
     }));
     spyOn(sessionStorage, 'setItem');
-    component.match = mockMatch({
-      demos: [{ id: 'demo-1', status: 'completed', isManual: false } as Demo],
-    });
     component.generateHighlights();
     expect(matchServiceSpy.generateHighlights).toHaveBeenCalledWith('match-1');
     expect(notifySpy.success).toHaveBeenCalled();

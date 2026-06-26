@@ -3,8 +3,11 @@ from unittest.mock import patch
 
 from highlight_renderer import (
     _parse_kill_ticks,
+    _sanitize_movie_basename,
     _tick_offset_seconds,
+    resolve_cs2_csgo_dir,
     resolve_render_mode,
+    resolve_steam_exe,
 )
 
 
@@ -25,6 +28,19 @@ class HighlightRendererTest(unittest.TestCase):
     def test_resolve_render_mode_auto_fallback_card(self, _mock):
         with patch("highlight_renderer.HIGHLIGHT_RENDER_MODE", "auto"):
             self.assertEqual(resolve_render_mode(), "card")
+
+    def test_resolve_cs2_csgo_dir(self):
+        csgo = resolve_cs2_csgo_dir(r"C:\Steam\game\bin\win64\cs2.exe")
+        self.assertTrue(str(csgo).replace("\\", "/").endswith("game/csgo"))
+
+    def test_sanitize_movie_basename(self):
+        self.assertEqual(_sanitize_movie_basename("cmqv8wo6k00040w0gyjyb254o"), "cmqv8wo6k00040w0gyjyb254o")
+        self.assertTrue(_sanitize_movie_basename("").startswith("csleague"))
+
+    @patch("highlight_renderer.Path.is_file", return_value=True)
+    def test_resolve_steam_exe_prefers_env(self, _mock):
+        with patch("highlight_renderer.STEAM_EXE_PATH", r"D:\Steam\steam.exe"):
+            self.assertEqual(resolve_steam_exe(), r"D:\Steam\steam.exe")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ import {
   showMatchMapVeto,
   showSeriesVetoPanel,
 } from '../../Utils/match-series-view.util';
+import { HIGHLIGHTS_FEATURE_ENABLED } from '../../Utils/feature-flags';
 import {
   getHighlightTypeAccent,
   getHighlightRenderBadgeClass,
@@ -837,6 +838,9 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   }
 
   get canShowHighlightsSection(): boolean {
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      return false;
+    }
     if (this.isDemoView) {
       return !!this.demo && this.demo.status === 'completed' && !this.demo.isManual;
     }
@@ -874,6 +878,9 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   }
 
   private resumeHighlightPolling(demo?: Demo, match?: Match): void {
+    if (!HIGHLIGHTS_FEATURE_ENABLED) {
+      return;
+    }
     const demoId = demo?.id;
     const matchId = match?.id;
     const pending =

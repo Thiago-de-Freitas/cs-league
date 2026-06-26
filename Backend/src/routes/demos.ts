@@ -23,6 +23,7 @@ import { requireDemoQueue } from '../middleware/demoQueue';
 import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import { isHighlightsFeatureEnabled } from '../lib/featureFlags';
 import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
 import { filterHighlightsForPersonalDemo } from '../lib/highlightPayload';
 import { getHighlightProgress } from '../lib/highlightProgress';
@@ -648,6 +649,10 @@ router.delete('/:id/highlights', authMiddleware, async (req: AuthRequest, res: R
 
 router.post('/:id/highlights/generate', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
   try {
+    if (!isHighlightsFeatureEnabled()) {
+      res.status(503).json({ error: 'Geração de destaques temporariamente desabilitada.' });
+      return;
+    }
     const demo = await prisma.demo.findUnique({
       where: { id: req.params.id },
       select: {

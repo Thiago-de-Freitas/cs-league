@@ -18,6 +18,7 @@ import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
 import { getDemoStoragePath } from './lib/demoStorage';
 import { getHighlightClipsPath } from './lib/highlightStorage';
 import { mapHighlightPayload, filterHighlightsForPersonalDemo } from './lib/highlightPayload';
+import { isHighlightsFeatureEnabled } from './lib/featureFlags';
 import {
   enqueueRenderJobsForDemoHighlights,
   enqueueRenderJobsForMatchHighlights,
@@ -300,7 +301,7 @@ app.post('/api/internal/matches/:id/highlights', internalServiceAuth, async (req
     });
 
     let renderJobs = 0;
-    if (demoId) {
+    if (demoId && isHighlightsFeatureEnabled()) {
       renderJobs = await enqueueRenderJobsForMatchHighlights(matchId, demoId);
     }
     await markHighlightRenderQueued('match', matchId, renderJobs);
@@ -358,7 +359,9 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
       })),
     });
 
-    const renderJobs = await enqueueRenderJobsForDemoHighlights(demoId);
+    const renderJobs = isHighlightsFeatureEnabled()
+      ? await enqueueRenderJobsForDemoHighlights(demoId)
+      : 0;
     await markHighlightRenderQueued('demo', demoId, renderJobs);
 
     skipAudit(req);

@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import urllib.request
 from pathlib import Path
 
@@ -19,6 +20,8 @@ HIGHLIGHT_RENDER_MODE = os.environ.get("HIGHLIGHT_RENDER_MODE", "auto").strip().
 HIGHLIGHT_CLIPS_PATH = os.environ.get("HIGHLIGHT_CLIPS_PATH")
 FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
 CS2_EXE_PATH = os.environ.get("CS2_EXE_PATH", "").strip()
+STEAM_EXE_PATH = os.environ.get("STEAM_EXE_PATH", "").strip()
+CS2_STEAM_APP_ID = os.environ.get("CS2_STEAM_APP_ID", "730").strip() or "730"
 BACKEND_INTERNAL_URL = os.environ.get("BACKEND_INTERNAL_URL", "").rstrip("/")
 INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 
@@ -32,6 +35,12 @@ _CS2_CANDIDATE_PATHS = [
     Path(r"C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"),
     Path(r"C:\Program Files\Steam\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"),
     Path.home() / ".steam/steam/steamapps/common/Counter-Strike Global Offensive/game/bin/win64/cs2.exe",
+]
+
+_STEAM_CANDIDATE_PATHS = [
+    Path(r"C:\Program Files (x86)\Steam\steam.exe"),
+    Path(r"C:\Program Files\Steam\steam.exe"),
+    Path.home() / ".steam/steam/steam.exe",
 ]
 
 
@@ -58,6 +67,139 @@ def resolve_cs2_exe() -> str | None:
         except OSError:
             continue
     return None
+
+
+def resolve_steam_exe() -> str | None:
+    candidates: list[Path] = []
+    if STEAM_EXE_PATH:
+        candidates.append(Path(STEAM_EXE_PATH))
+    candidates.extend(_STEAM_CANDIDATE_PATHS)
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return str(candidate.resolve())
+        except OSError:
+            continue
+    return None
+
+
+def _is_process_running(image_name: str) -> bool:
+    if os.name == "nt":
+        result = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {image_name}", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return image_name.lower() in (result.stdout or "").lower()
+
+    proc_name = image_name.replace(".exe", "")
+    result = subprocess.run(["pgrep", "-x", proc_name], capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def is_steam_client_running() -> bool:
+    return _is_process_running("steam.exe") or _is_process_running("steam")
+
+
+def _wait_for_process(image_name: str, timeout_sec: float) -> bool:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if _is_process_running(image_name):
+            return True
+        time.sleep(1)
+    return False
+
+
+def _wait_for_process_exit(image_name: str, timeout_sec: float) -> bool:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if not _is_process_running(image_name):
+            return True
+        time.sleep(2)
+    return False
+
+
+def ensure_steam_client_ready(timeout_sec: int = 120) -> None:
+    """Garante Steam em execução — o CS2 não inicia sem o cliente Steam."""
+    if is_steam_client_running():
+        time.sleep(3)
+        return
+
+    steam_exe = resolve_steam_exe()
+    if not steam_exe:
+        raise RuntimeError(
+            "Steam não encontrado. Instale o Steam ou defina STEAM_EXE_PATH no worker."
+        )
+
+    print("[highlights] Steam não detectado — iniciando cliente...")
+    subprocess.Popen(
+        [steam_exe, "-silent"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    if not _wait_for_process("steam.exe", timeout_sec) and not _wait_for_process("steam", timeout_sec):
+        raise RuntimeError(
+            "Não foi possível iniciar o Steam. Abra o Steam manualmente, faça login e tente de novo."
+        )
+
+    time.sleep(8)
+
+
+def _cs2_game_args(demo_path: str, cfg_name: str) -> list[str]:
+    return [
+        "-insecure",
+        "-novid",
+        "-windowed",
+        "-w",
+        "1280",
+        "-h",
+        "720",
+        "-console",
+        "+playdemo",
+        _demo_path_for_cs2(demo_path),
+        "+exec",
+        cfg_name,
+    ]
+
+
+def _launch_cs2_and_wait(cs2_exe: str, demo_path: str, cfg_name: str, timeout_sec: int) -> None:
+    ensure_steam_client_ready()
+
+    steam_exe = resolve_steam_exe()
+    game_args = _cs2_game_args(demo_path, cfg_name)
+
+    if steam_exe:
+        print("[highlights] Iniciando CS2 via Steam (-applaunch)...")
+        subprocess.Popen(
+            [steam_exe, "-applaunch", CS2_STEAM_APP_ID, *game_args],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if not _wait_for_process("cs2.exe", 180):
+            raise RuntimeError(
+                "CS2 não iniciou via Steam. Abra o Steam, faça login e confirme que o CS2 está instalado."
+            )
+        if not _wait_for_process_exit("cs2.exe", timeout_sec):
+            raise RuntimeError("CS2 não finalizou a renderização dentro do tempo limite.")
+        return
+
+    print("[highlights] Iniciando CS2 diretamente (Steam já em execução)...")
+    result = subprocess.run(
+        [cs2_exe, *game_args],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=timeout_sec,
+    )
+    if result.returncode != 0:
+        tail = (result.stderr or "")[-800:]
+        if "Steam Client" in tail or "Steam is probably not running" in tail:
+            raise RuntimeError(
+                "CS2 não conectou ao Steam. Abra o Steam, faça login e deixe rodando em segundo plano."
+            )
+        raise RuntimeError(tail or "CS2 não concluiu a renderização")
 
 
 def resolve_render_mode() -> str:
@@ -250,6 +392,31 @@ def render_card_clip(
         raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao gerar clipe")
 
 
+def resolve_cs2_csgo_dir(cs2_exe: str) -> Path:
+    """Diretório game/csgo onde o CS2 grava frames do startmovie."""
+    exe = Path(cs2_exe).resolve()
+    return exe.parents[2] / "csgo"
+
+
+def _sanitize_movie_basename(value: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "", value)
+    return (cleaned[:48] or "csleaguehl")
+
+
+def _cleanup_cs2_movie_files(csgo_dir: Path, basename: str) -> None:
+    for pattern in (f"{basename}*.tga", f"{basename}*.wav"):
+        for path in csgo_dir.glob(pattern):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+
+def _collect_cs2_movie_frames(csgo_dir: Path, basename: str) -> list[Path]:
+    frames = sorted(csgo_dir.glob(f"{basename}*.tga"))
+    return [frame for frame in frames if frame.is_file()]
+
+
 def _demo_path_for_cs2(demo_path: str) -> str:
     return str(Path(demo_path).resolve()).replace("\\", "/")
 
@@ -257,21 +424,18 @@ def _demo_path_for_cs2(demo_path: str) -> str:
 def _build_cs2_record_cfg(
     cfg_path: Path,
     *,
-    demo_path: str,
     clip_start_tick: int,
     clip_end_tick: int,
-    frame_prefix: Path,
+    frame_basename: str,
     steam_id: str | None,
     player_name: str | None,
 ) -> None:
-    demo = _demo_path_for_cs2(demo_path)
     lines = [
         "volume 0",
         "snd_mute_losefocus 1",
         "cl_draw_only_deathnotices 0",
         "demo_pauseafterinit 1",
-        f'demo_gototick {clip_start_tick}',
-        "demo_resume",
+        f"demo_gototick {clip_start_tick}",
     ]
 
     if steam_id and steam_id.isdigit():
@@ -282,9 +446,10 @@ def _build_cs2_record_cfg(
     lines.extend(
         [
             "spec_mode 4",
-            "host_framerate 30",
+            "demo_resume",
             "host_timescale 1",
-            f"startmovie {frame_prefix.as_posix()} tga",
+            "host_framerate 30",
+            f"startmovie {frame_basename} tga framerate 30",
             f"demo_gototick {clip_end_tick}",
             "endmovie",
             "quit",
@@ -293,30 +458,42 @@ def _build_cs2_record_cfg(
     cfg_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _frames_to_mp4(frames_dir: Path, output_path: Path) -> None:
-    cmd = [
-        FFMPEG_PATH,
-        "-y",
-        "-framerate",
-        "30",
-        "-i",
-        str(frames_dir / "frame%04d.tga"),
-        "-c:v",
-        "libx264",
-        "-pix_fmt",
-        "yuv420p",
-        "-movflags",
-        "+faststart",
-        str(output_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao converter frames")
+def _frames_to_mp4(frames: list[Path], output_path: Path) -> None:
+    if not frames:
+        raise RuntimeError("Nenhum frame TGA para converter")
+
+    staging_dir = output_path.parent / f".frames-{output_path.stem}"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for index, frame in enumerate(frames):
+            shutil.copy2(frame, staging_dir / f"frame{index:04d}.tga")
+
+        cmd = [
+            FFMPEG_PATH,
+            "-y",
+            "-framerate",
+            "30",
+            "-i",
+            str(staging_dir / "frame%04d.tga"),
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr[-500:] or "FFmpeg falhou ao converter frames")
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 def render_cs2_clip(
     output_path: Path,
     *,
+    highlight_id: str,
     demo_path: str,
     clip_start_tick: int,
     clip_end_tick: int,
@@ -332,49 +509,45 @@ def render_cs2_clip(
     if not Path(demo_path).is_file():
         raise RuntimeError(f"Demo não encontrada para renderização: {demo_path}")
 
+    csgo_dir = resolve_cs2_csgo_dir(cs2_exe)
+    cfg_dir = csgo_dir / "cfg"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+
+    frame_basename = _sanitize_movie_basename(f"csleague_{highlight_id}")
+    cfg_name = _sanitize_movie_basename(f"csleague_{highlight_id}")
+    cfg_path = cfg_dir / f"{cfg_name}.cfg"
+
     duration = clip_duration_seconds(clip_start_tick, clip_end_tick)
     temp_dir = output_path.parent / f".render-{output_path.stem}"
     temp_dir.mkdir(parents=True, exist_ok=True)
-    frame_prefix = temp_dir / "frame"
-    cfg_path = temp_dir / "highlight.cfg"
     raw_video = temp_dir / "raw.mp4"
+
+    _cleanup_cs2_movie_files(csgo_dir, frame_basename)
 
     try:
         _build_cs2_record_cfg(
             cfg_path,
-            demo_path=demo_path,
             clip_start_tick=clip_start_tick,
             clip_end_tick=clip_end_tick,
-            frame_prefix=frame_prefix,
+            frame_basename=frame_basename,
             steam_id=steam_id,
             player_name=player_name,
         )
 
-        cs2_cmd = [
-            cs2_exe,
-            "-insecure",
-            "-novid",
-            "-windowed",
-            "-w",
-            "1280",
-            "-h",
-            "720",
-            "-console",
-            "+playdemo",
-            _demo_path_for_cs2(demo_path),
-            "+exec",
-            str(cfg_path.resolve()),
-        ]
-        timeout = max(300, duration * 6)
-        result = subprocess.run(cs2_cmd, capture_output=True, text=True, timeout=timeout)
-        if result.returncode != 0:
-            tail = (result.stderr or result.stdout or "")[-800:]
-            raise RuntimeError(tail or "CS2 não concluiu a renderização")
+        timeout = max(300, int(duration * 8) + 120)
+        print(
+            f"[highlights] CS2 render {highlight_id}: ticks {clip_start_tick}-{clip_end_tick}, "
+            f"basename={frame_basename}, steam={steam_id or player_name}"
+        )
+        _launch_cs2_and_wait(cs2_exe, demo_path, cfg_name, timeout)
 
-        frames = sorted(temp_dir.glob("frame*.tga"))
+        frames = _collect_cs2_movie_frames(csgo_dir, frame_basename)
         if not frames:
-            raise RuntimeError("CS2 não gerou frames para o clipe")
-        _frames_to_mp4(temp_dir, raw_video)
+            raise RuntimeError(
+                f"CS2 não gerou frames em {csgo_dir} (basename {frame_basename}). "
+                "Verifique se o Steam/CS2 está instalado e se a demo abre no jogo."
+            )
+        _frames_to_mp4(frames, raw_video)
 
         ticks = kill_ticks or []
         if len(ticks) >= 2:
@@ -387,6 +560,11 @@ def render_cs2_clip(
         else:
             shutil.copy2(raw_video, output_path)
     finally:
+        _cleanup_cs2_movie_files(csgo_dir, frame_basename)
+        try:
+            cfg_path.unlink()
+        except OSError:
+            pass
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -401,29 +579,16 @@ def render_highlight_clip(job: dict) -> Path:
 
     mode = resolve_render_mode()
     if mode == "cs2":
-        try:
-            render_cs2_clip(
-                output_path,
-                demo_path=str(job["demoPath"]),
-                clip_start_tick=clip_start,
-                clip_end_tick=clip_end,
-                steam_id=steam_id,
-                player_name=player_name,
-                kill_ticks=kill_ticks,
-            )
-        except Exception as err:
-            if HIGHLIGHT_RENDER_MODE == "cs2":
-                raise
-            print(f"[highlights] CS2 indisponível ({err}); usando card como fallback")
-            render_card_clip(
-                output_path,
-                player_name=player_name,
-                description=str(job.get("description", "Destaque")),
-                highlight_type=str(job.get("highlightType", "MULTI_KILL")),
-                round_num=int(job.get("round", 0) or 0),
-                clip_start_tick=clip_start,
-                clip_end_tick=clip_end,
-            )
+        render_cs2_clip(
+            output_path,
+            highlight_id=highlight_id,
+            demo_path=str(job["demoPath"]),
+            clip_start_tick=clip_start,
+            clip_end_tick=clip_end,
+            steam_id=steam_id,
+            player_name=player_name,
+            kill_ticks=kill_ticks,
+        )
     else:
         render_card_clip(
             output_path,

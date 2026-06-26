@@ -15,6 +15,7 @@ import {
 } from '../lib/mapVetoService';
 import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
+import { isHighlightsFeatureEnabled } from '../lib/featureFlags';
 import {
   enqueueHighlightExtractJob,
   findLatestCompletedDemoForMatch,
@@ -521,6 +522,10 @@ export function registerMatchExtras(router: Router): void {
 
   router.post('/:id/highlights/generate', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
     try {
+      if (!isHighlightsFeatureEnabled()) {
+        res.status(503).json({ error: 'Geração de destaques temporariamente desabilitada.' });
+        return;
+      }
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {
         res.status(403).json({ error: access.error });

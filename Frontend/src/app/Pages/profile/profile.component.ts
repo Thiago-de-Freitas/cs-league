@@ -9,6 +9,7 @@ import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
 import { Demo, PersonalDemoStat, PersonalHighlightEntry, PersonalStatsOverview } from '../../Models/interfaces';
 import { hasHighlightVideoRendering } from '../../Utils/highlight-generate-pending.util';
+import { HIGHLIGHTS_FEATURE_ENABLED } from '../../Utils/feature-flags';
 import {
   getHighlightTypeAccent,
   getHighlightRenderBadgeClass,
@@ -36,6 +37,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   steamId = '';
   position = '';
   readonly positionOptions = PLAYER_POSITIONS;
+  readonly highlightsFeatureEnabled = HIGHLIGHTS_FEATURE_ENABLED;
   getHighlightTypeLabel = getHighlightTypeLabel;
   getHighlightRenderLabel = getHighlightRenderLabel;
   getHighlightTypeAccent = getHighlightTypeAccent;
@@ -83,11 +85,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.route.queryParamMap.subscribe((params) => {
       const tab = params.get('tab');
-      if (tab === 'demos' || tab === 'highlights' || tab === 'settings' || tab === 'stats') {
+      if (tab === 'demos' || tab === 'settings' || tab === 'stats') {
         this.activeTab = tab;
-        if (tab === 'highlights') {
-          this.loadPersonalHighlights();
-        }
+      } else if (tab === 'highlights' && HIGHLIGHTS_FEATURE_ENABLED) {
+        this.activeTab = tab;
+        this.loadPersonalHighlights();
       }
     });
 
@@ -114,7 +116,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.loadStatsOverview();
     this.loadPersonalDemos();
     this.loadDemoQueueHealth();
-    if (this.activeTab === 'highlights') {
+    if (HIGHLIGHTS_FEATURE_ENABLED && this.activeTab === 'highlights') {
       this.loadPersonalHighlights();
     }
   }
@@ -280,6 +282,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   setTab(tab: ProfileTab): void {
+    if (tab === 'highlights' && !HIGHLIGHTS_FEATURE_ENABLED) {
+      return;
+    }
     this.activeTab = tab;
     if (tab === 'highlights') {
       this.loadPersonalHighlights();
