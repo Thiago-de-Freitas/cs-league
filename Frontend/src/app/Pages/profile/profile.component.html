@@ -229,13 +229,13 @@
       </section>
 
       <!-- HIGHLIGHTS -->
-      <section *ngIf="activeTab === 'highlights'" class="highlights-section gc-card">
-        <div class="section-header">
-          <div>
+      <section *ngIf="activeTab === 'highlights'" class="highlights-section gc-card highlights-panel">
+        <header class="highlights-header">
+          <div class="highlights-header-main">
             <h2 class="section-title">Destaques</h2>
-            <p class="meta">Jogadas detectadas nas suas demos pessoais.</p>
+            <p class="meta highlights-intro">Jogadas detectadas nas suas demos pessoais.</p>
           </div>
-          <div class="section-header-actions">
+          <div class="highlights-header-actions">
             <button
               *ngIf="hasPersonalHighlights && !highlightsLoading"
               type="button"
@@ -248,11 +248,16 @@
               Atualizar
             </button>
           </div>
-        </div>
+        </header>
 
-        <p *ngIf="hasRenderingHighlights && !highlightsLoading" class="meta highlights-updating">
-          Gerando vídeos MP4… a lista atualiza automaticamente.
-        </p>
+        <div *ngIf="hasRenderingHighlights && !highlightsLoading" class="highlights-progress-banner">
+          <div class="highlights-progress-top">
+            <span>Gerando vídeos MP4… a lista atualiza automaticamente.</span>
+          </div>
+          <div class="highlight-progress-bar" style="--pct: 100%">
+            <div class="highlight-progress-fill highlight-progress-indeterminate"></div>
+          </div>
+        </div>
 
         <div *ngIf="highlightsLoading" class="loading">Carregando destaques...</div>
 
@@ -264,49 +269,65 @@
           <button type="button" class="btn btn-primary btn-small mt-4" (click)="setTab('demos')">Ver demos</button>
         </div>
 
-        <ul *ngIf="!highlightsLoading && hasPersonalHighlights" class="gc-list profile-highlights-list">
-          <li *ngFor="let h of personalHighlights" class="gc-list-item profile-highlight-item">
-            <div class="profile-highlight-main">
-              <div class="profile-highlight-head">
-                <strong>{{ h.playerName }}</strong>
-                <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
-                <span *ngIf="getHighlightRenderLabel(h.clipRenderStatus)" class="badge badge-gray">
-                  {{ getHighlightRenderLabel(h.clipRenderStatus) }}
-                </span>
+        <p *ngIf="!highlightsLoading && hasPersonalHighlights" class="highlights-count">
+          {{ personalHighlights.length }} destaque{{ personalHighlights.length === 1 ? '' : 's' }}
+        </p>
+
+        <ul *ngIf="!highlightsLoading && hasPersonalHighlights" class="highlights-list">
+          <li *ngFor="let h of personalHighlights" class="highlight-card">
+            <div class="highlight-card-accent" [ngClass]="getHighlightTypeAccent(h.type)"></div>
+            <div class="highlight-card-content">
+              <div class="highlight-card-row">
+                <div class="highlight-round-badge" aria-label="Round {{ h.round }}">
+                  <span class="highlight-round-label">RD</span>
+                  <span class="highlight-round-num">{{ h.round }}</span>
+                </div>
+                <div class="highlight-card-main">
+                  <div class="highlight-card-title">
+                    <strong>{{ h.playerName }}</strong>
+                    <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
+                    <span
+                      *ngIf="getHighlightRenderLabel(h.clipRenderStatus)"
+                      class="badge"
+                      [ngClass]="getHighlightRenderBadgeClass(h.clipRenderStatus)">
+                      {{ getHighlightRenderLabel(h.clipRenderStatus) }}
+                    </span>
+                  </div>
+                  <p class="highlight-card-desc">{{ h.description }}</p>
+                  <p class="meta profile-highlight-demo">
+                    Demo:
+                    <button type="button" class="demo-link" (click)="viewDemo(h.demoId!)">
+                      {{ shortFileName(h.demoFileName) }}
+                    </button>
+                    <span *ngIf="h.demoCreatedAt"> · {{ formatDate(h.demoCreatedAt) }}</span>
+                  </p>
+                  <p *ngIf="h.clipRenderError" class="error-message highlight-error">{{ h.clipRenderError }}</p>
+                </div>
               </div>
-              <p class="meta">{{ h.description }} · Round {{ h.round }}</p>
-              <p class="meta profile-highlight-demo">
-                Demo:
-                <button type="button" class="demo-link" (click)="viewDemo(h.demoId!)">
-                  {{ shortFileName(h.demoFileName) }}
+              <footer class="highlight-card-footer">
+                <span *ngIf="isHighlightVideoRendering(h)" class="highlight-rendering">Gerando MP4…</span>
+                <button
+                  *ngIf="h.clipStartTick != null && h.clipEndTick != null"
+                  type="button"
+                  class="btn btn-secondary btn-small"
+                  (click)="downloadHighlightClip(h)">
+                  Baixar spec
                 </button>
-                <span *ngIf="h.demoCreatedAt"> · {{ formatDate(h.demoCreatedAt) }}</span>
-              </p>
-              <p *ngIf="h.clipRenderError" class="error-message highlight-error">{{ h.clipRenderError }}</p>
-            </div>
-            <div class="profile-highlight-actions">
-              <button
-                *ngIf="h.clipStartTick != null && h.clipEndTick != null"
-                type="button"
-                class="btn btn-secondary btn-small"
-                (click)="downloadHighlightClip(h)">
-                Baixar spec
-              </button>
-              <button
-                *ngIf="canDownloadHighlightVideo(h)"
-                type="button"
-                class="btn btn-primary btn-small"
-                (click)="downloadHighlightVideo(h)">
-                Baixar MP4
-              </button>
-              <span *ngIf="isHighlightVideoRendering(h)" class="meta">Gerando MP4...</span>
-              <button
-                type="button"
-                class="btn btn-ghost btn-small btn-danger-text"
-                (click)="deleteHighlight(h)"
-                [disabled]="deletingHighlightId === h.id">
-                Excluir
-              </button>
+                <button
+                  *ngIf="canDownloadHighlightVideo(h)"
+                  type="button"
+                  class="btn btn-primary btn-small"
+                  (click)="downloadHighlightVideo(h)">
+                  Baixar MP4
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-small btn-danger-text"
+                  (click)="deleteHighlight(h)"
+                  [disabled]="deletingHighlightId === h.id">
+                  Excluir
+                </button>
+              </footer>
             </div>
           </li>
         </ul>

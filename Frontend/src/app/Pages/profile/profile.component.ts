@@ -9,6 +9,12 @@ import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
 import { Demo, PersonalDemoStat, PersonalHighlightEntry, PersonalStatsOverview } from '../../Models/interfaces';
 import { hasHighlightVideoRendering } from '../../Utils/highlight-generate-pending.util';
+import {
+  getHighlightTypeAccent,
+  getHighlightRenderBadgeClass,
+  getHighlightRenderLabel,
+  getHighlightTypeLabel,
+} from '../../Utils/highlight-display.util';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
@@ -30,6 +36,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
   steamId = '';
   position = '';
   readonly positionOptions = PLAYER_POSITIONS;
+  getHighlightTypeLabel = getHighlightTypeLabel;
+  getHighlightRenderLabel = getHighlightRenderLabel;
+  getHighlightTypeAccent = getHighlightTypeAccent;
+  getHighlightRenderBadgeClass = getHighlightRenderBadgeClass;
   avatarUrl: string | null = null;
   role = '';
   successMsg = '';
@@ -536,27 +546,6 @@ export class ProfileComponent implements OnInit, OnDestroy {
       failed: 'Falhou',
     };
     return labels[status] || status;
-  }
-
-  getHighlightTypeLabel(type: string): string {
-    const labels: Record<string, string> = {
-      MULTI_KILL: 'Multi-kill',
-      ACE: 'ACE',
-      CLUTCH: 'Clutch',
-      OPENING_KILL: 'Opening kill',
-    };
-    return labels[type] ?? type;
-  }
-
-  getHighlightRenderLabel(status?: string | null): string {
-    const labels: Record<string, string> = {
-      PENDING: 'Vídeo na fila',
-      PROCESSING: 'Renderizando vídeo',
-      COMPLETED: 'Vídeo pronto',
-      FAILED: 'Falha no vídeo',
-      UNAVAILABLE: 'Vídeo indisponível',
-    };
-    return labels[status ?? ''] ?? '';
   }
 
   canDownloadHighlightVideo(highlight: PersonalHighlightEntry): boolean {
