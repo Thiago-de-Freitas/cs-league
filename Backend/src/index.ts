@@ -33,6 +33,7 @@ import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
+import { getDemoMaxUploadErrorMessage } from './lib/demoUploadLimits';
 import { getBuildInfo, formatBuildLabel, type BuildInfo } from './lib/buildInfo';
 import {
   ensureUploadStorageDirectories,
@@ -536,7 +537,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
     return;
   }
   if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-    res.status(413).json({ error: 'Arquivo muito grande. O limite é 500 MB.' });
+    res.status(413).json({ error: getDemoMaxUploadErrorMessage(), code: 'DEMO_FILE_TOO_LARGE' });
     return;
   }
   if (err.message === 'Apenas imagens PNG, JPG, WEBP ou GIF são permitidas') {

@@ -14,6 +14,7 @@ export interface DemoHealthConfig {
   redis?: { queueAvailable?: boolean };
   redisErrors?: string[];
   warnings?: string[];
+  demoMaxUploadMb?: number;
 }
 
 @Injectable({ providedIn: 'root' })

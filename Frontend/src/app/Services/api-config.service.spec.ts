@@ -19,9 +19,9 @@ describe('ApiConfigService', () => {
     httpMock.verify();
   });
 
-  it('getDemoUploadUrl uses relative path when apiBaseUrl is empty', () => {
+  it('getDemoUploadUrl uses direct API URL on localhost dev', () => {
     service.getDemoUploadUrl().subscribe((url) => {
-      expect(url).toBe('/api/demos/upload');
+      expect(url).toMatch(/^http:\/\/(localhost|127\.0\.0\.1):3000\/api\/demos\/upload$/);
     });
 
     const req = httpMock.expectOne('/runtime-config.json');

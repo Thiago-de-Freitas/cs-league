@@ -1,3 +1,5 @@
+import { getDemoMaxUploadMb } from './demoUploadLimits';
+
 function isUnresolvedRailwayRef(value: string): boolean {
   return value.includes('${{') || value.includes('{{');
 }
@@ -94,6 +96,7 @@ export function getRedisWarnings(): string[] {
   ];
 }
 
+
 /** Diagnóstico sem expor secrets (para debug na Railway). */
 export function getEnvConfigStatus() {
   const cors = process.env.CORS_ORIGIN?.trim() ?? '';
@@ -125,6 +128,7 @@ export function getEnvConfigStatus() {
     coreErrors: getCoreEnvErrors(),
     redisErrors: getRedisEnvErrors(),
     warnings: getRedisWarnings(),
+    demoMaxUploadMb: getDemoMaxUploadMb(),
   };
 }
 

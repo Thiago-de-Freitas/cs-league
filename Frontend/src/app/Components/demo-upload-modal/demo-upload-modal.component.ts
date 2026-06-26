@@ -30,6 +30,7 @@ export class DemoUploadModalComponent implements OnInit {
   uploadProgress = 0;
   queueUnavailable = false;
   queueUnavailableMsg = '';
+  maxUploadMb = 1024;
   errorMsg = '';
   leagues: League[] = [];
   selectedLeagueId = '';
@@ -72,6 +73,9 @@ export class DemoUploadModalComponent implements OnInit {
 
     this.demoService.getDemoHealthConfig().subscribe({
       next: (config) => {
+        if (config.demoMaxUploadMb && config.demoMaxUploadMb > 0) {
+          this.maxUploadMb = config.demoMaxUploadMb;
+        }
         const available = config.redis?.queueAvailable !== false && !(config.redisErrors?.length);
         if (!available) {
           this.queueUnavailable = true;
@@ -162,14 +166,35 @@ export class DemoUploadModalComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
       const file = input.files[0];
-      this.selectedFile = file;
       this.errorMsg = '';
+      const maxBytes = this.maxUploadMb * 1024 * 1024;
+      if (file.size > maxBytes) {
+        this.errorMsg = `Arquivo muito grande (${this.formatFileSize(file.size)}). O limite é ${this.formatUploadLimit()}.`;
+        this.selectedFile = null;
+        input.value = '';
+        return;
+      }
+      this.selectedFile = file;
       if (this.existingDemoNames.has(file.name.toLowerCase())) {
         this.errorMsg = 'Este arquivo de demo já foi enviado.';
         this.selectedFile = null;
         input.value = '';
       }
     }
+  }
+
+  private formatUploadLimit(): string {
+    if (this.maxUploadMb >= 1024 && this.maxUploadMb % 1024 === 0) {
+      return `${this.maxUploadMb / 1024} GB`;
+    }
+    return `${this.maxUploadMb} MB`;
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
   }
 
   onLeagueChange(preselectMatchId?: string): void {
@@ -241,7 +266,9 @@ export class DemoUploadModalComponent implements OnInit {
         }
         this.errorMsg =
           err.error?.error ||
-          (err.status === 503
+          (err.status === 413
+            ? `Arquivo muito grande. O limite é ${this.formatUploadLimit()}.`
+            : err.status === 503
             ? 'Serviço de análise indisponível. Verifique a configuração do Redis na Railway.'
             : 'Erro no upload.');
       }

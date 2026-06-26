@@ -27,6 +27,7 @@ import { filterHighlightsForPersonalDemo } from '../lib/highlightPayload';
 import { getHighlightProgress } from '../lib/highlightProgress';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
 import { serializeHighlight } from '../lib/highlightSerialization';
+import { getDemoMaxUploadBytes } from '../lib/demoUploadLimits';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -57,7 +58,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
+  limits: { fileSize: getDemoMaxUploadBytes() },
   fileFilter: (_req, file, cb) => {
     if (file.originalname.toLowerCase().endsWith('.dem')) {
       cb(null, true);

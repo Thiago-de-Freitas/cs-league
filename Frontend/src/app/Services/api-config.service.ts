@@ -6,9 +6,16 @@ interface RuntimeConfig {
   apiBaseUrl?: string;
 }
 
+const DEV_API_PORT = '3000';
+
+function isLocalDevHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
 /**
  * Em produção (front separado), uploads grandes vão direto à API pública
  * para evitar timeout do proxy Railway (~30–40s no cs-league-front).
+ * Em dev local, também bypassa o proxy do ng serve para arquivos grandes.
  */
 @Injectable({ providedIn: 'root' })
 export class ApiConfigService {
@@ -37,7 +44,15 @@ export class ApiConfigService {
   /** URL absoluta para POST de demo; fallback relativo em dev local. */
   getDemoUploadUrl(): Observable<string> {
     return this.loadApiBaseUrl().pipe(
-      map((base) => (base ? `${base}/api/demos/upload` : '/api/demos/upload'))
+      map((base) => {
+        if (base) {
+          return `${base}/api/demos/upload`;
+        }
+        if (typeof window !== 'undefined' && isLocalDevHost(window.location.hostname)) {
+          return `http://${window.location.hostname}:${DEV_API_PORT}/api/demos/upload`;
+        }
+        return '/api/demos/upload';
+      })
     );
   }
 }
