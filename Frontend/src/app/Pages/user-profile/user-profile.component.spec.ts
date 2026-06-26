@@ -99,5 +99,44 @@ describe('UserProfileComponent', () => {
     component.loadProfile('u1');
     expect(component.hasPersonalStats).toBeTrue();
     expect(component.personalDemoStats.length).toBe(1);
+    fixture.detectChanges();
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Estatísticas individuais');
+  });
+
+  it('hasPersonalStats é false sem demos concluídas', () => {
+    expect(component.hasPersonalStats).toBeFalse();
+  });
+
+  it('calcula gauges de stats individuais', () => {
+    usersServiceSpy.getUserProfile.and.returnValue(
+      of({
+        ...mockProfile,
+        personalStats: {
+          summary: {
+            demosTotal: 1,
+            demosCompleted: 1,
+            kills: 20,
+            deaths: 10,
+            kd: 2,
+            adr: 85,
+            hsPercent: 50,
+            kast: 75,
+            rating: 1.2,
+          },
+          demos: [],
+        },
+      })
+    );
+    component.loadProfile('u1');
+    expect(component.kdGaugePercent()).toBe(100);
+    expect(component.ratingGaugePercent()).toBe(60);
+    expect(component.kastGaugePercent()).toBe(75);
+  });
+
+  it('shortFileName encurta nomes longos de demo', () => {
+    const longName = 'very-long-demo-name-that-should-be-truncated.dem';
+    expect(component.shortFileName(longName).length).toBeLessThan(longName.length);
+    expect(component.shortFileName('short.dem')).toBe('short.dem');
   });
 });

@@ -113,6 +113,24 @@ export type SerializedPersonalStatsOverview = {
   demos: Array<Omit<PersonalDemoStat, 'createdAt'> & { createdAt: string }>;
 };
 
+export function serializePublicPersonalStatsOverview(
+  overview: ReturnType<typeof buildPersonalStatsOverview>
+): SerializedPersonalStatsOverview | null {
+  if (overview.summary.demosCompleted === 0) {
+    return null;
+  }
+
+  return {
+    summary: overview.summary,
+    demos: overview.demos
+      .filter((demo) => demo.status === 'completed')
+      .map((demo) => ({
+        ...demo,
+        createdAt: demo.createdAt.toISOString(),
+      })),
+  };
+}
+
 export async function getPersonalStatsForUser(
   userId: string
 ): Promise<SerializedPersonalStatsOverview | null> {
@@ -128,18 +146,5 @@ export async function getPersonalStatsForUser(
     },
   });
 
-  const overview = buildPersonalStatsOverview(demos);
-  if (overview.summary.demosCompleted === 0) {
-    return null;
-  }
-
-  return {
-    summary: overview.summary,
-    demos: overview.demos
-      .filter((demo) => demo.status === 'completed')
-      .map((demo) => ({
-        ...demo,
-        createdAt: demo.createdAt.toISOString(),
-      })),
-  };
+  return serializePublicPersonalStatsOverview(buildPersonalStatsOverview(demos));
 }

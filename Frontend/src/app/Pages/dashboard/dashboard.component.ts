@@ -11,8 +11,6 @@ import { AuthService } from '../../Services/auth.service';
 import { League, Team, TeamInvite, PlayerRankingEntry, TeamRankingEntry } from '../../Models/interfaces';
 import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
 import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/create-team-modal/create-team-modal.component';
-import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
-import { Demo } from '../../Models/interfaces';
 import { formatTeamCapacity } from '../../Utils/bracket.util';
 import { RANKING_POSITION_OPTIONS, RankingPositionFilter, getPlayerPositionLabel } from '../../Utils/player-positions';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
@@ -20,7 +18,7 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent, DemoUploadModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, CreateLeagueModalComponent, CreateTeamModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -36,7 +34,6 @@ export class DashboardComponent implements OnInit {
   userName = '';
   showCreateLeagueModal = false;
   showCreateTeamModal = false;
-  showUploadModal = false;
   showArchivedLeagues = false;
   pendingInvites: TeamInvite[] = [];
   playerRankings: PlayerRankingEntry[] = [];
@@ -327,27 +324,6 @@ export class DashboardComponent implements OnInit {
   private clampTeamsPage(): void {
     const maxPage = Math.max(0, this.teamsTotalPages - 1);
     if (this.teamsPage > maxPage) this.teamsPage = maxPage;
-  }
-
-  openUploadModal(): void {
-    this.showUploadModal = true;
-  }
-
-  closeUploadModal(): void {
-    this.showUploadModal = false;
-  }
-
-  onDemoUploaded(demo: Demo): void {
-    this.showUploadModal = false;
-    if (demo.isPersonal) {
-      this.router.navigate(['/profile'], { queryParams: { tab: 'demos' } });
-      return;
-    }
-    if (demo.matchId) {
-      this.router.navigate(['/match', demo.matchId]);
-      return;
-    }
-    this.router.navigate(['/demo', demo.id]);
   }
 
   openCreateLeagueModal(): void {

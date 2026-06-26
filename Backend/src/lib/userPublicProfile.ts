@@ -5,6 +5,19 @@ import { publicUploadUrlForResponse } from './uploadAssets';
 import { isAdmin } from './permissions';
 import { getPersonalStatsForUser, type SerializedPersonalStatsOverview } from './personalStats';
 
+export function canViewInactiveUserProfile(
+  isActive: boolean,
+  isSelf: boolean,
+  viewerIsAdmin: boolean
+): boolean {
+  if (isActive) return true;
+  return isSelf || viewerIsAdmin;
+}
+
+export function shouldExposeProfileEmail(isSelf: boolean, viewerIsAdmin: boolean): boolean {
+  return isSelf || viewerIsAdmin;
+}
+
 export type PublicUserTeam = {
   id: string;
   name: string;
@@ -62,7 +75,7 @@ export async function getPublicUserProfile(
   const isSelf = viewer.userId === user.id;
   const viewerIsAdmin = isAdmin(viewer);
 
-  if (!user.isActive && !isSelf && !viewerIsAdmin) {
+  if (!canViewInactiveUserProfile(user.isActive, isSelf, viewerIsAdmin)) {
     return null;
   }
 
@@ -95,7 +108,7 @@ export async function getPublicUserProfile(
     isSelf,
   };
 
-  if (isSelf || viewerIsAdmin) {
+  if (shouldExposeProfileEmail(isSelf, viewerIsAdmin)) {
     profile.email = user.email;
   }
 

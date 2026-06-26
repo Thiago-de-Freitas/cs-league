@@ -11,7 +11,7 @@
 @media (max-width: 1024px) {
   .container,
   .dashboard-hero-inner,
-  .dashboard-grid,
+  .dashboard-body,
   .gc-navbar-inner {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
@@ -126,7 +126,7 @@
     font-size: 1.75rem;
   }
 
-  .dashboard-grid {
+  .dashboard-body {
     grid-template-columns: 1fr;
     gap: 1rem;
     padding: 0 1rem 1.5rem;

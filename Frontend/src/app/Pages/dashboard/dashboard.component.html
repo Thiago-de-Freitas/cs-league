@@ -1,271 +1,319 @@
 <div class="dashboard-container">
   <section class="dashboard-hero">
     <div class="dashboard-hero-inner">
-      <h1>CS <span>LEAGUE</span></h1>
-      <p *ngIf="userName">Bem-vindo de volta, <strong>{{ userName }}</strong></p>
-      <p *ngIf="!userName">Sua plataforma competitiva de Counter-Strike 2</p>
+      <div class="dashboard-hero-main">
+        <div class="dashboard-hero-copy">
+          <h1>CS <span>LEAGUE</span></h1>
+          <p *ngIf="userName">Bem-vindo de volta, <strong>{{ userName }}</strong></p>
+          <p *ngIf="!userName">Sua plataforma competitiva de Counter-Strike 2</p>
+        </div>
+
+        <div class="dashboard-hero-actions" *ngIf="!loading">
+          <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova liga</button>
+          <button type="button" class="btn btn-secondary btn-small" (click)="openCreateTeamModal()">+ Novo time</button>
+          <a routerLink="/profile" class="btn btn-ghost btn-small">Meu perfil</a>
+          <a routerLink="/demo-upload" class="btn btn-ghost btn-small">Demos de partida</a>
+        </div>
+      </div>
+
+      <div class="dashboard-hero-stats" *ngIf="!loading">
+        <div class="hero-stat">
+          <span class="hero-stat-value">{{ leagues.length }}</span>
+          <span class="hero-stat-label">Minhas ligas</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-value">{{ teams.length }}</span>
+          <span class="hero-stat-label">Meus times</span>
+        </div>
+        <div class="hero-stat" *ngIf="pendingInvites.length > 0">
+          <span class="hero-stat-value hero-stat-highlight">{{ pendingInvites.length }}</span>
+          <span class="hero-stat-label">Convites pendentes</span>
+        </div>
+        <div class="hero-stat" *ngIf="openLeagues.length > 0">
+          <span class="hero-stat-value hero-stat-highlight">{{ openLeagues.length }}</span>
+          <span class="hero-stat-label">Ligas abertas</span>
+        </div>
+      </div>
     </div>
   </section>
 
-  <div *ngIf="loading" class="loading">Carregando...</div>
+  <div *ngIf="loading" class="loading dashboard-loading">Carregando...</div>
 
-  <div *ngIf="loadError && !loading" class="error-message mb-4 page-inner">{{ loadError }}</div>
+  <div *ngIf="loadError && !loading" class="error-message mb-4 dashboard-body">{{ loadError }}</div>
 
-  <div class="dashboard-grid" *ngIf="!loading">
-    <section class="dashboard-card gc-card dashboard-card-full" *ngIf="openLeagues.length > 0">
-      <h2 class="gc-card-title">Ligas com inscrições abertas</h2>
-      <p class="meta mb-4">Inscreva um dos seus times e dispute com outros jogadores.</p>
-      <ul class="gc-list">
-        <li *ngFor="let league of openLeagues" class="gc-list-item">
-          <div class="open-league-info">
-            <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
-            <span class="meta" *ngIf="league.owner">por {{ league.owner.displayName }}</span>
-          </div>
-          <span class="badge badge-orange">Inscrições abertas</span>
-          <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
-        </li>
-      </ul>
+  <div class="dashboard-body" *ngIf="!loading">
+    <section class="dashboard-alerts" *ngIf="openLeagues.length > 0 || pendingInvites.length > 0">
+      <article class="dashboard-card gc-card dashboard-alert-card" *ngIf="openLeagues.length > 0">
+        <h2 class="gc-card-title">Ligas com inscrições abertas</h2>
+        <p class="meta dashboard-card-desc">Inscreva um dos seus times e dispute com outros jogadores.</p>
+        <ul class="gc-list">
+          <li *ngFor="let league of openLeagues" class="gc-list-item">
+            <div class="open-league-info">
+              <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
+              <span class="meta" *ngIf="league.owner">por {{ league.owner.displayName }}</span>
+            </div>
+            <span class="badge badge-orange">Inscrições abertas</span>
+            <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
+          </li>
+        </ul>
+      </article>
+
+      <article class="dashboard-card gc-card dashboard-alert-card" *ngIf="pendingInvites.length > 0">
+        <h2 class="gc-card-title">Convites de times</h2>
+        <ul class="gc-list">
+          <li *ngFor="let invite of pendingInvites" class="gc-list-item">
+            <span>{{ invite.team?.name }} <span class="badge badge-orange">{{ invite.team?.tag }}</span></span>
+            <div class="header-actions">
+              <button type="button" class="btn btn-primary btn-small" (click)="acceptInvite(invite)">Aceitar</button>
+              <button type="button" class="btn btn-ghost btn-small" (click)="rejectInvite(invite)">Recusar</button>
+            </div>
+          </li>
+        </ul>
+      </article>
     </section>
 
-    <section class="dashboard-card gc-card dashboard-card-full" *ngIf="pendingInvites.length > 0">
-      <h2 class="gc-card-title">Convites de Times</h2>
-      <ul class="gc-list">
-        <li *ngFor="let invite of pendingInvites" class="gc-list-item">
-          <span>{{ invite.team?.name }} <span class="badge badge-orange">{{ invite.team?.tag }}</span></span>
-          <div class="header-actions">
-            <button type="button" class="btn btn-primary btn-small" (click)="acceptInvite(invite)">Aceitar</button>
-            <button type="button" class="btn btn-ghost btn-small" (click)="rejectInvite(invite)">Recusar</button>
-          </div>
-        </li>
-      </ul>
-    </section>
+    <section class="dashboard-section">
+      <header class="dashboard-section-header">
+        <h2 class="dashboard-section-title">Minha competição</h2>
+        <p class="meta dashboard-section-subtitle">Ligas e times que você participa ou administra</p>
+      </header>
 
-    <section class="dashboard-card gc-card">
-      <div class="gc-card-header">
-        <h2 class="gc-card-title">Minhas Ligas</h2>
-        <div class="header-actions">
-          <button type="button" class="btn btn-ghost btn-small" (click)="toggleArchivedLeagues()">
-            {{ showArchivedLeagues ? 'Ocultar arquivadas' : 'Ver arquivadas' }}
-          </button>
-          <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
-        </div>
+      <div class="dashboard-competition-grid">
+        <article class="dashboard-card gc-card">
+          <div class="gc-card-header">
+            <h3 class="gc-card-title">Minhas ligas</h3>
+            <div class="header-actions">
+              <button type="button" class="btn btn-ghost btn-small" (click)="toggleArchivedLeagues()">
+                {{ showArchivedLeagues ? 'Ocultar arquivadas' : 'Ver arquivadas' }}
+              </button>
+              <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
+            </div>
+          </div>
+          <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
+            <li *ngFor="let league of paginatedLeagues" class="gc-list-item">
+              <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
+              <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
+              <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
+            </li>
+          </ul>
+          <nav
+            *ngIf="showLeaguesPagination"
+            class="gc-pagination"
+            aria-label="Paginação de minhas ligas">
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="leaguesPage === 0"
+              (click)="goToLeaguesPage(leaguesPage - 1)">
+              Anterior
+            </button>
+            <span class="gc-pagination-meta">{{ leaguesPageLabel }}</span>
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="leaguesPage >= leaguesTotalPages - 1"
+              (click)="goToLeaguesPage(leaguesPage + 1)">
+              Próxima
+            </button>
+          </nav>
+          <ng-template #noLeagues>
+            <div class="dashboard-empty">
+              <p class="meta">Nenhuma liga ainda.</p>
+              <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">Criar liga</button>
+            </div>
+          </ng-template>
+        </article>
+
+        <article class="dashboard-card gc-card">
+          <div class="gc-card-header">
+            <h3 class="gc-card-title">Meus times</h3>
+            <button type="button" class="btn btn-primary btn-small" (click)="openCreateTeamModal()">+ Novo</button>
+          </div>
+          <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
+            <li *ngFor="let team of paginatedTeams" class="gc-list-item">
+              <a [routerLink]="['/team-details', team.id]">{{ team.name }}</a>
+              <span class="badge badge-orange">{{ team.tag }}</span>
+              <span class="meta">{{ team.players.length || 0 }} jogadores</span>
+            </li>
+          </ul>
+          <nav
+            *ngIf="showTeamsPagination"
+            class="gc-pagination"
+            aria-label="Paginação de meus times">
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="teamsPage === 0"
+              (click)="goToTeamsPage(teamsPage - 1)">
+              Anterior
+            </button>
+            <span class="gc-pagination-meta">{{ teamsPageLabel }}</span>
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="teamsPage >= teamsTotalPages - 1"
+              (click)="goToTeamsPage(teamsPage + 1)">
+              Próxima
+            </button>
+          </nav>
+          <ng-template #noTeams>
+            <div class="dashboard-empty">
+              <p class="meta">Nenhum time ainda.</p>
+              <button type="button" class="btn btn-primary btn-small" (click)="openCreateTeamModal()">Criar time</button>
+            </div>
+          </ng-template>
+        </article>
       </div>
-      <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
-        <li *ngFor="let league of paginatedLeagues" class="gc-list-item">
-          <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
-          <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
-          <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
-        </li>
-      </ul>
-      <nav
-        *ngIf="showLeaguesPagination"
-        class="gc-pagination"
-        aria-label="Paginação de minhas ligas">
-        <button
-          type="button"
-          class="btn btn-secondary btn-small"
-          [disabled]="leaguesPage === 0"
-          (click)="goToLeaguesPage(leaguesPage - 1)">
-          Anterior
-        </button>
-        <span class="gc-pagination-meta">{{ leaguesPageLabel }}</span>
-        <button
-          type="button"
-          class="btn btn-secondary btn-small"
-          [disabled]="leaguesPage >= leaguesTotalPages - 1"
-          (click)="goToLeaguesPage(leaguesPage + 1)">
-          Próxima
-        </button>
-      </nav>
-      <ng-template #noLeagues>
-        <p class="meta">Nenhuma liga ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateLeagueModal()">Criar liga</button></p>
-      </ng-template>
     </section>
 
-    <section class="dashboard-card gc-card">
-      <div class="gc-card-header">
-        <h2 class="gc-card-title">Meus Times</h2>
-        <button type="button" class="btn btn-primary btn-small" (click)="openCreateTeamModal()">+ Novo</button>
+    <section class="dashboard-section">
+      <header class="dashboard-section-header">
+        <h2 class="dashboard-section-title">Rankings</h2>
+        <p class="meta dashboard-section-subtitle">Desempenho em partidas oficiais de ligas</p>
+      </header>
+
+      <div class="dashboard-rankings">
+        <article class="dashboard-card gc-card ranking-card ranking-card-players">
+          <div class="ranking-card-header">
+            <div class="ranking-card-intro">
+              <h3 class="gc-card-title">{{ rankingPlayersTitle }}</h3>
+              <p class="meta ranking-subtitle">{{ rankingPlayersSubtitle }}</p>
+            </div>
+            <span class="meta ranking-range" *ngIf="!playerRankingsLoading">{{ rankingRangeLabel }}</span>
+          </div>
+
+          <div class="ranking-filters-bar">
+            <div class="ranking-filters-grid">
+              <div class="form-group" *ngIf="leagues.length > 0">
+                <label class="form-label" for="ranking-league">Liga</label>
+                <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
+                  <option value="">Todas as ligas</option>
+                  <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ranking-position">Posição</label>
+                <select id="ranking-position" class="input-field" [(ngModel)]="rankingPosition" (ngModelChange)="onRankingPositionChange()">
+                  <option value="">Todas as posições</option>
+                  <option *ngFor="let option of rankingPositionOptions" [value]="option.id">{{ option.label }}</option>
+                </select>
+              </div>
+              <div class="form-group ranking-page-size">
+                <label class="form-label" for="ranking-page-size">Por página</label>
+                <select
+                  id="ranking-page-size"
+                  class="input-field"
+                  [(ngModel)]="rankingPageSize"
+                  (ngModelChange)="onRankingPageSizeChange()">
+                  <option *ngFor="let size of rankingPageSizeOptions" [ngValue]="size">{{ size }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="playerRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+
+          <div *ngIf="!playerRankingsLoading && playerRankings.length > 0" class="table-container">
+            <table class="stats-table ranking-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Jogador</th>
+                  <th>ADR</th>
+                  <th>K/D</th>
+                  <th>Rating</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let player of playerRankings">
+                  <td class="rank-cell" [class.rank-top]="player.rank <= 3">{{ player.rank }}</td>
+                  <td>
+                    <a *ngIf="getPlayerProfileLink(player) as link" [routerLink]="link" class="ranking-player-link">
+                      <strong>{{ getPlayerLabel(player) }}</strong>
+                    </a>
+                    <strong *ngIf="!getPlayerProfileLink(player)">{{ getPlayerLabel(player) }}</strong>
+                    <span *ngIf="getPlayerPositionBadge(player)" class="badge badge-gray ranking-position-badge">
+                      {{ getPlayerPositionBadge(player) }}
+                    </span>
+                    <span class="meta ranking-demos">{{ player.matches ?? player.demos }} jogo(s)</span>
+                  </td>
+                  <td class="stat-highlight">{{ player.adr }}</td>
+                  <td>{{ getKd(player) }}</td>
+                  <td>{{ player.rating }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p *ngIf="!playerRankingsLoading && playerRankings.length === 0" class="meta">
+            {{ rankingPosition ? 'Nenhum jogador com esta posição possui estatísticas ainda.' : 'Nenhuma estatística disponível ainda.' }}
+          </p>
+          <nav
+            *ngIf="showRankingPagination"
+            class="gc-pagination"
+            aria-label="Paginação do ranking de jogadores">
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="rankingPage <= 1"
+              (click)="goToRankingPage(rankingPage - 1)">
+              Anterior
+            </button>
+            <span class="gc-pagination-meta">{{ rankingPageLabel }}</span>
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              [disabled]="rankingPage >= rankingTotalPages"
+              (click)="goToRankingPage(rankingPage + 1)">
+              Próxima
+            </button>
+          </nav>
+        </article>
+
+        <article class="dashboard-card gc-card ranking-card ranking-card-teams">
+          <div class="ranking-card-header">
+            <div class="ranking-card-intro">
+              <h3 class="gc-card-title">Top times</h3>
+              <p class="meta ranking-subtitle">Times com mais vitórias nas ligas</p>
+            </div>
+          </div>
+
+          <div *ngIf="teamRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
+
+          <div *ngIf="!teamRankingsLoading && teamRankings.length > 0" class="table-container">
+            <table class="stats-table ranking-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Time</th>
+                  <th>V</th>
+                  <th>D</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let team of teamRankings">
+                  <td class="rank-cell" [class.rank-top]="team.rank <= 3">{{ team.rank }}</td>
+                  <td>
+                    <a [routerLink]="['/team-details', team.teamId]" class="ranking-team-link">
+                      <img
+                        *ngIf="teamRankingLogoSrc(team) as logoSrc"
+                        [src]="logoSrc"
+                        [alt]="team.name"
+                        class="ranking-team-logo"
+                        (error)="onTeamRankingLogoError(team.teamId)">
+                      <span *ngIf="!teamRankingLogoSrc(team)" class="ranking-team-badge">{{ team.tag }}</span>
+                      <strong>{{ team.name }}</strong>
+                    </a>
+                  </td>
+                  <td><span class="stat-badge stat-badge-wins">{{ team.wins }}</span></td>
+                  <td><span class="stat-badge stat-badge-losses">{{ team.losses }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p *ngIf="!teamRankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
+        </article>
       </div>
-      <ul class="gc-list" *ngIf="teams.length > 0; else noTeams">
-        <li *ngFor="let team of paginatedTeams" class="gc-list-item">
-          <a [routerLink]="['/team-details', team.id]">{{ team.name }}</a>
-          <span class="badge badge-orange">{{ team.tag }}</span>
-          <span class="meta">{{ team.players.length || 0 }} jogadores</span>
-        </li>
-      </ul>
-      <nav
-        *ngIf="showTeamsPagination"
-        class="gc-pagination"
-        aria-label="Paginação de meus times">
-        <button
-          type="button"
-          class="btn btn-secondary btn-small"
-          [disabled]="teamsPage === 0"
-          (click)="goToTeamsPage(teamsPage - 1)">
-          Anterior
-        </button>
-        <span class="gc-pagination-meta">{{ teamsPageLabel }}</span>
-        <button
-          type="button"
-          class="btn btn-secondary btn-small"
-          [disabled]="teamsPage >= teamsTotalPages - 1"
-          (click)="goToTeamsPage(teamsPage + 1)">
-          Próxima
-        </button>
-      </nav>
-      <ng-template #noTeams>
-        <p class="meta">Nenhum time ainda. <button type="button" class="text-link text-link-btn" (click)="openCreateTeamModal()">Criar time</button></p>
-      </ng-template>
     </section>
-
-    <section class="dashboard-card gc-card">
-      <h2 class="gc-card-title">Análise de Demos</h2>
-      <p class="meta mb-4">Envie arquivos .dem e obtenha estatísticas detalhadas: K/D, ADR, HS% e KAST.</p>
-      <button type="button" class="btn btn-success w-full" (click)="openUploadModal()">Enviar Demo</button>
-    </section>
-
-    <div class="dashboard-rankings">
-      <section class="dashboard-card gc-card ranking-card">
-        <div class="ranking-card-header">
-          <div class="ranking-card-intro">
-            <h2 class="gc-card-title">{{ rankingPlayersTitle }}</h2>
-            <p class="meta ranking-subtitle">{{ rankingPlayersSubtitle }}</p>
-          </div>
-          <span class="meta ranking-range" *ngIf="!playerRankingsLoading">{{ rankingRangeLabel }}</span>
-        </div>
-
-        <div class="ranking-filters-bar">
-          <div class="ranking-filters-grid">
-            <div class="form-group" *ngIf="leagues.length > 0">
-              <label class="form-label" for="ranking-league">Liga</label>
-              <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
-                <option value="">Todas as ligas</option>
-                <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ranking-position">Posição</label>
-              <select id="ranking-position" class="input-field" [(ngModel)]="rankingPosition" (ngModelChange)="onRankingPositionChange()">
-                <option value="">Todas as posições</option>
-                <option *ngFor="let option of rankingPositionOptions" [value]="option.id">{{ option.label }}</option>
-              </select>
-            </div>
-            <div class="form-group ranking-page-size">
-              <label class="form-label" for="ranking-page-size">Por página</label>
-              <select
-                id="ranking-page-size"
-                class="input-field"
-                [(ngModel)]="rankingPageSize"
-                (ngModelChange)="onRankingPageSizeChange()">
-                <option *ngFor="let size of rankingPageSizeOptions" [ngValue]="size">{{ size }}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div *ngIf="playerRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
-
-        <div *ngIf="!playerRankingsLoading && playerRankings.length > 0" class="table-container">
-          <table class="stats-table ranking-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Jogador</th>
-                <th>ADR</th>
-                <th>K/D</th>
-                <th>Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let player of playerRankings">
-                <td class="rank-cell" [class.rank-top]="player.rank <= 3">{{ player.rank }}</td>
-                <td>
-                  <a *ngIf="getPlayerProfileLink(player) as link" [routerLink]="link" class="ranking-player-link">
-                    <strong>{{ getPlayerLabel(player) }}</strong>
-                  </a>
-                  <strong *ngIf="!getPlayerProfileLink(player)">{{ getPlayerLabel(player) }}</strong>
-                  <span *ngIf="getPlayerPositionBadge(player)" class="badge badge-gray ranking-position-badge">
-                    {{ getPlayerPositionBadge(player) }}
-                  </span>
-                  <span class="meta ranking-demos">{{ player.matches ?? player.demos }} jogo(s)</span>
-                </td>
-                <td class="stat-highlight">{{ player.adr }}</td>
-                <td>{{ getKd(player) }}</td>
-                <td>{{ player.rating }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p *ngIf="!playerRankingsLoading && playerRankings.length === 0" class="meta">
-          {{ rankingPosition ? 'Nenhum jogador com esta posição possui estatísticas ainda.' : 'Nenhuma estatística disponível ainda.' }}
-        </p>
-        <nav
-          *ngIf="showRankingPagination"
-          class="gc-pagination"
-          aria-label="Paginação do ranking de jogadores">
-          <button
-            type="button"
-            class="btn btn-secondary btn-small"
-            [disabled]="rankingPage <= 1"
-            (click)="goToRankingPage(rankingPage - 1)">
-            Anterior
-          </button>
-          <span class="gc-pagination-meta">{{ rankingPageLabel }}</span>
-          <button
-            type="button"
-            class="btn btn-secondary btn-small"
-            [disabled]="rankingPage >= rankingTotalPages"
-            (click)="goToRankingPage(rankingPage + 1)">
-            Próxima
-          </button>
-        </nav>
-      </section>
-
-      <section class="dashboard-card gc-card ranking-card ranking-card-wide">
-        <div class="ranking-card-header">
-          <h2 class="gc-card-title">Top Times</h2>
-          <p class="meta ranking-subtitle">Times com mais vitórias nas ligas</p>
-        </div>
-
-        <div *ngIf="teamRankingsLoading" class="loading ranking-loading">Carregando ranking...</div>
-
-        <div *ngIf="!teamRankingsLoading && teamRankings.length > 0" class="table-container">
-          <table class="stats-table ranking-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Time</th>
-                <th>Vitórias</th>
-                <th>Derrotas</th>
-                <th>Ligas</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let team of teamRankings">
-                <td class="rank-cell" [class.rank-top]="team.rank <= 3">{{ team.rank }}</td>
-                <td>
-                  <a [routerLink]="['/team-details', team.teamId]" class="ranking-team-link">
-                    <img
-                      *ngIf="teamRankingLogoSrc(team) as logoSrc"
-                      [src]="logoSrc"
-                      [alt]="team.name"
-                      class="ranking-team-logo"
-                      (error)="onTeamRankingLogoError(team.teamId)">
-                    <span *ngIf="!teamRankingLogoSrc(team)" class="ranking-team-badge">{{ team.tag }}</span>
-                    <strong>{{ team.name }}</strong>
-                  </a>
-                </td>
-                <td><span class="stat-badge stat-badge-wins">{{ team.wins }}</span></td>
-                <td><span class="stat-badge stat-badge-losses">{{ team.losses }}</span></td>
-                <td>{{ team.leagues }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p *ngIf="!teamRankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
-      </section>
-    </div>
   </div>
 </div>
 
@@ -280,10 +328,3 @@
   (closed)="closeCreateTeamModal()"
   (created)="onTeamCreated($event)">
 </app-create-team-modal>
-
-<app-demo-upload-modal
-  *ngIf="showUploadModal"
-  [allowedModes]="['general']"
-  (closed)="closeUploadModal()"
-  (uploaded)="onDemoUploaded($event)">
-</app-demo-upload-modal>

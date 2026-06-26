@@ -1,9 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { DashboardComponent } from './dashboard.component';
-import { LeagueService } from '../../Services/league.service';
-import { TeamService } from '../../Services/team.service';
+import { LeagueService } from '../../Services/league.service';import { TeamService } from '../../Services/team.service';
 import { RankingsService } from '../../Services/rankings.service';
 import { AuthService } from '../../Services/auth.service';
 
@@ -33,14 +32,13 @@ describe('DashboardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DashboardComponent],
       providers: [
+        provideRouter([]),
         { provide: LeagueService, useValue: leagueServiceSpy },
         { provide: TeamService, useValue: teamServiceSpy },
         { provide: RankingsService, useValue: rankingsServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
-        { provide: Router, useValue: jasmine.createSpyObj('Router', ['navigate']) },
       ],
     }).compileComponents();
-
     fixture = TestBed.createComponent(DashboardComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -169,5 +167,27 @@ describe('DashboardComponent', () => {
     expect(component.paginatedLeagues.length).toBe(10);
     component.goToLeaguesPage(1);
     expect(component.paginatedLeagues[0].id).toBe('l10');
+  });
+
+  it('layout remodelado não exibe card de análise de demos', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).not.toContain('Análise de Demos');
+    expect(html.textContent).not.toContain('Enviar Demo');
+  });
+
+  it('hero exibe atalhos para perfil e demos de partida', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Meu perfil');
+    expect(html.textContent).toContain('Demos de partida');
+    expect(html.querySelector('a[href="/profile"]')).not.toBeNull();
+    expect(html.querySelector('a[href="/demo-upload"]')).not.toBeNull();
+  });
+
+  it('exibe seções Minha competição e Rankings', () => {
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Minha competição');
+    expect(html.textContent).toContain('Rankings');
+    expect(html.textContent).toContain('Minhas ligas');
+    expect(html.textContent).toContain('Meus times');
   });
 });
