@@ -95,6 +95,56 @@ describe('DashboardComponent', () => {
     expect(component.rankingPlayersTitle).toContain('AWP');
   });
 
+  it('getPlayerProfileLink prioriza userId para perfil público', () => {
+    expect(
+      component.getPlayerProfileLink({
+        rank: 1,
+        playerName: 'Player',
+        userId: 'user-abc',
+        steamId: '76561198000000001',
+        demos: 5,
+        kills: 100,
+        deaths: 80,
+        kd: 1.25,
+        adr: 85,
+        hsPercent: 40,
+        kast: 70,
+        rating: 1.1,
+      })
+    ).toEqual(['/users', 'user-abc']);
+
+    expect(
+      component.getPlayerProfileLink({
+        rank: 2,
+        playerName: 'Guest',
+        steamId: '76561198000000002',
+        demos: 3,
+        kills: 50,
+        deaths: 50,
+        kd: 1,
+        adr: 70,
+        hsPercent: 35,
+        kast: 65,
+        rating: 0.9,
+      })
+    ).toEqual(['/player', '76561198000000002']);
+
+    expect(
+      component.getPlayerProfileLink({
+        rank: 3,
+        playerName: 'Anon',
+        demos: 0,
+        kills: 0,
+        deaths: 0,
+        kd: 0,
+        adr: 0,
+        hsPercent: 0,
+        kast: 0,
+        rating: 0,
+      })
+    ).toBeNull();
+  });
+
   it('pagina ligas e times localmente', () => {
     component.leagues = Array.from({ length: 15 }, (_, i) => ({
       id: `l${i}`,

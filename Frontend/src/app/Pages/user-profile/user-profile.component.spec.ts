@@ -23,6 +23,7 @@ describe('UserProfileComponent', () => {
     teamCount: 0,
     teams: [],
     leagueStats: null,
+    personalStats: null,
     isSelf: false,
   };
 
@@ -60,5 +61,43 @@ describe('UserProfileComponent', () => {
     component.loadProfile('missing');
     expect(component.errorMsg).toBe('Jogador não encontrado');
     expect(component.loading).toBeFalse();
+  });
+
+  it('exibe estatísticas individuais quando disponíveis', () => {
+    usersServiceSpy.getUserProfile.and.returnValue(
+      of({
+        ...mockProfile,
+        personalStats: {
+          summary: {
+            demosTotal: 2,
+            demosCompleted: 2,
+            kills: 40,
+            deaths: 30,
+            kd: 1.33,
+            adr: 85,
+            hsPercent: 45,
+            kast: 72,
+            rating: 1.1,
+          },
+          demos: [
+            {
+              demoId: 'd1',
+              fileName: 'match.dem',
+              status: 'completed',
+              createdAt: '2025-06-01T12:00:00Z',
+              kills: 20,
+              deaths: 15,
+              kd: 1.33,
+              adr: 85,
+              hsPercent: 45,
+              kast: 72,
+            },
+          ],
+        },
+      })
+    );
+    component.loadProfile('u1');
+    expect(component.hasPersonalStats).toBeTrue();
+    expect(component.personalDemoStats.length).toBe(1);
   });
 });

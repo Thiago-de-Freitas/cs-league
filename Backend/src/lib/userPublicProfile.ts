@@ -3,6 +3,7 @@ import { getPlayerPositionLabel } from './playerPosition';
 import { getPlayerProfileBySteamId, type PlayerProfileStats } from './rankings';
 import { publicUploadUrlForResponse } from './uploadAssets';
 import { isAdmin } from './permissions';
+import { getPersonalStatsForUser, type SerializedPersonalStatsOverview } from './personalStats';
 
 export type PublicUserTeam = {
   id: string;
@@ -25,6 +26,7 @@ export type PublicUserProfile = {
   teamCount: number;
   teams: PublicUserTeam[];
   leagueStats: PlayerProfileStats | null;
+  personalStats: SerializedPersonalStatsOverview | null;
   isSelf: boolean;
 };
 
@@ -64,9 +66,10 @@ export async function getPublicUserProfile(
     return null;
   }
 
-  const leagueStats = user.steamId?.trim()
-    ? await getPlayerProfileBySteamId(user.steamId)
-    : null;
+  const [leagueStats, personalStats] = await Promise.all([
+    user.steamId?.trim() ? getPlayerProfileBySteamId(user.steamId) : Promise.resolve(null),
+    getPersonalStatsForUser(user.id),
+  ]);
 
   const position = user.position?.toLowerCase() ?? null;
 
@@ -88,6 +91,7 @@ export async function getPublicUserProfile(
       role: membership.role,
     })),
     leagueStats,
+    personalStats,
     isSelf,
   };
 

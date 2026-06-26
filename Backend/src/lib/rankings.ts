@@ -12,6 +12,7 @@ export type PlayerRankingEntry = {
   rank: number;
   playerName: string;
   displayName: string | null;
+  userId: string | null;
   steamId: string | null;
   position: PlayerPosition | null;
   positionLabel: string | null;
@@ -40,7 +41,10 @@ export type LeaguePlayerStatRow = {
   kast: number;
 };
 
-export type AggregatedPlayerRanking = Omit<PlayerRankingEntry, 'rank' | 'displayName' | 'positionLabel'>;
+export type AggregatedPlayerRanking = Omit<
+  PlayerRankingEntry,
+  'rank' | 'displayName' | 'positionLabel' | 'userId'
+>;
 
 export type TeamMembershipContext = {
   position: PlayerPosition | null;

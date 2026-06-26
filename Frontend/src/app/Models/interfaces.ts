@@ -486,6 +486,7 @@ export interface PublicUserProfile {
   teamCount: number;
   teams: PublicUserTeam[];
   leagueStats: PlayerProfileStats | null;
+  personalStats: PersonalStatsOverview | null;
   isSelf: boolean;
 }
 

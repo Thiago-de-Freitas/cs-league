@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { UsersService } from '../../Services/users.service';
-import { PublicUserProfile } from '../../Models/interfaces';
+import { PersonalStatsOverview, PublicUserProfile } from '../../Models/interfaces';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
@@ -83,6 +83,61 @@ export class UserProfileComponent implements OnInit {
 
   get hasLeagueStats(): boolean {
     return !!this.profile?.leagueStats;
+  }
+
+  get personalStats(): PersonalStatsOverview | null {
+    return this.profile?.personalStats ?? null;
+  }
+
+  get personalSummary() {
+    return this.personalStats?.summary;
+  }
+
+  get personalDemoStats() {
+    return this.personalStats?.demos ?? [];
+  }
+
+  get recentPersonalDemos() {
+    return this.personalDemoStats.slice(0, 20);
+  }
+
+  get hasPersonalStats(): boolean {
+    return (this.personalSummary?.demosCompleted ?? 0) > 0;
+  }
+
+  gaugePercent(value: number, max: number): number {
+    return Math.min(100, Math.round((value / max) * 100));
+  }
+
+  kdGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.kd || 0, 2);
+  }
+
+  ratingGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.rating || 0, 2);
+  }
+
+  kastGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.kast || 0, 100);
+  }
+
+  hsGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.hsPercent || 0, 100);
+  }
+
+  adrGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.adr || 0, 120);
+  }
+
+  shortFileName(fileName: string): string {
+    if (fileName.length <= 28) return fileName;
+    return `${fileName.slice(0, 12)}…${fileName.slice(-12)}`;
+  }
+
+  demoGridClass(status: string): string {
+    if (status === 'completed') return 'match-dot-win';
+    if (status === 'failed') return 'match-dot-loss';
+    return 'match-dot-pending';
   }
 
   goToEditProfile(): void {

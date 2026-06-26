@@ -1,4 +1,5 @@
 import type { MatchPlayerStat } from '@prisma/client';
+import { prisma } from './prisma';
 
 type DemoWithStats = {
   id: string;
@@ -105,4 +106,40 @@ export function buildPersonalStatsOverview(demos: DemoWithStats[]) {
   };
 
   return { summary, demos: perDemo };
+}
+
+export type SerializedPersonalStatsOverview = {
+  summary: PersonalStatsSummary;
+  demos: Array<Omit<PersonalDemoStat, 'createdAt'> & { createdAt: string }>;
+};
+
+export async function getPersonalStatsForUser(
+  userId: string
+): Promise<SerializedPersonalStatsOverview | null> {
+  const demos = await prisma.demo.findMany({
+    where: { uploadedById: userId, isPersonal: true },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      fileName: true,
+      status: true,
+      createdAt: true,
+      stats: true,
+    },
+  });
+
+  const overview = buildPersonalStatsOverview(demos);
+  if (overview.summary.demosCompleted === 0) {
+    return null;
+  }
+
+  return {
+    summary: overview.summary,
+    demos: overview.demos
+      .filter((demo) => demo.status === 'completed')
+      .map((demo) => ({
+        ...demo,
+        createdAt: demo.createdAt.toISOString(),
+      })),
+  };
 }
