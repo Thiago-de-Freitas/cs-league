@@ -21,11 +21,19 @@ export interface HighlightRenderJob {
   round: number;
 }
 
-function isRenderableHighlight(
+function readRenderableClipTicks(
   clipStartTick: number | null | undefined,
   clipEndTick: number | null | undefined
-): clipStartTick is number {
-  return clipStartTick != null && clipEndTick != null && clipStartTick >= 0 && clipEndTick > clipStartTick;
+): { clipStartTick: number; clipEndTick: number } | null {
+  if (
+    clipStartTick == null ||
+    clipEndTick == null ||
+    clipStartTick < 0 ||
+    clipEndTick <= clipStartTick
+  ) {
+    return null;
+  }
+  return { clipStartTick, clipEndTick };
 }
 
 export async function enqueueHighlightRenderJob(job: HighlightRenderJob): Promise<void> {
@@ -62,7 +70,8 @@ export async function enqueueRenderJobsForMatchHighlights(matchId: string, demoI
 
   let count = 0;
   for (const highlight of highlights) {
-    if (!isRenderableHighlight(highlight.clipStartTick, highlight.clipEndTick)) {
+    const clipTicks = readRenderableClipTicks(highlight.clipStartTick, highlight.clipEndTick);
+    if (!clipTicks) {
       await prisma.matchHighlight.update({
         where: { id: highlight.id },
         data: { clipRenderStatus: 'UNAVAILABLE', clipRenderError: 'Ticks de clipe ausentes' },
@@ -81,8 +90,8 @@ export async function enqueueRenderJobsForMatchHighlights(matchId: string, demoI
       parentId: matchId,
       demoId,
       demoPath: resolveDemoFilePath(demoPath),
-      clipStartTick: highlight.clipStartTick,
-      clipEndTick: highlight.clipEndTick,
+      clipStartTick: clipTicks.clipStartTick,
+      clipEndTick: clipTicks.clipEndTick,
       playerName: highlight.playerName,
       description: highlight.description,
       highlightType: highlight.type,
@@ -105,7 +114,8 @@ export async function enqueueRenderJobsForDemoHighlights(demoId: string): Promis
 
   let count = 0;
   for (const highlight of highlights) {
-    if (!isRenderableHighlight(highlight.clipStartTick, highlight.clipEndTick)) {
+    const clipTicks = readRenderableClipTicks(highlight.clipStartTick, highlight.clipEndTick);
+    if (!clipTicks) {
       await prisma.demoHighlight.update({
         where: { id: highlight.id },
         data: { clipRenderStatus: 'UNAVAILABLE', clipRenderError: 'Ticks de clipe ausentes' },
@@ -124,8 +134,8 @@ export async function enqueueRenderJobsForDemoHighlights(demoId: string): Promis
       parentId: demoId,
       demoId,
       demoPath: resolveDemoFilePath(demoPath),
-      clipStartTick: highlight.clipStartTick,
-      clipEndTick: highlight.clipEndTick,
+      clipStartTick: clipTicks.clipStartTick,
+      clipEndTick: clipTicks.clipEndTick,
       playerName: highlight.playerName,
       description: highlight.description,
       highlightType: highlight.type,
