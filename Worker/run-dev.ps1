@@ -11,6 +11,12 @@ if (-not $env:REDIS_URL) {
 if (-not $env:DEMO_STORAGE_PATH) {
   $env:DEMO_STORAGE_PATH = Join-Path $root "Backend\data\demos"
 }
+if (-not $env:BACKEND_INTERNAL_URL) {
+  $env:BACKEND_INTERNAL_URL = "http://localhost:3000"
+}
+if (-not $env:INTERNAL_SERVICE_KEY) {
+  $env:INTERNAL_SERVICE_KEY = "dev-internal-service-key"
+}
 
 Set-Location $PSScriptRoot
 Write-Host ("Worker CS League - DATABASE_URL=" + $env:DATABASE_URL)

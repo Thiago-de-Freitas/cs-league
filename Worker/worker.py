@@ -370,11 +370,13 @@ def get_demo_meta(demo_id: str) -> dict | None:
         conn.close()
 
 
-def post_demo_highlights(demo_id: str, highlights: list[dict]) -> None:
+def post_demo_highlights(demo_id: str, highlights: list[dict]) -> dict:
     if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
-        return
+        raise RuntimeError(
+            "BACKEND_INTERNAL_URL ou INTERNAL_SERVICE_KEY ausente no worker — destaques não podem ser salvos"
+        )
     if "${{" in INTERNAL_SERVICE_KEY:
-        return
+        raise RuntimeError("INTERNAL_SERVICE_KEY contém referência Railway não resolvida (${{...}})")
     payload = {"highlights": highlights}
     url = f"{BACKEND_INTERNAL_URL}/api/internal/demos/{demo_id}/highlights"
     req = urllib.request.Request(
@@ -387,17 +389,23 @@ def post_demo_highlights(demo_id: str, highlights: list[dict]) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=30):
-            pass
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else {}
+    except urllib.error.HTTPError as err:
+        detail = err.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"API rejeitou destaques da demo ({err.code}): {detail}") from err
     except Exception as err:
-        print(f"[highlights] falha ao salvar destaques pessoais: {err}")
+        raise RuntimeError(f"Falha ao salvar destaques pessoais: {err}") from err
 
 
-def post_match_highlights(match_id: str, demo_id: str, highlights: list[dict]) -> None:
+def post_match_highlights(match_id: str, demo_id: str, highlights: list[dict]) -> dict:
     if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
-        return
+        raise RuntimeError(
+            "BACKEND_INTERNAL_URL ou INTERNAL_SERVICE_KEY ausente no worker — destaques não podem ser salvos"
+        )
     if "${{" in INTERNAL_SERVICE_KEY:
-        return
+        raise RuntimeError("INTERNAL_SERVICE_KEY contém referência Railway não resolvida (${{...}})")
     payload = {
         "highlights": [
             {**h, "demoId": demo_id}
@@ -415,10 +423,14 @@ def post_match_highlights(match_id: str, demo_id: str, highlights: list[dict]) -
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=30):
-            pass
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else {}
+    except urllib.error.HTTPError as err:
+        detail = err.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"API rejeitou destaques da partida ({err.code}): {detail}") from err
     except Exception as err:
-        print(f"[highlights] falha ao salvar destaques: {err}")
+        raise RuntimeError(f"Falha ao salvar destaques: {err}") from err
 
 
 def save_and_extract_highlights(
@@ -532,13 +544,6 @@ def process_highlight_extract_job(payload: str) -> None:
         else:
             post_demo_highlights(demo_id, hl)
 
-        set_highlight_progress(
-            scope,
-            parent_id,
-            percent=50,
-            phase="rendering",
-            message=f"{len(hl)} destaque(s) detectado(s). Gerando vídeos...",
-        )
         print(f"[highlights] extração sob demanda concluída para demo {demo_id} ({len(hl)} clips)")
     except Exception as err:
         message = str(err)[:500]

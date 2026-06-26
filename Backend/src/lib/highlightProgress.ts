@@ -62,10 +62,10 @@ export async function getHighlightProgress(
   scope: HighlightProgressScope,
   parentId: string
 ): Promise<HighlightProgress | null> {
-  await connectRedis();
-  const raw = await redis.get(progressKey(scope, parentId));
-  if (!raw) return null;
   try {
+    await connectRedis();
+    const raw = await redis.get(progressKey(scope, parentId));
+    if (!raw) return null;
     return JSON.parse(raw) as HighlightProgress;
   } catch {
     return null;

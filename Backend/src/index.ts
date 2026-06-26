@@ -341,6 +341,7 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
 
     if (demo.isPersonal && scopedHighlights.length === 0) {
       await prisma.demoHighlight.deleteMany({ where: { demoId } });
+      await markHighlightRenderQueued('demo', demoId, 0);
       skipAudit(req);
       res.status(201).json({ ok: true, count: 0, renderJobs: 0 });
       return;
