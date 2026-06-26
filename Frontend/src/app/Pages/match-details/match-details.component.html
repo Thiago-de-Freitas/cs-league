@@ -109,23 +109,46 @@
       </ng-template>
     </div>
 
-    <div *ngIf="match?.highlights?.length" class="gc-card mt-4">
-      <h2 class="section-title">Destaques da partida</h2>
-      <p class="meta mb-4">Melhores jogadas detectadas na demo. Use "Baixar spec" para ticks de clipe (HLAE/demo tools). Vídeo MP4 exige renderização externa com FFmpeg/GOTV.</p>
-      <ul class="gc-list">
-        <li *ngFor="let h of match!.highlights!" class="gc-list-item">
+    <div *ngIf="canShowHighlightsSection" class="gc-card mt-4">
+      <div class="highlights-header">
+        <h2 class="section-title">{{ isDemoView ? 'Destaques da demo' : 'Destaques da partida' }}</h2>
+        <button
+          *ngIf="canGenerateHighlights"
+          type="button"
+          class="btn btn-primary btn-small"
+          (click)="generateHighlights()">
+          {{ generateHighlightsLabel }}
+        </button>
+        <span *ngIf="generatingHighlights" class="meta">Gerando destaques...</span>
+      </div>
+      <p class="meta mb-4">Melhores jogadas detectadas na demo. O MP4 é gerado automaticamente após a extração. Use "Baixar spec" para ticks HLAE/GOTV.</p>
+      <p *ngIf="!visibleHighlights.length && !generatingHighlights" class="meta">Nenhum destaque encontrado ainda. Clique em "Gerar destaques" para analisar a demo.</p>
+      <ul *ngIf="visibleHighlights.length" class="gc-list">
+        <li *ngFor="let h of visibleHighlights" class="gc-list-item highlight-item">
           <div>
             <strong>{{ h.playerName }}</strong>
             <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
+            <span *ngIf="getHighlightRenderLabel(h.clipRenderStatus)" class="badge badge-gray">{{ getHighlightRenderLabel(h.clipRenderStatus) }}</span>
             <p class="meta">{{ h.description }} · Round {{ h.round }}</p>
+            <p *ngIf="h.clipRenderError" class="meta highlight-error">{{ h.clipRenderError }}</p>
           </div>
-          <button
-            *ngIf="h.clipStartTick != null && h.clipEndTick != null"
-            type="button"
-            class="btn btn-secondary btn-small"
-            (click)="downloadHighlightClip(h.id)">
-            Baixar spec
-          </button>
+          <div class="highlight-actions">
+            <button
+              *ngIf="h.clipStartTick != null && h.clipEndTick != null"
+              type="button"
+              class="btn btn-secondary btn-small"
+              (click)="isDemoView ? downloadDemoHighlightClip(h.id) : downloadHighlightClip(h.id)">
+              Baixar spec
+            </button>
+            <button
+              *ngIf="canDownloadHighlightVideo(h)"
+              type="button"
+              class="btn btn-primary btn-small"
+              (click)="downloadHighlightVideo(h.id)">
+              Baixar MP4
+            </button>
+            <span *ngIf="isHighlightVideoRendering(h)" class="meta">Gerando MP4...</span>
+          </div>
         </li>
       </ul>
     </div>
@@ -170,13 +193,13 @@
           <a routerLink="/profile">Ver no perfil</a>
         </span>
       </div>
-      <div class="match-actions" *ngIf="!pollingDemo && demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
+      <div class="match-actions" *ngIf="!pollingDemo && demo.isPersonal && canReprocessDemo && (demo.status === 'pending' || demo.status === 'failed')">
         <button class="btn btn-secondary btn-small" (click)="reprocessDemo()">Reprocessar</button>
         <a routerLink="/profile" class="btn btn-ghost btn-small">Voltar ao Perfil</a>
       </div>
-      <div class="match-actions" *ngIf="!pollingDemo && !demo.isPersonal && (demo.status === 'pending' || demo.status === 'failed')">
+      <div class="match-actions" *ngIf="!pollingDemo && !demo.isPersonal && canReprocessDemo && (demo.status === 'pending' || demo.status === 'failed')">
         <button class="btn btn-secondary btn-small" (click)="reprocessDemo()">Reprocessar</button>
-        <a routerLink="/demo-upload" class="btn btn-ghost btn-small">Voltar às Demos</a>
+        <a routerLink="/demos" class="btn btn-ghost btn-small">Voltar às Demos</a>
       </div>
       <app-demo-status-loader
         *ngIf="pollingDemo"
@@ -312,7 +335,7 @@
     <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView && !showManualStatsForm" class="not-found-message">
       <p>Nenhuma demo associada. Envie um arquivo .dem ou insira as estatísticas manualmente.</p>
       <div class="empty-stats-actions">
-        <button class="btn btn-primary" (click)="openUploadModal()" *ngIf="!match?.hasFileDemo && !match?.manualDemoId">Enviar Demo</button>
+        <button class="btn btn-primary" (click)="openUploadModal()" *ngIf="match?.status !== 'completed' && !match?.hasFileDemo && !match?.manualDemoId">Enviar Demo</button>
         <button class="btn btn-secondary" (click)="openManualStatsForm()" *ngIf="canEditManualStats">Inserir stats manuais</button>
       </div>
     </div>

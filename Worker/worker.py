@@ -16,6 +16,8 @@ from pathlib import Path
 import psycopg2
 import redis
 from demoparser2 import DemoParser
+from highlight_extraction import extract_highlights
+from highlight_renderer import HIGHLIGHT_RENDER_QUEUE, process_highlight_render_job
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
@@ -367,15 +369,27 @@ def get_demo_meta(demo_id: str) -> dict | None:
         conn.close()
 
 
-CLIP_PADDING_TICKS = 64 * 5
-
-
-def _clip_ticks(center_tick: int) -> tuple[int, int]:
-    if center_tick <= 0:
-        return 0, 0
-    start = max(0, center_tick - CLIP_PADDING_TICKS)
-    end = center_tick + CLIP_PADDING_TICKS
-    return start, end
+def post_demo_highlights(demo_id: str, highlights: list[dict]) -> None:
+    if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
+        return
+    if "${{" in INTERNAL_SERVICE_KEY:
+        return
+    payload = {"highlights": highlights}
+    url = f"{BACKEND_INTERNAL_URL}/api/internal/demos/{demo_id}/highlights"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Internal-Service-Key": INTERNAL_SERVICE_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30):
+            pass
+    except Exception as err:
+        print(f"[highlights] falha ao salvar destaques pessoais: {err}")
 
 
 def post_match_highlights(match_id: str, demo_id: str, highlights: list[dict]) -> None:
@@ -406,59 +420,44 @@ def post_match_highlights(match_id: str, demo_id: str, highlights: list[dict]) -
         print(f"[highlights] falha ao salvar destaques: {err}")
 
 
-def extract_highlights(file_path: str) -> list[dict]:
-    parser = DemoParser(file_path)
-    deaths = parser.parse_event(
-        "player_death",
-        player=["X", "Y"],
-        other=["attacker_steamid", "attacker_name", "user_steamid", "headshot", "total_rounds_played", "tick"],
-    )
-    if deaths is None or len(deaths) == 0:
-        return []
+def save_and_extract_highlights(
+    file_path: str,
+    demo_id: str,
+    meta: dict | None,
+) -> None:
+    uploader_steam = None
+    if meta and meta.get("is_personal") and meta.get("uploader_steam_id"):
+        uploader_steam = str(meta["uploader_steam_id"])
 
-    kills_by_round: dict[int, dict[str, dict]] = {}
-    for _, row in deaths.iterrows():
-        attacker = str(row.get("attacker_steamid", ""))
-        if not attacker or attacker == "0":
-            continue
-        round_num = int(row.get("total_rounds_played", 0) or 0)
-        if round_num <= 0:
-            continue
-        name = str(row.get("attacker_name", attacker))
-        tick = int(row.get("tick", 0) or 0)
-        is_hs = row.get("headshot") in (True, 1)
-        bucket = kills_by_round.setdefault(round_num, {})
-        entry = bucket.setdefault(attacker, {"name": name, "kills": 0, "hs": 0, "last_tick": tick})
-        entry["kills"] += 1
-        if is_hs:
-            entry["hs"] += 1
-        entry["last_tick"] = tick
+    try:
+        hl = extract_highlights(file_path, uploader_steam_id=uploader_steam)
+        if not hl:
+            return
+        if meta and meta.get("match_id"):
+            post_match_highlights(meta["match_id"], demo_id, hl)
+        elif meta and meta.get("is_personal"):
+            post_demo_highlights(demo_id, hl)
+    except Exception as err:
+        print(f"[highlights] extração falhou: {err}")
 
-    highlights: list[dict] = []
-    for round_num, attackers in kills_by_round.items():
-        for steam_id, data in attackers.items():
-            kills = data["kills"]
-            if kills < 3:
-                continue
-            htype = "ACE" if kills >= 5 else "MULTI_KILL"
-            score = float(kills) + (0.5 if data["hs"] > 0 else 0)
-            tick = int(data["last_tick"])
-            clip_start, clip_end = _clip_ticks(tick)
-            highlights.append({
-                "round": round_num,
-                "tick": tick,
-                "clipStartTick": clip_start,
-                "clipEndTick": clip_end,
-                "steamId": steam_id,
-                "playerName": data["name"],
-                "type": htype,
-                "description": f"{data['name']}: {kills} abates no round {round_num}",
-                "score": score,
-                "metadata": {"kills": kills, "headshots": data["hs"]},
-            })
 
-    highlights.sort(key=lambda h: (-h["score"], h["round"]))
-    return highlights[:20]
+HIGHLIGHT_EXTRACT_QUEUE = "highlight:extract:queue"
+
+
+def process_highlight_extract_job(payload: str) -> None:
+    job = json.loads(payload)
+    demo_id = str(job.get("demoId", ""))
+    file_path = str(job.get("filePath", ""))
+    if not demo_id or not file_path:
+        raise ValueError("Job de extração de destaques inválido")
+
+    resolved, error = ensure_demo_file(demo_id, file_path)
+    if error or not resolved:
+        raise RuntimeError(error or "Arquivo da demo não encontrado")
+
+    meta = get_demo_meta(demo_id)
+    save_and_extract_highlights(resolved, demo_id, meta)
+    print(f"[highlights] extração sob demanda concluída para demo {demo_id}")
 
 
 def extract_map_name(file_path: str) -> str | None:
@@ -734,12 +733,6 @@ def process_job(demo_id: str, file_path: str):
     save_player_stats(demo_id, stats)
     if meta and meta.get("match_id"):
         update_match_map_from_demo(demo_id, map_name)
-        try:
-            hl = extract_highlights(file_path)
-            if hl:
-                post_match_highlights(meta["match_id"], demo_id, hl)
-        except Exception as err:
-            print(f"[highlights] extração falhou: {err}")
         record_worker_audit(
             "demo.match.map_update",
             "Match",
@@ -748,6 +741,7 @@ def process_job(demo_id: str, file_path: str):
             parent_id=demo_id,
             after={"map": map_name},
         )
+    save_and_extract_highlights(file_path, demo_id, meta)
     update_demo_status(demo_id, "COMPLETED")
     record_worker_audit(
         "demo.processing.complete",
@@ -768,16 +762,33 @@ def main():
     while True:
         try:
             publish_worker_status(r)
-            result = r.brpop(DEMO_QUEUE, timeout=POLL_TIMEOUT)
+            result = r.brpop([DEMO_QUEUE, HIGHLIGHT_RENDER_QUEUE, HIGHLIGHT_EXTRACT_QUEUE], timeout=POLL_TIMEOUT)
             if result is None:
                 idle_ticks += 1
                 if idle_ticks % 12 == 0:
                     qlen = r.llen(DEMO_QUEUE)
-                    print(f"Aguardando jobs... fila {DEMO_QUEUE}: {qlen} item(s)")
+                    render_len = r.llen(HIGHLIGHT_RENDER_QUEUE)
+                    extract_len = r.llen(HIGHLIGHT_EXTRACT_QUEUE)
+                    print(f"Aguardando jobs... demos={qlen} renders={render_len} extracts={extract_len}")
                 continue
 
             idle_ticks = 0
-            _, payload = result
+            queue_name, payload = result
+            if queue_name == HIGHLIGHT_RENDER_QUEUE:
+                print(f"Job de renderização recebido ({len(payload)} bytes)")
+                try:
+                    process_highlight_render_job(payload)
+                except Exception as err:
+                    print(f"[highlights] job de render inválido: {err}")
+                continue
+            if queue_name == HIGHLIGHT_EXTRACT_QUEUE:
+                print(f"Job de extração de destaques recebido ({len(payload)} bytes)")
+                try:
+                    process_highlight_extract_job(payload)
+                except Exception as err:
+                    print(f"[highlights] extração sob demanda falhou: {err}")
+                continue
+
             print(f"Job recebido da fila ({len(payload)} bytes)")
             parsed = parse_job_payload(payload)
             if not parsed:

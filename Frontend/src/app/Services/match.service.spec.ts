@@ -47,4 +47,22 @@ describe('MatchService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({ id: 'series-1', matches: [] });
   });
+
+  it('downloadHighlightClip baixa spec VDM', () => {
+    service.downloadHighlightClip('match-1', 'hl-1').subscribe((blob) => {
+      expect(blob.type).toContain('text');
+    });
+    const req = httpMock.expectOne('/api/matches/match-1/highlights/hl-1/clip?format=vdm');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Accept')).toBe('text/plain');
+    req.flush(new Blob(['vdm'], { type: 'text/plain' }));
+  });
+
+  it('downloadHighlightVideo baixa MP4', () => {
+    service.downloadHighlightVideo('match-1', 'hl-1').subscribe();
+    const req = httpMock.expectOne('/api/matches/match-1/highlights/hl-1/video');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['mp4'], { type: 'video/mp4' }));
+  });
 });

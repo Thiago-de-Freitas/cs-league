@@ -107,4 +107,17 @@ export class MatchService {
       headers: { Accept: 'text/plain' },
     });
   }
+
+  downloadHighlightVideo(matchId: string, highlightId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${matchId}/highlights/${highlightId}/video`, {
+      responseType: 'blob',
+    });
+  }
+
+  generateHighlights(matchId: string): Observable<{ ok: boolean; demoId: string; message: string }> {
+    return this.http.post<{ ok: boolean; demoId: string; message: string }>(
+      `${this.apiUrl}/${matchId}/highlights/generate`,
+      {}
+    );
+  }
 }

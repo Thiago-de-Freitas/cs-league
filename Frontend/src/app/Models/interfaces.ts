@@ -277,17 +277,34 @@ export interface MatchImage {
 
 export interface MatchHighlight {
   id: string;
-  matchId: string;
+  matchId?: string;
+  demoId?: string;
   round: number;
   tick?: number | null;
   clipStartTick?: number | null;
   clipEndTick?: number | null;
+  clipRenderStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'UNAVAILABLE' | string;
+  clipVideoUrl?: string | null;
+  clipRenderError?: string | null;
   steamId?: string | null;
   playerName: string;
   type: string;
   description: string;
   score: number;
   metadata?: Record<string, unknown> | null;
+}
+
+export type DemoHighlight = MatchHighlight;
+
+export interface PersonalHighlightEntry extends DemoHighlight {
+  demoFileName: string;
+  demoCreatedAt?: string;
+}
+
+export interface PersonalHighlightsResponse {
+  highlights: PersonalHighlightEntry[];
+  total: number;
+  videoExportAvailable: boolean;
 }
 
 export interface MatchRosterPlayer {
@@ -330,10 +347,12 @@ export interface Demo {
   status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   errorMessage?: string | null;
   matchId?: string | null;
+  uploadedById?: string;
   isPersonal?: boolean;
   isManual?: boolean;
   match?: Match | null;
   stats?: MatchPlayerStat[];
+  highlights?: DemoHighlight[];
   createdAt?: string;
   updatedAt?: string;
   playerCount?: number;

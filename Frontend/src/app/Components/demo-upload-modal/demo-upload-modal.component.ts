@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
 import { DemoService } from '../../Services/demo.service';
 import { LeagueService } from '../../Services/league.service';
 import { AuthService } from '../../Services/auth.service';
@@ -49,29 +50,24 @@ export class DemoUploadModalComponent implements OnInit {
     this.uploadMode = this.allowedModes[0] || 'general';
 
     this.authService.currentUser$.subscribe((user) => {
-      const isSystemAdmin = user?.role === 'ADMIN';
-      this.hasSteamId = isSystemAdmin || !!user?.steamId?.trim();
+      this.hasSteamId = !!user?.steamId?.trim();
       if (this.isPersonalMode && this.hasSteamId) {
-        if (isSystemAdmin) {
-          this.personalValidationOk = true;
-        } else {
-          this.validatePersonalProfile();
-        }
+        this.validatePersonalProfile();
       }
     });
 
-    const listDemos$ = this.isPersonalOnly
-      ? this.demoService.listPersonalDemos()
-      : this.demoService.listDemos();
-
-    listDemos$.subscribe({
-      next: (demos) => {
+    forkJoin({
+      personal: this.demoService.listPersonalDemos(),
+      league: this.isPersonalOnly ? of([] as Demo[]) : this.demoService.listDemos(),
+    }).subscribe({
+      next: ({ personal, league }) => {
+        const allDemos = [...personal, ...league];
         this.existingDemoNames = new Set(
-          demos
+          allDemos
             .filter((d) => d.status !== 'failed')
             .map((d) => d.fileName.toLowerCase())
         );
-      }
+      },
     });
 
     this.demoService.getDemoHealthConfig().subscribe({
@@ -133,10 +129,6 @@ export class DemoUploadModalComponent implements OnInit {
   }
 
   validatePersonalProfile(): void {
-    if (this.authService.isSystemAdmin()) {
-      this.personalValidationOk = true;
-      return;
-    }
     if (!this.hasSteamId) {
       this.personalValidationOk = false;
       return;
@@ -204,7 +196,7 @@ export class DemoUploadModalComponent implements OnInit {
     }
 
     if (this.isPersonalMode) {
-      if (!this.authService.isSystemAdmin() && !this.hasSteamId) {
+      if (!this.hasSteamId) {
         this.errorMsg = 'Configure seu Steam ID no perfil antes de enviar uma demo pessoal.';
         return;
       }

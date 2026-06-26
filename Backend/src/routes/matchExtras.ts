@@ -13,7 +13,12 @@ import {
   upsertMatchLineup,
 } from '../lib/mapVetoService';
 import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
-import { buildVdmClipSpec } from '../lib/clipExport';
+import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
+import {
+  enqueueHighlightExtractJob,
+  findLatestCompletedDemoForMatch,
+} from '../lib/highlightExtractQueue';
+import { requireDemoQueue } from '../middleware/demoQueue';
 import { getSeriesForMatch } from '../lib/matchSeriesService';
 import { encodeUploadedImageToDataUrl } from '../lib/uploadAssets';
 import { setAuditContext } from '../lib/audit';
@@ -383,7 +388,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.get('/:id/highlights', async (req: AuthRequest, res: Response) => {
+  router.get('/:id/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {
@@ -394,18 +399,14 @@ export function registerMatchExtras(router: Router): void {
         where: { matchId: req.params.id },
         orderBy: [{ score: 'desc' }, { round: 'asc' }],
       });
-      res.json({
-        highlights,
-        videoExportAvailable: highlights.some((h) => h.clipStartTick != null && h.clipEndTick != null),
-        note: 'Use "Baixar spec" para obter ticks de clipe (HLAE/demo tools). Vídeo MP4 exige renderização externa com FFmpeg/GOTV.',
-      });
+      res.json(buildHighlightsListResponse(highlights, { matchId: req.params.id }));
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Erro ao listar highlights' });
     }
   });
 
-  router.get('/:id/highlights/:highlightId/clip', async (req: AuthRequest, res: Response) => {
+  router.get('/:id/highlights/:highlightId/clip', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {
@@ -426,39 +427,63 @@ export function registerMatchExtras(router: Router): void {
         return;
       }
 
-      const vdm = buildVdmClipSpec({
-        clipStartTick: highlight.clipStartTick,
-        clipEndTick: highlight.clipEndTick,
-        playerName: highlight.playerName,
-        round: highlight.round,
-        description: highlight.description,
-      });
-
-      const accept = String(req.headers.accept ?? '');
-      if (accept.includes('text/plain') || req.query.format === 'vdm') {
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader(
-          'Content-Disposition',
-          `attachment; filename="highlight-r${highlight.round}-${highlight.id.slice(0, 8)}.vdm.txt"`
-        );
-        res.send(vdm);
-        return;
-      }
-
-      res.json({
-        format: 'vdm',
-        clipStartTick: highlight.clipStartTick,
-        clipEndTick: highlight.clipEndTick,
-        tick: highlight.tick,
-        round: highlight.round,
-        playerName: highlight.playerName,
-        description: highlight.description,
-        content: vdm,
-        note: 'Cole o conteúdo em um arquivo .vdm ou use HLAE com os ticks indicados. Vídeo MP4 requer FFmpeg/GOTV externo.',
-      });
+      sendHighlightClipSpec(res, highlight);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Erro ao exportar clipe' });
+    }
+  });
+
+  router.get('/:id/highlights/:highlightId/video', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
+      if (!access.allowed) {
+        res.status(403).json({ error: access.error });
+        return;
+      }
+      const highlight = await prisma.matchHighlight.findFirst({
+        where: { id: req.params.highlightId, matchId: req.params.id },
+      });
+      if (!highlight) {
+        res.status(404).json({ error: 'Destaque não encontrado' });
+        return;
+      }
+      sendHighlightVideo(res, highlight);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao baixar vídeo do destaque' });
+    }
+  });
+
+  router.post('/:id/highlights/generate', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+    try {
+      const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
+      if (!access.allowed) {
+        res.status(403).json({ error: access.error });
+        return;
+      }
+      const demoId = await findLatestCompletedDemoForMatch(req.params.id);
+      if (!demoId) {
+        res.status(400).json({ error: 'Nenhuma demo processada encontrada para esta partida' });
+        return;
+      }
+      await enqueueHighlightExtractJob(demoId);
+      setAuditContext(req, audit.of('match.highlights.generate', 'Match', req.params.id, {
+        metadata: { demoId },
+      }));
+      res.status(202).json({
+        ok: true,
+        demoId,
+        message: 'Geração de destaques enfileirada. Atualize a página em instantes.',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao gerar destaques';
+      if (message.includes('não encontrado') || message.includes('processada') || message.includes('manuais')) {
+        res.status(400).json({ error: message });
+        return;
+      }
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao gerar destaques' });
     }
   });
 

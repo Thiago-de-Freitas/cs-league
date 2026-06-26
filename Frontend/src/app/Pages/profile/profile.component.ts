@@ -2,17 +2,19 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, interval } from 'rxjs';
+import { startWith, switchMap, takeWhile } from 'rxjs/operators';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, PersonalDemoStat, PersonalStatsOverview } from '../../Models/interfaces';
+import { Demo, PersonalDemoStat, PersonalHighlightEntry, PersonalStatsOverview } from '../../Models/interfaces';
+import { hasHighlightVideoRendering } from '../../Utils/highlight-generate-pending.util';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 import { PLAYER_POSITIONS, getPlayerPositionLabel, normalizePlayerPositionForForm } from '../../Utils/player-positions';
 
-type ProfileTab = 'stats' | 'demos' | 'settings';
+type ProfileTab = 'stats' | 'demos' | 'highlights' | 'settings';
 
 @Component({
   selector: 'app-profile',
@@ -39,12 +41,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
   statsLoading = true;
   personalDemos: Demo[] = [];
   demosLoading = true;
+  personalHighlights: PersonalHighlightEntry[] = [];
+  highlightsLoading = true;
   showUploadModal = false;
   reprocessingId: string | null = null;
   deletingId: string | null = null;
   requeueAllLoading = false;
   demoQueueAvailable = true;
   private listPollSub?: Subscription;
+  private highlightsPollSub?: Subscription;
   private readonly stuckPendingMs = 2 * 60 * 1000;
 
   constructor(
@@ -65,8 +70,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.route.queryParamMap.subscribe((params) => {
       const tab = params.get('tab');
-      if (tab === 'demos' || tab === 'settings' || tab === 'stats') {
+      if (tab === 'demos' || tab === 'highlights' || tab === 'settings' || tab === 'stats') {
         this.activeTab = tab;
+        if (tab === 'highlights') {
+          this.loadPersonalHighlights();
+        }
       }
     });
 
@@ -92,11 +100,13 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     this.loadStatsOverview();
     this.loadPersonalDemos();
+    this.loadPersonalHighlights();
     this.loadDemoQueueHealth();
   }
 
   ngOnDestroy(): void {
     this.listPollSub?.unsubscribe();
+    this.highlightsPollSub?.unsubscribe();
   }
 
   loadStatsOverview(): void {
@@ -110,6 +120,46 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.statsLoading = false;
       }
     });
+  }
+
+  loadPersonalHighlights(): void {
+    this.highlightsLoading = true;
+    this.demoService.listPersonalHighlights().subscribe({
+      next: (response) => {
+        this.personalHighlights = response.highlights;
+        this.highlightsLoading = false;
+        this.setupHighlightsPolling();
+      },
+      error: () => {
+        this.highlightsLoading = false;
+        this.notify.error('Erro ao carregar destaques.');
+      },
+    });
+  }
+
+  setupHighlightsPolling(): void {
+    this.highlightsPollSub?.unsubscribe();
+    if (!hasHighlightVideoRendering(this.personalHighlights)) {
+      return;
+    }
+
+    this.highlightsPollSub = interval(4000).pipe(
+      startWith(0),
+      switchMap(() => this.demoService.listPersonalHighlights()),
+      takeWhile((response) => hasHighlightVideoRendering(response.highlights), true)
+    ).subscribe({
+      next: (response) => {
+        this.personalHighlights = response.highlights;
+      },
+    });
+  }
+
+  get hasPersonalHighlights(): boolean {
+    return this.personalHighlights.length > 0;
+  }
+
+  get hasRenderingHighlights(): boolean {
+    return hasHighlightVideoRendering(this.personalHighlights);
   }
 
   loadPersonalDemos(): void {
@@ -164,7 +214,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.demoQueueAvailable = config.redis?.queueAvailable !== false && !(config.redisErrors?.length);
       },
       error: () => {
-        this.demoQueueAvailable = true;
+        this.demoQueueAvailable = false;
       },
     });
   }
@@ -202,6 +252,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   setTab(tab: ProfileTab): void {
     this.activeTab = tab;
+    if (tab === 'highlights') {
+      this.loadPersonalHighlights();
+    }
   }
 
   gaugePercent(value: number, max: number): number {
@@ -464,5 +517,60 @@ export class ProfileComponent implements OnInit, OnDestroy {
       failed: 'Falhou',
     };
     return labels[status] || status;
+  }
+
+  getHighlightTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      MULTI_KILL: 'Multi-kill',
+      ACE: 'ACE',
+      CLUTCH: 'Clutch',
+      OPENING_KILL: 'Opening kill',
+    };
+    return labels[type] ?? type;
+  }
+
+  getHighlightRenderLabel(status?: string | null): string {
+    const labels: Record<string, string> = {
+      PENDING: 'Vídeo na fila',
+      PROCESSING: 'Renderizando vídeo',
+      COMPLETED: 'Vídeo pronto',
+      FAILED: 'Falha no vídeo',
+      UNAVAILABLE: 'Vídeo indisponível',
+    };
+    return labels[status ?? ''] ?? '';
+  }
+
+  canDownloadHighlightVideo(highlight: PersonalHighlightEntry): boolean {
+    return highlight.clipRenderStatus === 'COMPLETED' && !!highlight.clipVideoUrl;
+  }
+
+  isHighlightVideoRendering(highlight: PersonalHighlightEntry): boolean {
+    return highlight.clipRenderStatus === 'PENDING' || highlight.clipRenderStatus === 'PROCESSING';
+  }
+
+  downloadHighlightClip(highlight: PersonalHighlightEntry): void {
+    if (!highlight.demoId) return;
+    this.demoService.downloadDemoHighlightClip(highlight.demoId, highlight.id).subscribe({
+      next: (blob) => this.saveHighlightBlob(blob, highlight.id, 'vdm.txt', 'Spec de clipe baixada.'),
+      error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar spec do clipe.'),
+    });
+  }
+
+  downloadHighlightVideo(highlight: PersonalHighlightEntry): void {
+    if (!highlight.demoId) return;
+    this.demoService.downloadDemoHighlightVideo(highlight.demoId, highlight.id).subscribe({
+      next: (blob) => this.saveHighlightBlob(blob, highlight.id, 'mp4', 'Vídeo MP4 baixado.'),
+      error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar vídeo do destaque.'),
+    });
+  }
+
+  private saveHighlightBlob(blob: Blob, highlightId: string, extension: string, successMessage: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `highlight-${highlightId.slice(0, 8)}.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.notify.success(successMessage);
   }
 }

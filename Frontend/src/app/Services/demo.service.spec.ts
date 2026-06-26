@@ -44,4 +44,32 @@ describe('DemoService', () => {
     expect(upload.request.body instanceof FormData).toBeTrue();
     upload.flush({ id: 'd1', fileName: 'match.dem', status: 'pending' });
   });
+
+  it('listPersonalHighlights calls GET endpoint', () => {
+    service.listPersonalHighlights().subscribe((result) => {
+      expect(result.total).toBe(1);
+      expect(result.highlights.length).toBe(1);
+    });
+    const req = httpMock.expectOne('/api/demos/personal/highlights');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      total: 1,
+      videoExportAvailable: true,
+      highlights: [{ id: 'hl-1', demoId: 'demo-1', demoFileName: 'x.dem', type: 'ACE', round: 1, playerName: 'P', description: 'Ace', score: 5 }],
+    });
+  });
+
+  it('downloadDemoHighlightClip baixa spec VDM da demo', () => {
+    service.downloadDemoHighlightClip('demo-1', 'hl-1').subscribe();
+    const req = httpMock.expectOne('/api/demos/demo-1/highlights/hl-1/clip?format=vdm');
+    expect(req.request.method).toBe('GET');
+    req.flush(new Blob(['vdm'], { type: 'text/plain' }));
+  });
+
+  it('downloadDemoHighlightVideo baixa MP4 da demo', () => {
+    service.downloadDemoHighlightVideo('demo-1', 'hl-1').subscribe();
+    const req = httpMock.expectOne('/api/demos/demo-1/highlights/hl-1/video');
+    expect(req.request.method).toBe('GET');
+    req.flush(new Blob(['mp4'], { type: 'video/mp4' }));
+  });
 });

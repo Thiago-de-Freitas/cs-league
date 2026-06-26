@@ -50,10 +50,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
-    path: 'demo-upload',
+    path: 'demos',
     loadComponent: () =>
       import('./Pages/demo-upload/demo-upload.component').then((m) => m.DemoUploadComponent),
     canActivate: [authGuard],
+  },
+  {
+    path: 'demo-upload',
+    redirectTo: 'demos',
+    pathMatch: 'full',
   },
   {
     path: 'match/:id',

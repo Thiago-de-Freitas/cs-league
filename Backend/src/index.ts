@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import multer from 'multer';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
@@ -15,6 +16,12 @@ import auditRoutes from './routes/audit';
 import { prisma } from './lib/prisma';
 import { redis, connectRedis, DEMO_QUEUE } from './lib/redis';
 import { getDemoStoragePath } from './lib/demoStorage';
+import { getHighlightClipsPath } from './lib/highlightStorage';
+import { mapHighlightPayload } from './lib/highlightPayload';
+import {
+  enqueueRenderJobsForDemoHighlights,
+  enqueueRenderJobsForMatchHighlights,
+} from './lib/highlightRenderQueue';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -274,29 +281,98 @@ app.post('/api/internal/matches/:id/highlights', internalServiceAuth, async (req
       return;
     }
 
+    const demoId = highlights[0]?.demoId ? String(highlights[0].demoId) : null;
+
     await prisma.matchHighlight.deleteMany({ where: { matchId } });
     await prisma.matchHighlight.createMany({
       data: highlights.map((h: Record<string, unknown>) => ({
         matchId,
         demoId: h.demoId ? String(h.demoId) : null,
-        round: Number(h.round) || 0,
-        tick: h.tick != null ? Number(h.tick) : null,
-        clipStartTick: h.clipStartTick != null ? Number(h.clipStartTick) : null,
-        clipEndTick: h.clipEndTick != null ? Number(h.clipEndTick) : null,
-        steamId: h.steamId ? String(h.steamId) : null,
-        playerName: String(h.playerName ?? 'Jogador'),
-        type: String(h.type ?? 'MULTI_KILL').toUpperCase() as 'MULTI_KILL' | 'ACE' | 'CLUTCH' | 'OPENING_KILL',
-        description: String(h.description ?? 'Destaque'),
-        score: Number(h.score) || 0,
-        metadata: h.metadata ?? undefined,
+        ...mapHighlightPayload(h),
       })),
     });
 
+    let renderJobs = 0;
+    if (demoId) {
+      renderJobs = await enqueueRenderJobsForMatchHighlights(matchId, demoId);
+    }
+
     skipAudit(req);
-    res.status(201).json({ ok: true, count: highlights.length });
+    res.status(201).json({ ok: true, count: highlights.length, renderJobs });
   } catch (err) {
     console.error('[internal/highlights]', err);
     res.status(500).json({ error: 'Erro ao salvar highlights' });
+  }
+});
+
+app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, res) => {
+  try {
+    const demoId = req.params.id;
+    if (!isValidResourceId(demoId)) {
+      res.status(400).json({ error: 'ID inválido' });
+      return;
+    }
+    const highlights = Array.isArray(req.body?.highlights) ? req.body.highlights : [];
+    if (highlights.length === 0) {
+      res.status(400).json({ error: 'Nenhum highlight informado' });
+      return;
+    }
+
+    await prisma.demoHighlight.deleteMany({ where: { demoId } });
+    await prisma.demoHighlight.createMany({
+      data: highlights.map((h: Record<string, unknown>) => ({
+        demoId,
+        ...mapHighlightPayload(h),
+      })),
+    });
+
+    const renderJobs = await enqueueRenderJobsForDemoHighlights(demoId);
+
+    skipAudit(req);
+    res.status(201).json({ ok: true, count: highlights.length, renderJobs });
+  } catch (err) {
+    console.error('[internal/demo-highlights]', err);
+    res.status(500).json({ error: 'Erro ao salvar highlights da demo' });
+  }
+});
+
+app.post('/api/internal/highlights/render-result', internalServiceAuth, async (req, res) => {
+  try {
+    const scope = String(req.body?.scope ?? '');
+    const highlightId = String(req.body?.highlightId ?? '');
+    const status = String(req.body?.status ?? '').toUpperCase();
+    const clipVideoPath = req.body?.clipVideoPath ? String(req.body.clipVideoPath) : null;
+    const errorMessage = req.body?.errorMessage ? String(req.body.errorMessage) : null;
+
+    if (!isValidResourceId(highlightId)) {
+      res.status(400).json({ error: 'ID inválido' });
+      return;
+    }
+    if (!['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'UNAVAILABLE'].includes(status)) {
+      res.status(400).json({ error: 'Status de renderização inválido' });
+      return;
+    }
+
+    const data = {
+      clipRenderStatus: status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'UNAVAILABLE',
+      clipVideoPath: status === 'COMPLETED' ? clipVideoPath : null,
+      clipRenderError: status === 'FAILED' || status === 'UNAVAILABLE' ? errorMessage : null,
+    };
+
+    if (scope === 'match') {
+      await prisma.matchHighlight.updateMany({ where: { id: highlightId }, data });
+    } else if (scope === 'demo') {
+      await prisma.demoHighlight.updateMany({ where: { id: highlightId }, data });
+    } else {
+      res.status(400).json({ error: 'Escopo de highlight inválido' });
+      return;
+    }
+
+    skipAudit(req);
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('[internal/highlights/render-result]', err);
+    res.status(500).json({ error: 'Erro ao atualizar renderização' });
   }
 });
 
@@ -351,6 +427,7 @@ console.log(
 
 const teamLogosPath = getTeamLogoStoragePath();
 const userAvatarsPath = getUserAvatarStoragePath();
+const highlightClipsPath = getHighlightClipsPath();
 
 app.use('/uploads/team-logos', (req, res, next) => {
   if (!isSafeStaticRequestPath(req.path)) {
@@ -367,6 +444,14 @@ app.use('/uploads/user-avatars', (req, res, next) => {
   }
   next();
 }, express.static(userAvatarsPath, { dotfiles: 'deny', index: false }));
+
+app.use('/uploads/highlights', (req, res, next) => {
+  if (!isSafeStaticRequestPath(req.path)) {
+    res.status(400).end();
+    return;
+  }
+  next();
+}, express.static(highlightClipsPath, { dotfiles: 'deny', index: false }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -404,6 +489,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
   if (err.message === 'Apenas arquivos .dem são permitidos') {
     res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: 'Arquivo muito grande. O limite é 500 MB.' });
     return;
   }
   if (err.message === 'Apenas imagens PNG, JPG, WEBP ou GIF são permitidas') {

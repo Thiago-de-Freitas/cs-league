@@ -2,12 +2,13 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, interval } from 'rxjs';
+import { startWith, switchMap, takeWhile } from 'rxjs/operators';
 import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, Match, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
+import { Demo, Match, MatchHighlight, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { MatchMapVetoComponent } from '../../Components/match-map-veto/match-map-veto.component';
@@ -20,6 +21,15 @@ import {
   showMatchMapVeto,
   showSeriesVetoPanel,
 } from '../../Utils/match-series-view.util';
+import {
+  clearHighlightGeneratePending,
+  createHighlightSnapshot,
+  findHighlightGeneratePendingForDemo,
+  findHighlightGeneratePendingForMatch,
+  hasHighlightVideoRendering,
+  isHighlightGenerationComplete,
+  writeHighlightGeneratePending,
+} from '../../Utils/highlight-generate-pending.util';
 
 interface ManualStatDraft {
   key: string;
@@ -68,6 +78,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   getMapLabel = getMapLabel;
   imageUploading = false;
   imageCaption = '';
+  generatingHighlights = false;
   myCaptainTeamIds: string[] = [];
   private pollSub?: Subscription;
 
@@ -105,9 +116,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         this.demo = demo;
         this.stats = demo.stats || [];
         this.loading = false;
-        if (demo.status === 'pending' || demo.status === 'processing') {
-          this.startDemoViewPolling(id);
-        }
+        this.resumeHighlightPolling(demo);
       },
       error: () => {
         this.errorMsg = 'Demo não encontrada.';
@@ -119,16 +128,27 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   startDemoViewPolling(id: string): void {
     this.pollSub?.unsubscribe();
     this.pollingDemo = true;
-    this.pollSub = this.demoService.pollDemoStatus(id).subscribe({
+    this.pollSub = interval(3000).pipe(
+      startWith(0),
+      switchMap(() => this.demoService.getDemo(id)),
+      takeWhile(() => this.shouldContinueHighlightPolling(), true)
+    ).subscribe({
       next: (demo) => {
         this.demo = demo;
         if (demo.status === 'completed') {
           this.stats = demo.stats || [];
-          this.pollingDemo = false;
-        } else if (demo.status === 'failed') {
-          this.pollingDemo = false;
         }
-      }
+        this.syncHighlightGenerationFromPoll(demo.highlights ?? [], demo.id);
+        const stillProcessingDemo = demo.status === 'pending' || demo.status === 'processing';
+        const renderingHighlights = hasHighlightVideoRendering(demo.highlights ?? []);
+        this.pollingDemo =
+          stillProcessingDemo || renderingHighlights || this.generatingHighlights;
+        if (demo.status === 'failed') {
+          this.pollingDemo = false;
+          this.generatingHighlights = false;
+          clearHighlightGeneratePending();
+        }
+      },
     });
   }
 
@@ -156,6 +176,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         this.stats = match.aggregatedStats || this.buildAggregatedStats(match.demos || []);
         this.loading = false;
         this.startPollingPendingDemos();
+        this.resumeHighlightPolling(undefined, match);
       },
       error: (err) => {
         this.errorMsg = err.status === 403
@@ -641,6 +662,25 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     return labels[type] ?? type;
   }
 
+  getHighlightRenderLabel(status?: string | null): string {
+    const labels: Record<string, string> = {
+      PENDING: 'Vídeo na fila',
+      PROCESSING: 'Renderizando vídeo',
+      COMPLETED: 'Vídeo pronto',
+      FAILED: 'Falha no vídeo',
+      UNAVAILABLE: 'Vídeo indisponível',
+    };
+    return labels[status ?? ''] ?? '';
+  }
+
+  canDownloadHighlightVideo(highlight: MatchHighlight): boolean {
+    return highlight.clipRenderStatus === 'COMPLETED' && !!highlight.clipVideoUrl;
+  }
+
+  isHighlightVideoRendering(highlight: MatchHighlight): boolean {
+    return highlight.clipRenderStatus === 'PENDING' || highlight.clipRenderStatus === 'PROCESSING';
+  }
+
   downloadHighlightClip(highlightId: string): void {
     if (!this.match) return;
     this.matchService.downloadHighlightClip(this.match.id, highlightId).subscribe({
@@ -655,6 +695,215 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.notify.error(err.error?.error || 'Erro ao baixar spec do clipe.');
+      },
+    });
+  }
+
+  downloadHighlightVideo(highlightId: string): void {
+    if (this.isDemoView && this.demo) {
+      this.demoService.downloadDemoHighlightVideo(this.demo.id, highlightId).subscribe({
+        next: (blob) => this.saveHighlightBlob(blob, highlightId, 'mp4', 'Vídeo MP4 baixado.'),
+        error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar vídeo do destaque.'),
+      });
+      return;
+    }
+    if (!this.match) return;
+    this.matchService.downloadHighlightVideo(this.match.id, highlightId).subscribe({
+      next: (blob) => this.saveHighlightBlob(blob, highlightId, 'mp4', 'Vídeo MP4 baixado.'),
+      error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar vídeo do destaque.'),
+    });
+  }
+
+  downloadDemoHighlightClip(highlightId: string): void {
+    if (!this.demo) return;
+    this.demoService.downloadDemoHighlightClip(this.demo.id, highlightId).subscribe({
+      next: (blob) => this.saveHighlightBlob(blob, highlightId, 'vdm.txt', 'Spec de clipe baixada.'),
+      error: (err) => this.notify.error(err.error?.error || 'Erro ao baixar spec do clipe.'),
+    });
+  }
+
+  private saveHighlightBlob(blob: Blob, highlightId: string, extension: string, successMessage: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `highlight-${highlightId.slice(0, 8)}.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.notify.success(successMessage);
+  }
+
+  get canReprocessDemo(): boolean {
+    if (!this.demo) return false;
+    const userId = this.authService.currentUser?.id;
+    if (!userId) return false;
+    return this.demo.uploadedById === userId || this.authService.isSystemAdmin();
+  }
+
+  get visibleHighlights(): MatchHighlight[] {
+    if (this.isDemoView && this.demo?.highlights?.length) {
+      return this.demo.highlights;
+    }
+    return this.match?.highlights ?? [];
+  }
+
+  get canShowHighlightsSection(): boolean {
+    if (this.isDemoView) {
+      return !!this.demo && this.demo.status === 'completed' && !this.demo.isManual;
+    }
+    return (this.match?.demos ?? []).some((demo) => demo.status === 'completed' && !demo.isManual);
+  }
+
+  get canGenerateHighlights(): boolean {
+    return this.canShowHighlightsSection && !this.generatingHighlights;
+  }
+
+  get generateHighlightsLabel(): string {
+    return this.visibleHighlights.length ? 'Regenerar destaques' : 'Gerar destaques';
+  }
+
+  private markHighlightGeneratePending(): void {
+    const snapshot = createHighlightSnapshot(this.visibleHighlights);
+    writeHighlightGeneratePending({
+      demoId: this.isDemoView ? this.demo?.id : undefined,
+      matchId: !this.isDemoView ? this.match?.id : undefined,
+      startedAt: Date.now(),
+      ...snapshot,
+    });
+    this.generatingHighlights = true;
+  }
+
+  private resumeHighlightPolling(demo?: Demo, match?: Match): void {
+    const demoId = demo?.id;
+    const matchId = match?.id;
+    const pending =
+      (demoId && findHighlightGeneratePendingForDemo(demoId)) ||
+      (matchId && findHighlightGeneratePendingForMatch(matchId)) ||
+      null;
+
+    if (pending) {
+      const highlights = demo?.highlights ?? match?.highlights ?? [];
+      this.generatingHighlights = !isHighlightGenerationComplete(highlights, pending);
+      if (!this.generatingHighlights) {
+        clearHighlightGeneratePending();
+      }
+    }
+
+    if (!this.shouldContinueHighlightPolling(demo, match)) {
+      return;
+    }
+
+    if (this.isDemoView && demoId) {
+      this.startDemoViewPolling(demoId);
+      return;
+    }
+
+    if (matchId) {
+      this.startMatchHighlightPolling();
+    }
+  }
+
+  private syncHighlightGenerationFromPoll(
+    highlights: MatchHighlight[],
+    demoId?: string,
+    matchId?: string
+  ): void {
+    const pending =
+      (demoId && findHighlightGeneratePendingForDemo(demoId)) ||
+      (matchId && findHighlightGeneratePendingForMatch(matchId)) ||
+      null;
+    if (!pending) {
+      return;
+    }
+
+    if (isHighlightGenerationComplete(highlights, pending) && !hasHighlightVideoRendering(highlights)) {
+      clearHighlightGeneratePending();
+      this.generatingHighlights = false;
+    }
+  }
+
+  private shouldContinueHighlightPolling(demo?: Demo, match?: Match): boolean {
+    const currentDemo = demo ?? this.demo ?? undefined;
+    const currentMatch = match ?? this.match ?? undefined;
+    const highlights = currentDemo?.highlights ?? currentMatch?.highlights ?? [];
+
+    if (currentDemo && (currentDemo.status === 'pending' || currentDemo.status === 'processing')) {
+      return true;
+    }
+
+    if (hasHighlightVideoRendering(highlights)) {
+      return true;
+    }
+
+    const pending =
+      (currentDemo?.id && findHighlightGeneratePendingForDemo(currentDemo.id)) ||
+      (currentMatch?.id && findHighlightGeneratePendingForMatch(currentMatch.id)) ||
+      null;
+
+    if (pending) {
+      if (isHighlightGenerationComplete(highlights, pending)) {
+        clearHighlightGeneratePending();
+        this.generatingHighlights = false;
+        return false;
+      }
+      this.generatingHighlights = true;
+      return true;
+    }
+
+    return this.generatingHighlights;
+  }
+
+  private startMatchHighlightPolling(): void {
+    if (!this.matchId) return;
+    this.pollSub?.unsubscribe();
+    this.pollSub = interval(3000).pipe(
+      startWith(0),
+      switchMap(() => this.matchService.getMatch(this.matchId!)),
+      takeWhile(() => this.shouldContinueHighlightPolling(), true)
+    ).subscribe({
+      next: (match) => {
+        this.match = match;
+        this.syncHighlightGenerationFromPoll(match.highlights ?? [], undefined, match.id);
+        const renderingHighlights = hasHighlightVideoRendering(match.highlights ?? []);
+        this.pollingDemo = renderingHighlights || this.generatingHighlights;
+      },
+      complete: () => {
+        this.generatingHighlights = false;
+        this.pollingDemo = false;
+      },
+    });
+  }
+
+  generateHighlights(): void {
+    if (!this.canGenerateHighlights) return;
+
+    this.markHighlightGeneratePending();
+    const request$ = this.isDemoView && this.demo
+      ? this.demoService.generateHighlights(this.demo.id)
+      : this.match
+        ? this.matchService.generateHighlights(this.match.id)
+        : null;
+
+    if (!request$) {
+      this.generatingHighlights = false;
+      clearHighlightGeneratePending();
+      return;
+    }
+
+    request$.subscribe({
+      next: (res) => {
+        this.notify.success(res.message || 'Geração de destaques enfileirada.');
+        if (this.isDemoView && this.demo) {
+          this.pollingDemo = true;
+          this.startDemoViewPolling(this.demo.id);
+        } else if (this.matchId) {
+          this.pollingDemo = true;
+          this.startMatchHighlightPolling();
+        }
+      },
+      error: (err) => {
+        this.generatingHighlights = false;
+        clearHighlightGeneratePending();
+        this.notify.error(err.error?.error || 'Erro ao gerar destaques.');
       },
     });
   }

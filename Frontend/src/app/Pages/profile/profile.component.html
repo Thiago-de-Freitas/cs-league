@@ -39,6 +39,7 @@
       <nav class="profile-tabs" aria-label="Seções do perfil">
         <button type="button" class="profile-tab" [class.active]="activeTab === 'stats'" (click)="setTab('stats')">Stats</button>
         <button type="button" class="profile-tab" [class.active]="activeTab === 'demos'" (click)="setTab('demos')">Demos</button>
+        <button type="button" class="profile-tab" [class.active]="activeTab === 'highlights'" (click)="setTab('highlights')">Destaques</button>
         <button type="button" class="profile-tab" [class.active]="activeTab === 'settings'" (click)="setTab('settings')">Configurações</button>
       </nav>
 
@@ -225,6 +226,71 @@
         <ng-template #noPersonalDemos>
           <p class="meta" *ngIf="!demosLoading">Nenhuma demo pessoal ainda.</p>
         </ng-template>
+      </section>
+
+      <!-- HIGHLIGHTS -->
+      <section *ngIf="activeTab === 'highlights'" class="highlights-section gc-card">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Destaques</h2>
+            <p class="meta">Jogadas detectadas nas suas demos pessoais.</p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-small" (click)="loadPersonalHighlights()" [disabled]="highlightsLoading">
+            Atualizar
+          </button>
+        </div>
+
+        <p *ngIf="hasRenderingHighlights && !highlightsLoading" class="meta highlights-updating">
+          Gerando vídeos MP4… a lista atualiza automaticamente.
+        </p>
+
+        <div *ngIf="highlightsLoading" class="loading">Carregando destaques...</div>
+
+        <div *ngIf="!highlightsLoading && !hasPersonalHighlights" class="highlights-empty">
+          <p class="meta">Nenhum destaque gerado ainda.</p>
+          <p class="meta">Envie uma demo pessoal e use "Gerar destaques" na página da demo.</p>
+          <button type="button" class="btn btn-primary btn-small mt-4" (click)="setTab('demos')">Ver demos</button>
+        </div>
+
+        <ul *ngIf="!highlightsLoading && hasPersonalHighlights" class="gc-list profile-highlights-list">
+          <li *ngFor="let h of personalHighlights" class="gc-list-item profile-highlight-item">
+            <div class="profile-highlight-main">
+              <div class="profile-highlight-head">
+                <strong>{{ h.playerName }}</strong>
+                <span class="badge badge-orange">{{ getHighlightTypeLabel(h.type) }}</span>
+                <span *ngIf="getHighlightRenderLabel(h.clipRenderStatus)" class="badge badge-gray">
+                  {{ getHighlightRenderLabel(h.clipRenderStatus) }}
+                </span>
+              </div>
+              <p class="meta">{{ h.description }} · Round {{ h.round }}</p>
+              <p class="meta profile-highlight-demo">
+                Demo:
+                <button type="button" class="demo-link" (click)="viewDemo(h.demoId!)">
+                  {{ shortFileName(h.demoFileName) }}
+                </button>
+                <span *ngIf="h.demoCreatedAt"> · {{ formatDate(h.demoCreatedAt) }}</span>
+              </p>
+              <p *ngIf="h.clipRenderError" class="error-message highlight-error">{{ h.clipRenderError }}</p>
+            </div>
+            <div class="profile-highlight-actions">
+              <button
+                *ngIf="h.clipStartTick != null && h.clipEndTick != null"
+                type="button"
+                class="btn btn-secondary btn-small"
+                (click)="downloadHighlightClip(h)">
+                Baixar spec
+              </button>
+              <button
+                *ngIf="canDownloadHighlightVideo(h)"
+                type="button"
+                class="btn btn-primary btn-small"
+                (click)="downloadHighlightVideo(h)">
+                Baixar MP4
+              </button>
+              <span *ngIf="isHighlightVideoRendering(h)" class="meta">Gerando MP4...</span>
+            </div>
+          </li>
+        </ul>
       </section>
 
       <!-- SETTINGS -->

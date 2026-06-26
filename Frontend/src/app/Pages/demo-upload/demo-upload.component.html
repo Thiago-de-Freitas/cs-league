@@ -2,8 +2,11 @@
   <div class="page-inner max-width-narrow">
     <div class="gc-card-header list-page-header">
       <div>
-        <h1 class="page-title">Demos</h1>
-        <p class="page-subtitle list-page-subtitle">Demos gerais para ligas e partidas — demos pessoais ficam no seu perfil</p>
+        <h1 class="page-title">Demos de liga</h1>
+        <p class="page-subtitle list-page-subtitle">
+          Envios vinculados a partidas de ligas. Para analisar só o seu desempenho, use
+          <a routerLink="/profile" [queryParams]="{ tab: 'demos' }" class="text-link">demos pessoais no perfil</a>.
+        </p>
       </div>
       <button class="btn btn-primary" (click)="openUploadModal()">+ Enviar Demo</button>
     </div>
@@ -39,7 +42,7 @@
     <div *ngIf="loading" class="loading">Carregando...</div>
 
     <div class="gc-card" *ngIf="!loading">
-      <h2 class="section-title">Demos Gerais</h2>
+      <h2 *ngIf="demos.length > 0" class="section-title">Suas demos</h2>
       <ul class="gc-list" *ngIf="demos.length > 0; else noDemos">
         <li *ngFor="let demo of demos" class="gc-list-item demo-list-item">
           <div class="demo-row">
@@ -65,7 +68,7 @@
                 {{ getStatusLabel(demo.status) }}
               </span>
               <button *ngIf="demo.status === 'completed'" class="btn btn-secondary btn-small" (click)="viewDemo(demo.id)">
-                Ver Stats
+                Abrir
               </button>
               <button
                 *ngIf="canReprocess(demo)"
@@ -94,7 +97,20 @@
         </li>
       </ul>
       <ng-template #noDemos>
-        <p class="meta">Nenhuma demo enviada ainda. Clique em <strong>+ Enviar Demo</strong> para começar.</p>
+        <div class="demos-empty">
+          <p class="demos-empty-title">Nenhuma demo de liga ainda</p>
+          <p class="meta demos-empty-text">
+            O jeito mais rápido é abrir a partida na liga e usar <strong>Enviar Demo</strong> lá.
+            Você também pode enviar por aqui escolhendo liga e confronto no formulário.
+          </p>
+          <p class="meta demos-empty-text">
+            Demos pessoais (só suas estatísticas e destaques) ficam no
+            <a routerLink="/profile" [queryParams]="{ tab: 'demos' }" class="text-link">perfil → aba Demos</a>.
+          </p>
+          <button type="button" class="btn btn-primary demos-empty-cta" (click)="openUploadModal()">
+            + Enviar primeira demo
+          </button>
+        </div>
       </ng-template>
     </div>
   </div>

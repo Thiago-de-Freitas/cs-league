@@ -38,12 +38,8 @@ export async function validateDuplicateDemoUpload(
 
 export async function validatePersonalDemoUpload(
   userId: string,
-  role?: string
+  _role?: string
 ): Promise<PersonalDemoValidation> {
-  if (role === 'ADMIN') {
-    return { valid: true };
-  }
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { steamId: true },

@@ -30,6 +30,7 @@ import { ensureMatchMapVeto } from '../lib/mapVetoService';
 import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
 import { getMapLabel } from '../lib/cs2Maps';
 import { getSeriesForMatch, advanceSeriesAfterMapWin } from '../lib/matchSeriesService';
+import { serializeHighlight } from '../lib/highlightSerialization';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -173,7 +174,9 @@ function formatMatchResponse(
     mapVetoEnabled: extras?.mapVetoEnabled ?? false,
     lineup: extras?.lineup ?? [],
     images: extras?.images ?? [],
-    highlights: extras?.highlights ?? [],
+    highlights: (extras?.highlights ?? []).map((highlight) =>
+      serializeHighlight(highlight as Parameters<typeof serializeHighlight>[0], { matchId: match.id })
+    ),
     series: extras?.series ?? null,
     seriesGameNumber: match.seriesGameNumber ?? null,
   };

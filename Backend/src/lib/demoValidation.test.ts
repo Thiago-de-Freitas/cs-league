@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 import { validatePersonalDemoUpload } from './demoValidation';
 
 describe('validatePersonalDemoUpload', () => {
-  it('permite admin sem consultar Steam ID', async () => {
-    const result = await validatePersonalDemoUpload('any-user-id', 'ADMIN');
-    assert.deepEqual(result, { valid: true });
+  it('rejeita usuário sem Steam ID', async () => {
+    const result = await validatePersonalDemoUpload('nonexistent-user-id');
+    assert.equal(result.valid, false);
+    if (!result.valid) {
+      assert.equal(result.code, 'NO_STEAM_ID');
+    }
   });
 });

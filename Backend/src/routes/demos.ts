@@ -21,6 +21,9 @@ import { requireDemoQueue } from '../middleware/demoQueue';
 import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
+import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
+import { serializeHighlight } from '../lib/highlightSerialization';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -97,6 +100,42 @@ router.get('/personal/overview', authMiddleware, async (req: AuthRequest, res: R
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao carregar estatísticas do perfil' });
+  }
+});
+
+router.get('/personal/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const highlights = await prisma.demoHighlight.findMany({
+      where: {
+        demo: {
+          uploadedById: req.user!.userId,
+          isPersonal: true,
+        },
+      },
+      include: {
+        demo: {
+          select: { id: true, fileName: true, createdAt: true },
+        },
+      },
+      orderBy: [{ score: 'desc' }, { round: 'asc' }],
+    });
+
+    const serialized = highlights.map((highlight) => ({
+      ...serializeHighlight(highlight, { demoId: highlight.demoId }),
+      demoFileName: highlight.demo.fileName ?? 'demo.dem',
+      demoCreatedAt: highlight.demo.createdAt,
+    }));
+
+    res.json({
+      highlights: serialized,
+      total: serialized.length,
+      videoExportAvailable: serialized.some(
+        (h) => h.clipRenderStatus === 'COMPLETED' && !!h.clipVideoUrl
+      ),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar destaques pessoais' });
   }
 });
 
@@ -194,13 +233,14 @@ router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upl
       return;
     }
 
+    const uploadedFile = req.file;
     const isPersonal = parseIsPersonal(req.body.isPersonal);
     const matchId = isPersonal ? undefined : (req.body.matchId ? String(req.body.matchId) : undefined);
-    const fileName = req.file.originalname;
+    const fileName = uploadedFile.originalname;
 
     const duplicateCheck = await validateDuplicateDemoUpload(req.user!.userId, fileName);
     if (!duplicateCheck.valid) {
-      fs.unlink(req.file.path, () => {});
+      fs.unlink(uploadedFile.path, () => {});
       res.status(400).json({ error: duplicateCheck.error, code: duplicateCheck.code });
       return;
     }
@@ -208,39 +248,58 @@ router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upl
     if (isPersonal) {
       const validation = await validatePersonalDemoUpload(req.user!.userId, req.user!.role);
       if (!validation.valid) {
-        fs.unlink(req.file.path, () => {});
+        fs.unlink(uploadedFile.path, () => {});
         res.status(400).json({ error: validation.error, code: validation.code });
         return;
       }
     } else {
       if (!matchId) {
-        fs.unlink(req.file.path, () => {});
+        fs.unlink(uploadedFile.path, () => {});
         res.status(400).json({ error: 'Selecione uma partida para enviar a demo.', code: 'MATCH_REQUIRED' });
         return;
       }
       const permission = await canUserManageMatchDemo(req.user!.userId, req.user!.role, matchId);
       if (!permission.allowed) {
-        fs.unlink(req.file.path, () => {});
+        fs.unlink(uploadedFile.path, () => {});
         res.status(403).json({ error: permission.error });
         return;
       }
       const validation = await validateGeneralDemoUpload(matchId);
       if (!validation.valid) {
-        fs.unlink(req.file.path, () => {});
+        fs.unlink(uploadedFile.path, () => {});
         res.status(400).json({ error: validation.error, code: validation.code });
         return;
       }
     }
 
-    const demo = await prisma.demo.create({
-      data: {
-        uploadedById: req.user!.userId,
-        filePath: resolveDemoFilePath(req.file.path),
-        fileName: req.file.originalname,
-        status: 'PENDING',
-        isPersonal,
-        ...(matchId && !isPersonal && { matchId }),
-      },
+    const demo = await prisma.$transaction(async (tx) => {
+      if (!isPersonal && matchId) {
+        const existing = await tx.demo.findFirst({
+          where: {
+            matchId,
+            isPersonal: false,
+            status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
+          },
+          select: { id: true, isManual: true },
+        });
+        if (existing) {
+          const error = existing.isManual
+            ? 'Já existem estatísticas manuais para esta partida. Edite-as em vez de enviar uma demo.'
+            : 'Já existe uma demo geral associada a esta partida.';
+          throw new Error(error);
+        }
+      }
+
+      return tx.demo.create({
+        data: {
+          uploadedById: req.user!.userId,
+          filePath: resolveDemoFilePath(uploadedFile.path),
+          fileName: uploadedFile.originalname,
+          status: 'PENDING',
+          isPersonal,
+          ...(matchId && !isPersonal && { matchId }),
+        },
+      });
     });
 
     try {
@@ -251,7 +310,7 @@ router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upl
       await enqueueDemoJob(demo.id, demoFilePath);
     } catch (enqueueErr) {
       await prisma.demo.delete({ where: { id: demo.id } }).catch(() => {});
-      fs.unlink(req.file.path, () => {});
+      fs.unlink(uploadedFile.path, () => {});
       throw enqueueErr;
     }
 
@@ -276,6 +335,13 @@ router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upl
       fs.unlink(req.file.path, () => {});
     }
     const message = err instanceof Error ? err.message : '';
+    if (
+      message.includes('estatísticas manuais') ||
+      message.includes('demo geral associada')
+    ) {
+      res.status(400).json({ error: message, code: 'MATCH_HAS_DEMO' });
+      return;
+    }
     if (message.includes('Fila Redis indisponível') || message.includes('Redis')) {
       res.status(503).json({
         error: 'Fila de processamento de demos indisponível. Verifique REDIS_URL na API (plugin Redis, não o Worker).',
@@ -293,6 +359,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       include: {
         stats: true,
+        highlights: { orderBy: [{ score: 'desc' }, { round: 'asc' }] },
         match: {
           include: {
             team1: { select: { id: true, name: true, tag: true } },
@@ -320,8 +387,12 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       errorMessage: demo.errorMessage,
       matchId: demo.matchId,
       isPersonal: demo.isPersonal,
+      uploadedById: demo.uploadedById,
       match: demo.match,
       stats: demo.stats,
+      highlights: demo.highlights.map((highlight) =>
+        serializeHighlight(highlight, { demoId: demo.id })
+      ),
       createdAt: demo.createdAt,
       updatedAt: demo.updatedAt,
     });
@@ -357,6 +428,131 @@ router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response)
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+router.get('/:id/highlights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+    const highlights = await prisma.demoHighlight.findMany({
+      where: { demoId: req.params.id },
+      orderBy: [{ score: 'desc' }, { round: 'asc' }],
+    });
+    res.json(buildHighlightsListResponse(highlights, { demoId: req.params.id }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar highlights da demo' });
+  }
+});
+
+router.get('/:id/highlights/:highlightId/clip', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+    const highlight = await prisma.demoHighlight.findFirst({
+      where: { id: req.params.highlightId, demoId: req.params.id },
+    });
+    if (!highlight) {
+      res.status(404).json({ error: 'Destaque não encontrado' });
+      return;
+    }
+    sendHighlightClipSpec(res, highlight);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao exportar clipe' });
+  }
+});
+
+router.get('/:id/highlights/:highlightId/video', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+    const highlight = await prisma.demoHighlight.findFirst({
+      where: { id: req.params.highlightId, demoId: req.params.id },
+    });
+    if (!highlight) {
+      res.status(404).json({ error: 'Destaque não encontrado' });
+      return;
+    }
+    sendHighlightVideo(res, highlight);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao baixar vídeo do destaque' });
+  }
+});
+
+router.post('/:id/highlights/generate', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        uploadedById: true,
+        isPersonal: true,
+        matchId: true,
+        isManual: true,
+        status: true,
+      },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+    await enqueueHighlightExtractJob(demo.id);
+    setAuditContext(req, audit.of('demo.highlights.generate', 'Demo', demo.id, {
+      metadata: { matchId: demo.matchId, isPersonal: demo.isPersonal },
+    }));
+    res.status(202).json({
+      ok: true,
+      message: 'Geração de destaques enfileirada. Atualize a página em instantes.',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro ao gerar destaques';
+    if (message.includes('não encontrado') || message.includes('processada') || message.includes('manuais')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao gerar destaques' });
   }
 });
 

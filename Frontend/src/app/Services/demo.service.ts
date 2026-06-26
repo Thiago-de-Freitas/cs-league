@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
 import { Observable, interval, switchMap, takeWhile, startWith, filter, map } from 'rxjs';
-import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalStatsOverview } from '../Models/interfaces';
+import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalHighlightsResponse, PersonalStatsOverview } from '../Models/interfaces';
 import { ApiConfigService } from './api-config.service';
 
 export interface DemoUploadProgress {
@@ -82,6 +82,10 @@ export class DemoService {
     return this.http.get<Demo[]>(`${this.apiUrl}/personal`);
   }
 
+  listPersonalHighlights(): Observable<PersonalHighlightsResponse> {
+    return this.http.get<PersonalHighlightsResponse>(`${this.apiUrl}/personal/highlights`);
+  }
+
   getPersonalStatsOverview(): Observable<PersonalStatsOverview> {
     return this.http.get<PersonalStatsOverview>(`${this.apiUrl}/personal/overview`);
   }
@@ -145,5 +149,22 @@ export class DemoService {
       switchMap(() => this.getDemo(demoId)),
       takeWhile((demo) => demo.status === 'pending' || demo.status === 'processing', true)
     );
+  }
+
+  downloadDemoHighlightClip(demoId: string, highlightId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${demoId}/highlights/${highlightId}/clip?format=vdm`, {
+      responseType: 'blob',
+      headers: { Accept: 'text/plain' },
+    });
+  }
+
+  downloadDemoHighlightVideo(demoId: string, highlightId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${demoId}/highlights/${highlightId}/video`, {
+      responseType: 'blob',
+    });
+  }
+
+  generateHighlights(demoId: string): Observable<{ ok: boolean; message: string }> {
+    return this.http.post<{ ok: boolean; message: string }>(`${this.apiUrl}/${demoId}/highlights/generate`, {});
   }
 }

@@ -6,7 +6,7 @@ import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, Match, MatchPlayerStat } from '../../Models/interfaces';
+import { Demo, Match, MatchHighlight, MatchPlayerStat } from '../../Models/interfaces';
 
 function mockMatch(overrides: Partial<Match> = {}): Match {
   return {
@@ -36,8 +36,21 @@ describe('MatchDetailsComponent', () => {
   beforeEach(async () => {
     paramMap$.next(convertToParamMap({ id: 'match-1' }));
     routeConfig.snapshot = { url: [{ path: 'match' }] };
-    matchServiceSpy = jasmine.createSpyObj('MatchService', ['getMatch', 'registerResult', 'saveManualStats']);
-    demoServiceSpy = jasmine.createSpyObj('DemoService', ['getDemo', 'pollDemoStatus']);
+    matchServiceSpy = jasmine.createSpyObj('MatchService', [
+      'getMatch',
+      'registerResult',
+      'saveManualStats',
+      'downloadHighlightClip',
+      'downloadHighlightVideo',
+      'generateHighlights',
+    ]);
+    demoServiceSpy = jasmine.createSpyObj('DemoService', [
+      'getDemo',
+      'pollDemoStatus',
+      'downloadDemoHighlightClip',
+      'downloadDemoHighlightVideo',
+      'generateHighlights',
+    ]);
 
     matchServiceSpy.getMatch.and.returnValue(of(mockMatch()));
     demoServiceSpy.getDemo.and.returnValue(
@@ -143,5 +156,49 @@ describe('MatchDetailsComponent', () => {
     matchServiceSpy.getMatch.and.returnValue(throwError(() => ({ status: 403 })));
     component.loadMatch('match-x');
     expect(component.errorMsg).toContain('permissão');
+  });
+
+  it('visibleHighlights prioriza destaques da demo em modo demo', () => {
+    const demoHighlight = { id: 'dh1', playerName: 'P', type: 'ACE', description: 'x', score: 5, round: 1 } as MatchHighlight;
+    component.isDemoView = true;
+    component.demo = { id: 'demo-1', highlights: [demoHighlight] } as Demo;
+    expect(component.visibleHighlights).toEqual([demoHighlight]);
+  });
+
+  it('canDownloadHighlightVideo exige status COMPLETED e URL', () => {
+    expect(component.canDownloadHighlightVideo({ clipRenderStatus: 'COMPLETED', clipVideoUrl: '/x.mp4' } as MatchHighlight)).toBeTrue();
+    expect(component.canDownloadHighlightVideo({ clipRenderStatus: 'PENDING' } as MatchHighlight)).toBeFalse();
+  });
+
+  it('getHighlightTypeLabel traduz tipos novos', () => {
+    expect(component.getHighlightTypeLabel('CLUTCH')).toBe('Clutch');
+    expect(component.getHighlightTypeLabel('OPENING_KILL')).toBe('Opening kill');
+  });
+
+  it('canShowHighlightsSection exige demo concluída e não manual', () => {
+    component.isDemoView = true;
+    component.demo = { status: 'completed', isManual: false } as Demo;
+    expect(component.canShowHighlightsSection).toBeTrue();
+    component.demo = { status: 'processing', isManual: false } as Demo;
+    expect(component.canShowHighlightsSection).toBeFalse();
+    component.demo = { status: 'completed', isManual: true } as Demo;
+    expect(component.canShowHighlightsSection).toBeFalse();
+  });
+
+  it('generateHighlights enfileira extração na partida', () => {
+    const notifySpy = TestBed.inject(NotificationService) as jasmine.SpyObj<NotificationService>;
+    matchServiceSpy.generateHighlights.and.returnValue(of({
+      ok: true,
+      demoId: 'demo-1',
+      message: 'Geração enfileirada',
+    }));
+    spyOn(sessionStorage, 'setItem');
+    component.match = mockMatch({
+      demos: [{ id: 'demo-1', status: 'completed', isManual: false } as Demo],
+    });
+    component.generateHighlights();
+    expect(matchServiceSpy.generateHighlights).toHaveBeenCalledWith('match-1');
+    expect(notifySpy.success).toHaveBeenCalled();
+    expect(component.generatingHighlights).toBeTrue();
   });
 });
