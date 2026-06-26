@@ -1,5 +1,6 @@
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
 import { getPlayerPositionLabel } from './playerPosition';
+import { isParticipationBanned } from './userModeration';
 
 export type UserSearchResult = {
   id: string;
@@ -19,6 +20,9 @@ export type AdminUserEntry = {
   positionLabel: string | null;
   avatarUrl: string | null;
   role: string;
+  isActive: boolean;
+  bannedUntil: string | null;
+  isBanned: boolean;
   createdAt: string;
   teamCount: number;
 };
@@ -49,12 +53,15 @@ export function formatAdminUserEntries(
     position: string | null;
     avatarUrl: string | null;
     role: string;
+    isActive: boolean;
+    bannedUntil: Date | null;
     createdAt: Date;
     _count: { memberships: number };
   }[]
 ): AdminUserEntry[] {
   return users.map((user) => {
     const position = user.position?.toLowerCase() ?? null;
+    const moderation = { isActive: user.isActive, bannedUntil: user.bannedUntil };
     return {
       id: user.id,
       email: user.email,
@@ -64,6 +71,9 @@ export function formatAdminUserEntries(
       positionLabel: user.position ? getPlayerPositionLabel(user.position) : null,
       avatarUrl: publicUploadUrlForResponse(user.avatarUrl),
       role: user.role,
+      isActive: user.isActive,
+      bannedUntil: user.bannedUntil?.toISOString() ?? null,
+      isBanned: isParticipationBanned(moderation),
       createdAt: user.createdAt.toISOString(),
       teamCount: user._count.memberships,
     };

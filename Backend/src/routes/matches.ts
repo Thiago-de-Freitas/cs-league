@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import { advanceBracketFromRound } from '../lib/bracketAdvance';
 import { resolveBracketSize } from '../lib/bracket';
 import { tryCompleteLeague } from '../lib/leagueComplete';
@@ -334,7 +335,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/:id/manual-stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.put('/:id/manual-stats', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const permission = await canUserEditMatchStats(req.user!.userId, req.user!.role, req.params.id);
     if (!permission.allowed) {
@@ -474,7 +475,7 @@ router.put('/:id/manual-stats', authMiddleware, async (req: AuthRequest, res: Re
   }
 });
 
-router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/result', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const match = await prisma.match.findUnique({
       where: { id: req.params.id },
@@ -659,7 +660,7 @@ router.patch('/:id/result', authMiddleware, async (req: AuthRequest, res: Respon
   }
 });
 
-router.patch('/:id/schedule', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/schedule', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const match = await prisma.match.findUnique({
       where: { id: req.params.id },

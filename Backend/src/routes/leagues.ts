@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import {
   getFairBracketSize,
   getFirstRoundPairings,
@@ -514,7 +515,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, startDate, endDate, status, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay } = req.body;
     if (!name) {
@@ -892,7 +893,7 @@ router.post('/:id/unarchive', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
-router.post('/:id/register', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/register', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const { teamId } = req.body as { teamId?: string };
     if (!teamId) {
@@ -1883,7 +1884,7 @@ router.post('/:id/one-vs-one/setup', authMiddleware, async (req: AuthRequest, re
   }
 });
 
-router.post('/:id/matches', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/matches', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {

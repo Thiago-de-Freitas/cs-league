@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import { isAdmin } from '../lib/permissions';
 import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
@@ -204,7 +205,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const { name, tag, ownerAsMember } = req.body;
     if (!name || !tag) {
@@ -455,7 +456,7 @@ router.post('/:id/invites/:inviteId/reject', authMiddleware, async (req: AuthReq
   }
 });
 
-router.post('/:id/invites/:inviteId/accept', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/invites/:inviteId/accept', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const invite = await prisma.teamInvite.findUnique({
       where: { id: req.params.inviteId },

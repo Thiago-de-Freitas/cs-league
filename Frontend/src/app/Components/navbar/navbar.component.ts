@@ -8,6 +8,14 @@ import { AuthService } from '../../Services/auth.service';
   standalone: true,
   imports: [RouterModule, CommonModule],
   template: `
+    @if (auth.isLoggedIn && auth.isParticipationBanned()) {
+      <div class="gc-ban-banner" role="status">
+        Conta suspensa de participar em ligas, partidas e envio de demos
+        @if (auth.getBannedUntilLabel(); as until) {
+          até {{ until }}.
+        }
+      </div>
+    }
     <nav class="gc-navbar">
       <div class="gc-navbar-inner">
         <a class="gc-logo" routerLink="/" (click)="closeMenu()">

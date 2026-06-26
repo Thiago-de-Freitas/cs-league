@@ -105,6 +105,18 @@ export class AuthService {
     return this.currentUserSubject.value?.role === 'ADMIN';
   }
 
+  isParticipationBanned(): boolean {
+    return this.currentUserSubject.value?.isBanned === true;
+  }
+
+  getBannedUntilLabel(): string | null {
+    const until = this.currentUserSubject.value?.bannedUntil;
+    if (!until) return null;
+    const date = new Date(until);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleString('pt-BR');
+  }
+
   isAdmin(): Observable<boolean> {
     return new Observable((observer) => {
       observer.next(this.isSystemAdmin());

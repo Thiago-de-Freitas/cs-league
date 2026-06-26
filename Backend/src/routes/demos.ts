@@ -16,6 +16,7 @@ import { buildPersonalStatsOverview } from '../lib/personalStats';
 import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from '../lib/demoStorage';
 import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import { requireDemoQueue } from '../middleware/demoQueue';
 import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
@@ -134,7 +135,7 @@ router.get('/personal', authMiddleware, async (req: AuthRequest, res: Response) 
   }
 });
 
-router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+router.post('/personal/requeue-pending', authMiddleware, participationGuard, requireDemoQueue, async (req: AuthRequest, res: Response) => {
   try {
     const demos = await prisma.demo.findMany({
       where: {
@@ -186,7 +187,7 @@ router.post('/personal/requeue-pending', authMiddleware, requireDemoQueue, async
   }
 });
 
-router.post('/upload', authMiddleware, requireDemoQueue, upload.single('demo'), async (req: AuthRequest, res: Response) => {
+router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Arquivo .dem é obrigatório' });
@@ -359,7 +360,7 @@ router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response)
   }
 });
 
-router.post('/:id/reprocess', authMiddleware, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+router.post('/:id/reprocess', authMiddleware, participationGuard, requireDemoQueue, async (req: AuthRequest, res: Response) => {
   try {
     const demo = await prisma.demo.findUnique({ where: { id: req.params.id } });
 
@@ -453,7 +454,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
   }
 });
 
-router.patch('/:id/match', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/match', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const demo = await prisma.demo.findUnique({
       where: { id: req.params.id },

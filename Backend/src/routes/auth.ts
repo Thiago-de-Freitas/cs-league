@@ -15,6 +15,11 @@ import {
 } from '../lib/uploadAssets';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import {
+  canUserLogin,
+  DEACTIVATED_ACCOUNT_MESSAGE,
+  isParticipationBanned,
+} from '../lib/userModeration';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -48,8 +53,11 @@ function sanitizeUser(user: {
   avatarUrl: string | null;
   position: string | null;
   role: string;
+  isActive: boolean;
+  bannedUntil: Date | null;
   createdAt: Date;
 }) {
+  const moderation = { isActive: user.isActive, bannedUntil: user.bannedUntil };
   return {
     id: user.id,
     email: user.email,
@@ -58,6 +66,9 @@ function sanitizeUser(user: {
     avatarUrl: publicUploadUrlForResponse(user.avatarUrl),
     position: user.position?.toLowerCase() ?? null,
     role: user.role,
+    isActive: user.isActive,
+    bannedUntil: user.bannedUntil?.toISOString() ?? null,
+    isBanned: isParticipationBanned(moderation),
     createdAt: user.createdAt,
   };
 }
@@ -144,6 +155,16 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
         errorCode: 'INVALID_CREDENTIALS',
       }));
       res.status(401).json({ error: 'Credenciais inválidas' });
+      return;
+    }
+
+    if (!canUserLogin(user)) {
+      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
+        metadata: { email: user.email },
+        success: false,
+        errorCode: 'ACCOUNT_DEACTIVATED',
+      }));
+      res.status(403).json({ error: DEACTIVATED_ACCOUNT_MESSAGE });
       return;
     }
 

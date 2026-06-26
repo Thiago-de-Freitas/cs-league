@@ -31,13 +31,22 @@ describe('UsersService', () => {
   });
 
   it('listUsers envia busca e filtros', (done) => {
-    service.listUsers({ page: 2, pageSize: 20, q: 'allan', position: 'AWP', role: 'USER' }).subscribe(() => done());
+    service.listUsers({ page: 2, pageSize: 20, q: 'allan', position: 'AWP', role: 'USER', status: 'banned' }).subscribe(() => done());
     const req = httpMock.expectOne((r) => r.url === '/api/users');
     expect(req.request.params.get('page')).toBe('2');
     expect(req.request.params.get('limit')).toBe('20');
     expect(req.request.params.get('q')).toBe('allan');
     expect(req.request.params.get('position')).toBe('AWP');
     expect(req.request.params.get('role')).toBe('USER');
+    expect(req.request.params.get('status')).toBe('banned');
     req.flush({ users: [], page: 2, pageSize: 20, total: 0, totalPages: 1 });
+  });
+
+  it('banUser envia dias no corpo', (done) => {
+    service.banUser('u1', 14).subscribe(() => done());
+    const req = httpMock.expectOne('/api/users/u1/ban');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ days: 14 });
+    req.flush({ user: { id: 'u1' } });
   });
 });

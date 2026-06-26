@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { Router, provideRouter } from '@angular/router';
 import { AdminPlayersComponent } from './admin-players.component';
 import { UsersService } from '../../Services/users.service';
@@ -22,13 +22,25 @@ describe('AdminPlayersComponent', () => {
     position: 'awp',
     positionLabel: 'AWPer',
     role: 'USER',
+    isActive: true,
+    bannedUntil: null,
+    isBanned: false,
     createdAt: '2025-06-01T12:00:00Z',
     teamCount: 1,
   };
 
   beforeEach(async () => {
-    usersServiceSpy = jasmine.createSpyObj('UsersService', ['listUsers']);
-    authServiceSpy = jasmine.createSpyObj('AuthService', ['isSystemAdmin']);
+    usersServiceSpy = jasmine.createSpyObj('UsersService', [
+      'listUsers',
+      'deactivateUser',
+      'activateUser',
+      'banUser',
+      'unbanUser',
+      'deleteUser',
+    ]);
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['isSystemAdmin'], {
+      currentUser: { id: 'admin-1', role: 'ADMIN' },
+    });
 
     authServiceSpy.isSystemAdmin.and.returnValue(true);
     usersServiceSpy.listUsers.and.returnValue(
@@ -64,6 +76,7 @@ describe('AdminPlayersComponent', () => {
       q: '',
       position: undefined,
       role: undefined,
+      status: undefined,
     });
     expect(component.users.length).toBe(1);
     expect(component.total).toBe(1);
@@ -82,5 +95,28 @@ describe('AdminPlayersComponent', () => {
   it('getProfileLink retorna rota quando há steamId', () => {
     expect(component.getProfileLink(mockUser)).toEqual(['/player', '76561198000000001']);
     expect(component.getProfileLink({ ...mockUser, steamId: null })).toBeNull();
+  });
+
+  it('canModerate bloqueia admin e próprio usuário', () => {
+    expect(component.canModerate(mockUser)).toBeTrue();
+    expect(component.canModerate({ ...mockUser, id: 'admin-1' })).toBeFalse();
+    expect(component.canModerate({ ...mockUser, role: 'ADMIN' })).toBeFalse();
+  });
+
+  it('confirmModeration aplica banimento', () => {
+    const banned = { ...mockUser, isBanned: true, bannedUntil: '2025-07-01T00:00:00Z' };
+    usersServiceSpy.banUser.and.returnValue(of({ user: banned }));
+    component.openModeration(mockUser, 'ban');
+    component.banDays = 7;
+    component.confirmModeration();
+    expect(usersServiceSpy.banUser).toHaveBeenCalledWith('u1', 7);
+    expect(component.users[0].isBanned).toBeTrue();
+  });
+
+  it('confirmModeration exibe erro da API', () => {
+    usersServiceSpy.deactivateUser.and.returnValue(throwError(() => ({ error: { error: 'Falhou' } })));
+    component.openModeration(mockUser, 'deactivate');
+    component.confirmModeration();
+    expect(component.moderationError).toBe('Falhou');
   });
 });

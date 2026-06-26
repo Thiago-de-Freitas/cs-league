@@ -649,6 +649,15 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
 .auth-page .form-subtitle { margin-bottom: 1.5rem; }
 
 /* ===== Navbar ===== */
+.gc-ban-banner {
+  background: color-mix(in srgb, var(--gc-red) 18%, var(--gc-bg));
+  border-bottom: 1px solid var(--gc-border);
+  color: var(--gc-text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 0.55rem 1.5rem;
+  text-align: center;
+}
 .gc-navbar {
   background: var(--gc-bg);
   border-bottom: 1px solid var(--gc-border);

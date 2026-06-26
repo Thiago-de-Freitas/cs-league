@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import { canUserAccessMatch } from '../lib/matchPermissions';
 import { isValidMapId } from '../lib/cs2Maps';
 import {
@@ -74,7 +75,7 @@ router.get('/:id/veto', authMiddleware, async (req: AuthRequest, res: Response) 
   }
 });
 
-router.post('/:id/veto/ban', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/veto/ban', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const series = await prisma.matchSeries.findUnique({
       where: { id: req.params.id },
@@ -132,7 +133,7 @@ router.post('/:id/veto/ban', authMiddleware, async (req: AuthRequest, res: Respo
   }
 });
 
-router.post('/:id/veto/pick', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/veto/pick', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const series = await prisma.matchSeries.findUnique({
       where: { id: req.params.id },

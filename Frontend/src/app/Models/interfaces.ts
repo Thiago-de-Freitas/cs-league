@@ -6,6 +6,9 @@ export interface User {
   avatarUrl?: string | null;
   position?: string | null;
   role: 'USER' | 'ADMIN';
+  isActive?: boolean;
+  bannedUntil?: string | null;
+  isBanned?: boolean;
   createdAt?: string;
 }
 
@@ -446,6 +449,9 @@ export interface AdminUserEntry {
   position: string | null;
   positionLabel: string | null;
   role: 'USER' | 'ADMIN' | string;
+  isActive: boolean;
+  bannedUntil: string | null;
+  isBanned: boolean;
   createdAt: string;
   teamCount: number;
 }

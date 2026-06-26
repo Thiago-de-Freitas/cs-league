@@ -30,6 +30,8 @@ describe('formatAdminUserEntries', () => {
         position: 'RIFLER',
         avatarUrl: null,
         role: 'USER',
+        isActive: true,
+        bannedUntil: null,
         createdAt: new Date('2025-01-15T12:00:00Z'),
         _count: { memberships: 2 },
       },
@@ -38,5 +40,7 @@ describe('formatAdminUserEntries', () => {
     assert.equal(rows[0].positionLabel, 'Rifler');
     assert.equal(rows[0].teamCount, 2);
     assert.equal(rows[0].role, 'USER');
+    assert.equal(rows[0].isActive, true);
+    assert.equal(rows[0].isBanned, false);
   });
 });

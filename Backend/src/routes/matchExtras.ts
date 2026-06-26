@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, authMiddleware } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import { canUserAccessMatch, canUserRegisterMatchResult } from '../lib/matchPermissions';
 import { isValidMapId } from '../lib/cs2Maps';
 import {
@@ -102,7 +103,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.post('/:id/map-veto/ban', async (req: AuthRequest, res: Response) => {
+  router.post('/:id/map-veto/ban', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
     try {
       const match = await loadMatchContext(req.params.id);
       if (!match) {
@@ -182,7 +183,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.post('/:id/map-veto/side', async (req: AuthRequest, res: Response) => {
+  router.post('/:id/map-veto/side', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
     try {
       const match = await loadMatchContext(req.params.id);
       if (!match) {
@@ -226,7 +227,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.put('/:id/lineup', async (req: AuthRequest, res: Response) => {
+  router.put('/:id/lineup', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
     try {
       const match = await loadMatchContext(req.params.id);
       if (!match) {
@@ -315,7 +316,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.post('/:id/images', imageUpload.single('image'), async (req: AuthRequest, res: Response) => {
+  router.post('/:id/images', authMiddleware, participationGuard, imageUpload.single('image'), async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {

@@ -3,7 +3,7 @@
     <div class="gc-card-header list-page-header">
       <div>
         <h1 class="page-title">Jogadores</h1>
-        <p class="page-subtitle list-page-subtitle">Listagem de usuários cadastrados no sistema</p>
+        <p class="page-subtitle list-page-subtitle">Listagem e moderação de usuários cadastrados</p>
       </div>
     </div>
 
@@ -29,6 +29,12 @@
           <label class="form-label" for="role-filter">Perfil</label>
           <select id="role-filter" class="input-field" [(ngModel)]="roleFilter">
             <option *ngFor="let role of roleOptions" [value]="role.value">{{ role.label }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="status-filter">Status</label>
+          <select id="status-filter" class="input-field" [(ngModel)]="statusFilter">
+            <option *ngFor="let status of statusOptions" [value]="status.value">{{ status.label }}</option>
           </select>
         </div>
         <div class="form-group">
@@ -82,13 +88,54 @@
               <span class="badge" [class.badge-orange]="user.role === 'ADMIN'" [class.badge-gray]="user.role !== 'ADMIN'">
                 {{ getRoleLabel(user.role) }}
               </span>
+              <span *ngIf="!user.isActive" class="badge status-cancelled">Desativado</span>
+              <span *ngIf="user.isActive && user.isBanned" class="badge status-cancelled">Banido</span>
+              <span *ngIf="user.isActive && !user.isBanned" class="badge status-completed">Ativo</span>
             </div>
             <div class="meta player-meta">
               <span>{{ user.email }}</span>
               <span *ngIf="user.steamId">Steam: {{ user.steamId }}</span>
               <span>{{ user.teamCount }} time(s)</span>
               <span>Desde {{ formatDate(user.createdAt) }}</span>
+              <span *ngIf="user.isBanned && user.bannedUntil">Ban até {{ formatBannedUntil(user.bannedUntil) }}</span>
             </div>
+          </div>
+
+          <div class="player-actions" *ngIf="canModerate(user)">
+            <button
+              *ngIf="user.isActive && !user.isBanned"
+              type="button"
+              class="btn btn-secondary btn-small"
+              (click)="openModeration(user, 'ban')">
+              Banir
+            </button>
+            <button
+              *ngIf="user.isBanned"
+              type="button"
+              class="btn btn-secondary btn-small"
+              (click)="openModeration(user, 'unban')">
+              Remover ban
+            </button>
+            <button
+              *ngIf="user.isActive"
+              type="button"
+              class="btn btn-secondary btn-small"
+              (click)="openModeration(user, 'deactivate')">
+              Desativar
+            </button>
+            <button
+              *ngIf="!user.isActive"
+              type="button"
+              class="btn btn-success btn-small"
+              (click)="openModeration(user, 'activate')">
+              Reativar
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger btn-small"
+              (click)="openModeration(user, 'delete')">
+              Excluir
+            </button>
           </div>
         </li>
       </ul>
@@ -115,3 +162,47 @@
     </div>
   </div>
 </div>
+
+<div
+  *ngIf="moderationAction === 'ban' && moderationTarget"
+  class="gc-modal-backdrop"
+  (click)="closeModeration()">
+  <div class="gc-modal form-wrapper ban-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <h2 class="section-title">{{ moderationTitle }}</h2>
+    <p class="meta ban-modal-message">{{ moderationMessage }}</p>
+    <p class="ban-modal-highlight">{{ moderationTarget.displayName }}</p>
+    <div class="form-group">
+      <label class="form-label" for="ban-days">Dias de suspensão</label>
+      <input
+        id="ban-days"
+        class="input-field"
+        type="number"
+        min="1"
+        max="365"
+        [(ngModel)]="banDays" />
+    </div>
+    <p *ngIf="moderationError" class="form-error">{{ moderationError }}</p>
+    <div class="ban-modal-actions">
+      <button type="button" class="btn btn-secondary" [disabled]="moderationLoading" (click)="closeModeration()">
+        Cancelar
+      </button>
+      <button type="button" class="btn btn-primary" [disabled]="moderationLoading" (click)="confirmModeration()">
+        {{ moderationLoading ? 'Aplicando...' : 'Confirmar banimento' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<app-confirm-modal
+  *ngIf="moderationTarget && moderationAction && moderationAction !== 'ban'"
+  [title]="moderationTitle"
+  [message]="moderationMessage"
+  [highlight]="moderationTarget.displayName"
+  highlightLabel="Jogador"
+  [hint]="moderationError"
+  [confirmLabel]="moderationAction === 'delete' ? 'Excluir' : 'Confirmar'"
+  [danger]="moderationAction === 'delete' || moderationAction === 'deactivate'"
+  [loading]="moderationLoading"
+  (confirmed)="confirmModeration()"
+  (closed)="closeModeration()">
+</app-confirm-modal>

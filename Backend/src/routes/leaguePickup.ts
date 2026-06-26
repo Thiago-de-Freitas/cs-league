@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { participationGuard } from '../middleware/participationGuard';
 import {
   assignPlayerToSquad,
   balancePickupLeague,
@@ -49,7 +50,7 @@ router.get('/:id/pickup', authMiddleware, async (req: AuthRequest, res: Response
   }
 });
 
-router.post('/:id/pickup/players', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/pickup/players', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -106,7 +107,7 @@ router.post('/:id/pickup/players', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
-router.delete('/:id/pickup/players/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.delete('/:id/pickup/players/:userId', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -137,7 +138,7 @@ router.delete('/:id/pickup/players/:userId', authMiddleware, async (req: AuthReq
   }
 });
 
-router.patch('/:id/pickup/assign', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/pickup/assign', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -172,7 +173,7 @@ router.patch('/:id/pickup/assign', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
-router.post('/:id/pickup/balance', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/pickup/balance', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -212,7 +213,7 @@ router.post('/:id/pickup/balance', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
-router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/pickup/settings', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -265,7 +266,7 @@ router.patch('/:id/pickup/settings', authMiddleware, async (req: AuthRequest, re
   }
 });
 
-router.patch('/:id/pickup/squads', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/pickup/squads', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
@@ -292,7 +293,7 @@ router.patch('/:id/pickup/squads', authMiddleware, async (req: AuthRequest, res:
   }
 });
 
-router.post('/:id/pickup/start', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/pickup/start', authMiddleware, participationGuard, async (req: AuthRequest, res: Response) => {
   try {
     const check = await assertPickupLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
