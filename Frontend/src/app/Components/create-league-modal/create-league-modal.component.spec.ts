@@ -89,4 +89,36 @@ describe('CreateLeagueModalComponent', () => {
     component.form.patchValue({ format: 'single_group' });
     expect(component.mapSeriesScopeHint).toContain('fase de grupos');
   });
+
+  it('liga individual envia pickupBalanceModes e playersPerTeam', () => {
+    component.form.patchValue({
+      leagueName: 'Duelo',
+      format: 'one_vs_one',
+      pickupPlayersPerTeam: 3,
+    });
+    component.pickupBalanceModes = ['rating', 'adr'];
+    component.onSubmit();
+    expect(leagueServiceSpy.createLeague).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        format: 'ONE_VS_ONE',
+        pickupPlayersPerTeam: 3,
+        pickupBalanceModes: ['rating', 'adr'],
+      })
+    );
+  });
+
+  it('togglePickupBalanceMode impede remover último critério', () => {
+    component.pickupBalanceModes = ['rating'];
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = false;
+    component.togglePickupBalanceMode('rating', { target: input } as unknown as Event);
+    expect(component.pickupBalanceModes).toEqual(['rating']);
+    expect(input.checked).toBeTrue();
+  });
+
+  it('minTeamsForFormat retorna 2 para liga individual', () => {
+    component.form.patchValue({ format: 'one_vs_one' });
+    expect(component.minTeamsForFormat).toBe(2);
+  });
 });

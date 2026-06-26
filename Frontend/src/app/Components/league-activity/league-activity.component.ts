@@ -79,7 +79,7 @@ export class LeagueActivityComponent implements OnInit {
     this.auditService.getLeagueActivity(this.leagueId).subscribe({
       next: (page) => {
         this.events = page.events;
-        this.nextCursor = page.nextCursor;
+        this.nextCursor = page.nextCursor ?? null;
         this.loading = false;
       },
       error: () => {
@@ -94,7 +94,7 @@ export class LeagueActivityComponent implements OnInit {
     this.auditService.getLeagueActivity(this.leagueId, 50, this.nextCursor).subscribe({
       next: (page) => {
         this.events = [...this.events, ...page.events];
-        this.nextCursor = page.nextCursor;
+        this.nextCursor = page.nextCursor ?? null;
         this.loadingMore = false;
       },
       error: () => {
