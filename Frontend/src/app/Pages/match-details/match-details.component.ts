@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subscription, interval } from 'rxjs';
+import { Subscription, forkJoin, interval } from 'rxjs';
 import { startWith, switchMap, takeWhile } from 'rxjs/operators';
 import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
@@ -79,6 +79,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   imageUploading = false;
   imageCaption = '';
   generatingHighlights = false;
+  pollingHighlights = false;
+  highlightProgressPercent = 0;
+  highlightProgressMessage = '';
+  highlightProgressError = '';
   myCaptainTeamIds: string[] = [];
   private pollSub?: Subscription;
 
@@ -125,31 +129,39 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     });
   }
 
-  startDemoViewPolling(id: string): void {
+  startDemoStatusPolling(id: string): void {
     this.pollSub?.unsubscribe();
     this.pollingDemo = true;
     this.pollSub = interval(3000).pipe(
       startWith(0),
       switchMap(() => this.demoService.getDemo(id)),
-      takeWhile(() => this.shouldContinueHighlightPolling(), true)
+      takeWhile((demo) => demo.status === 'pending' || demo.status === 'processing', true)
     ).subscribe({
       next: (demo) => {
         this.demo = demo;
         if (demo.status === 'completed') {
           this.stats = demo.stats || [];
+          this.pollingDemo = false;
+          this.resumeHighlightPolling(demo);
         }
-        this.syncHighlightGenerationFromPoll(demo.highlights ?? [], demo.id);
-        const stillProcessingDemo = demo.status === 'pending' || demo.status === 'processing';
-        const renderingHighlights = hasHighlightVideoRendering(demo.highlights ?? []);
-        this.pollingDemo =
-          stillProcessingDemo || renderingHighlights || this.generatingHighlights;
         if (demo.status === 'failed') {
           this.pollingDemo = false;
-          this.generatingHighlights = false;
-          clearHighlightGeneratePending();
         }
       },
     });
+  }
+
+  /** @deprecated use startDemoStatusPolling or startHighlightGenerationPolling */
+  startDemoViewPolling(id: string): void {
+    if (this.demo?.status === 'pending' || this.demo?.status === 'processing') {
+      this.startDemoStatusPolling(id);
+      return;
+    }
+    this.startHighlightGenerationPolling(id);
+  }
+
+  get isPollingDemoStats(): boolean {
+    return this.pollingDemo && !!this.demo && (this.demo.status === 'pending' || this.demo.status === 'processing');
   }
 
   reprocessDemo(): void {
@@ -157,8 +169,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     this.demoService.reprocessDemo(this.demo.id).subscribe({
       next: (updated) => {
         this.demo = updated;
-        this.pollingDemo = true;
-        this.startDemoViewPolling(updated.id);
+        this.startDemoStatusPolling(updated.id);
       },
       error: (err) => {
         this.errorMsg = err.error?.error || 'Erro ao reprocessar demo';
@@ -788,18 +799,115 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (!this.shouldContinueHighlightPolling(demo, match)) {
+    if (demo && (demo.status === 'pending' || demo.status === 'processing')) {
+      this.startDemoStatusPolling(demo.id);
       return;
     }
 
+    if (this.shouldContinueHighlightPolling(demo, match)) {
+      this.startHighlightGenerationPolling(demoId, matchId);
+    }
+  }
+
+  private applyHighlightProgress(progress: { percent?: number; phase?: string; message?: string; error?: string }): void {
+    if (!progress || progress.phase === 'idle') {
+      return;
+    }
+    this.highlightProgressPercent = progress.percent ?? 0;
+    this.highlightProgressMessage = progress.message ?? '';
+    this.highlightProgressError = progress.error ?? '';
+    if (progress.phase === 'completed') {
+      this.generatingHighlights = false;
+      clearHighlightGeneratePending();
+    }
+    if (progress.phase === 'failed') {
+      this.generatingHighlights = false;
+      this.pollingHighlights = false;
+      clearHighlightGeneratePending();
+      if (progress.error || progress.message) {
+        this.notify.error(progress.error || progress.message || 'Falha ao gerar destaques.');
+      }
+    }
+  }
+
+  private updateHighlightPollingFlags(): void {
+    const highlights = this.isDemoView
+      ? (this.demo?.highlights ?? [])
+      : (this.match?.highlights ?? []);
+    const rendering = hasHighlightVideoRendering(highlights);
+    const inProgress = this.generatingHighlights && this.highlightProgressPercent < 100;
+    this.pollingHighlights = rendering || inProgress;
+    if (!this.pollingHighlights && !rendering) {
+      this.generatingHighlights = false;
+    }
+  }
+
+  private startHighlightGenerationPolling(demoId?: string, matchId?: string): void {
+    this.pollSub?.unsubscribe();
+    this.pollingHighlights = true;
+
     if (this.isDemoView && demoId) {
-      this.startDemoViewPolling(demoId);
+      this.pollSub = interval(2000)
+        .pipe(
+          startWith(0),
+          switchMap(() =>
+            forkJoin({
+              demo: this.demoService.getDemo(demoId),
+              progress: this.demoService.getHighlightProgress(demoId),
+            })
+          ),
+          takeWhile(() => this.shouldContinueHighlightPolling(), true)
+        )
+        .subscribe({
+          next: ({ demo, progress }) => {
+            if (demo.status === 'completed' && this.demo) {
+              this.demo = { ...this.demo, highlights: demo.highlights };
+            } else {
+              this.demo = demo;
+              if (demo.status === 'completed') {
+                this.stats = demo.stats || [];
+              }
+            }
+            this.applyHighlightProgress(progress);
+            this.syncHighlightGenerationFromPoll(demo.highlights ?? [], demoId);
+            this.updateHighlightPollingFlags();
+          },
+          complete: () => {
+            this.pollingHighlights = false;
+            this.generatingHighlights = false;
+          },
+        });
       return;
     }
 
     if (matchId) {
-      this.startMatchHighlightPolling();
+      this.pollSub = interval(2000)
+        .pipe(
+          startWith(0),
+          switchMap(() =>
+            forkJoin({
+              match: this.matchService.getMatch(matchId),
+              progress: this.matchService.getHighlightProgress(matchId),
+            })
+          ),
+          takeWhile(() => this.shouldContinueHighlightPolling(), true)
+        )
+        .subscribe({
+          next: ({ match, progress }) => {
+            this.match = match;
+            this.applyHighlightProgress(progress);
+            this.syncHighlightGenerationFromPoll(match.highlights ?? [], undefined, matchId);
+            this.updateHighlightPollingFlags();
+          },
+          complete: () => {
+            this.pollingHighlights = false;
+            this.generatingHighlights = false;
+          },
+        });
+      return;
     }
+
+    this.pollingHighlights = false;
   }
 
   private syncHighlightGenerationFromPoll(
@@ -826,11 +934,11 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     const currentMatch = match ?? this.match ?? undefined;
     const highlights = currentDemo?.highlights ?? currentMatch?.highlights ?? [];
 
-    if (currentDemo && (currentDemo.status === 'pending' || currentDemo.status === 'processing')) {
+    if (hasHighlightVideoRendering(highlights)) {
       return true;
     }
 
-    if (hasHighlightVideoRendering(highlights)) {
+    if (this.generatingHighlights && this.highlightProgressPercent < 100) {
       return true;
     }
 
@@ -840,7 +948,7 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       null;
 
     if (pending) {
-      if (isHighlightGenerationComplete(highlights, pending)) {
+      if (isHighlightGenerationComplete(highlights, pending) && !hasHighlightVideoRendering(highlights)) {
         clearHighlightGeneratePending();
         this.generatingHighlights = false;
         return false;
@@ -849,34 +957,16 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       return true;
     }
 
-    return this.generatingHighlights;
-  }
-
-  private startMatchHighlightPolling(): void {
-    if (!this.matchId) return;
-    this.pollSub?.unsubscribe();
-    this.pollSub = interval(3000).pipe(
-      startWith(0),
-      switchMap(() => this.matchService.getMatch(this.matchId!)),
-      takeWhile(() => this.shouldContinueHighlightPolling(), true)
-    ).subscribe({
-      next: (match) => {
-        this.match = match;
-        this.syncHighlightGenerationFromPoll(match.highlights ?? [], undefined, match.id);
-        const renderingHighlights = hasHighlightVideoRendering(match.highlights ?? []);
-        this.pollingDemo = renderingHighlights || this.generatingHighlights;
-      },
-      complete: () => {
-        this.generatingHighlights = false;
-        this.pollingDemo = false;
-      },
-    });
+    return false;
   }
 
   generateHighlights(): void {
     if (!this.canGenerateHighlights) return;
 
     this.markHighlightGeneratePending();
+    this.highlightProgressPercent = 0;
+    this.highlightProgressMessage = 'Na fila de extração de destaques...';
+    this.highlightProgressError = '';
     const request$ = this.isDemoView && this.demo
       ? this.demoService.generateHighlights(this.demo.id)
       : this.match
@@ -893,11 +983,9 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.notify.success(res.message || 'Geração de destaques enfileirada.');
         if (this.isDemoView && this.demo) {
-          this.pollingDemo = true;
-          this.startDemoViewPolling(this.demo.id);
+          this.startHighlightGenerationPolling(this.demo.id);
         } else if (this.matchId) {
-          this.pollingDemo = true;
-          this.startMatchHighlightPolling();
+          this.startHighlightGenerationPolling(undefined, this.matchId);
         }
       },
       error: (err) => {

@@ -22,6 +22,10 @@ import {
   enqueueRenderJobsForDemoHighlights,
   enqueueRenderJobsForMatchHighlights,
 } from './lib/highlightRenderQueue';
+import {
+  bumpHighlightRenderProgress,
+  markHighlightRenderQueued,
+} from './lib/highlightProgress';
 import { isSafeStaticRequestPath } from './lib/pathSafe';
 import { securityHeaders } from './middleware/securityHeaders';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -296,6 +300,7 @@ app.post('/api/internal/matches/:id/highlights', internalServiceAuth, async (req
     if (demoId) {
       renderJobs = await enqueueRenderJobsForMatchHighlights(matchId, demoId);
     }
+    await markHighlightRenderQueued('match', matchId, renderJobs);
 
     skipAudit(req);
     res.status(201).json({ ok: true, count: highlights.length, renderJobs });
@@ -327,6 +332,7 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
     });
 
     const renderJobs = await enqueueRenderJobsForDemoHighlights(demoId);
+    await markHighlightRenderQueued('demo', demoId, renderJobs);
 
     skipAudit(req);
     res.status(201).json({ ok: true, count: highlights.length, renderJobs });
@@ -360,9 +366,23 @@ app.post('/api/internal/highlights/render-result', internalServiceAuth, async (r
     };
 
     if (scope === 'match') {
+      const highlight = await prisma.matchHighlight.findUnique({
+        where: { id: highlightId },
+        select: { matchId: true },
+      });
       await prisma.matchHighlight.updateMany({ where: { id: highlightId }, data });
+      if (highlight?.matchId) {
+        await bumpHighlightRenderProgress('match', highlight.matchId, status);
+      }
     } else if (scope === 'demo') {
+      const highlight = await prisma.demoHighlight.findUnique({
+        where: { id: highlightId },
+        select: { demoId: true },
+      });
       await prisma.demoHighlight.updateMany({ where: { id: highlightId }, data });
+      if (highlight?.demoId) {
+        await bumpHighlightRenderProgress('demo', highlight.demoId, status);
+      }
     } else {
       res.status(400).json({ error: 'Escopo de highlight inválido' });
       return;

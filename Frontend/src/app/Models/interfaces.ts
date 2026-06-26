@@ -307,6 +307,18 @@ export interface PersonalHighlightsResponse {
   videoExportAvailable: boolean;
 }
 
+export interface HighlightProgress {
+  scope?: 'demo' | 'match';
+  parentId?: string;
+  percent: number;
+  phase: 'idle' | 'queued' | 'extracting' | 'saving' | 'rendering' | 'completed' | 'failed' | string;
+  message: string;
+  renderTotal?: number;
+  renderCompleted?: number;
+  error?: string;
+  updatedAt?: string;
+}
+
 export interface MatchRosterPlayer {
   userId: string;
   playerName: string;

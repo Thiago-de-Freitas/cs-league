@@ -139,7 +139,6 @@
   margin-bottom: 1.25rem;
   border-bottom: 1px solid var(--gc-border);
   padding-bottom: 0;
-  overflow-x: auto;
 }
 
 .profile-tab {
@@ -205,6 +204,11 @@
 
 /* Demos tab */
 .demos-section, .settings-section { padding: 1.5rem; }
+
+.settings-success-message {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
 
 .profile-avatar-section {
   display: flex;
@@ -384,4 +388,15 @@
 
   .profile-history-table { font-size: 0.75rem; }
   .demo-link { max-width: 100px; }
+
+  .profile-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .profile-tabs::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -43,6 +43,7 @@ describe('MatchDetailsComponent', () => {
       'downloadHighlightClip',
       'downloadHighlightVideo',
       'generateHighlights',
+      'getHighlightProgress',
     ]);
     demoServiceSpy = jasmine.createSpyObj('DemoService', [
       'getDemo',
@@ -50,7 +51,12 @@ describe('MatchDetailsComponent', () => {
       'downloadDemoHighlightClip',
       'downloadDemoHighlightVideo',
       'generateHighlights',
+      'getHighlightProgress',
     ]);
+
+    const idleProgress = { percent: 0, phase: 'idle', message: '' };
+    matchServiceSpy.getHighlightProgress.and.returnValue(of(idleProgress));
+    demoServiceSpy.getHighlightProgress.and.returnValue(of(idleProgress));
 
     matchServiceSpy.getMatch.and.returnValue(of(mockMatch()));
     demoServiceSpy.getDemo.and.returnValue(

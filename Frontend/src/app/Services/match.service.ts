@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Match, ManualPlayerStatInput, MapVetoState, MatchLineupEntry, MatchImage, MatchSeriesInfo } from '../Models/interfaces';
+import { Match, ManualPlayerStatInput, MapVetoState, MatchLineupEntry, MatchImage, MatchSeriesInfo, HighlightProgress } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class MatchService {
@@ -119,5 +119,9 @@ export class MatchService {
       `${this.apiUrl}/${matchId}/highlights/generate`,
       {}
     );
+  }
+
+  getHighlightProgress(matchId: string): Observable<HighlightProgress> {
+    return this.http.get<HighlightProgress>(`${this.apiUrl}/${matchId}/highlights/progress`);
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
 import { Observable, interval, switchMap, takeWhile, startWith, filter, map } from 'rxjs';
-import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalHighlightsResponse, PersonalStatsOverview } from '../Models/interfaces';
+import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalHighlightsResponse, PersonalStatsOverview, HighlightProgress } from '../Models/interfaces';
 import { ApiConfigService } from './api-config.service';
 
 export interface DemoUploadProgress {
@@ -84,6 +84,10 @@ export class DemoService {
 
   listPersonalHighlights(): Observable<PersonalHighlightsResponse> {
     return this.http.get<PersonalHighlightsResponse>(`${this.apiUrl}/personal/highlights`);
+  }
+
+  getHighlightProgress(demoId: string): Observable<HighlightProgress> {
+    return this.http.get<HighlightProgress>(`${this.apiUrl}/${demoId}/highlights/progress`);
   }
 
   getPersonalStatsOverview(): Observable<PersonalStatsOverview> {

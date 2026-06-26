@@ -17,6 +17,7 @@ import psycopg2
 import redis
 from demoparser2 import DemoParser
 from highlight_extraction import extract_highlights
+from highlight_progress import set_highlight_progress
 from highlight_renderer import HIGHLIGHT_RENDER_QUEUE, process_highlight_render_job
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
@@ -451,13 +452,85 @@ def process_highlight_extract_job(payload: str) -> None:
     if not demo_id or not file_path:
         raise ValueError("Job de extração de destaques inválido")
 
-    resolved, error = ensure_demo_file(demo_id, file_path)
-    if error or not resolved:
-        raise RuntimeError(error or "Arquivo da demo não encontrado")
-
     meta = get_demo_meta(demo_id)
-    save_and_extract_highlights(resolved, demo_id, meta)
-    print(f"[highlights] extração sob demanda concluída para demo {demo_id}")
+    scope = "demo"
+    parent_id = demo_id
+    if meta and meta.get("match_id") and not meta.get("is_personal"):
+        scope = "match"
+        parent_id = str(meta["match_id"])
+
+    try:
+        set_highlight_progress(
+            scope,
+            parent_id,
+            percent=5,
+            phase="extracting",
+            message="Carregando arquivo da demo...",
+        )
+
+        resolved, error = ensure_demo_file(demo_id, file_path)
+        if error or not resolved:
+            raise RuntimeError(error or "Arquivo da demo não encontrado")
+
+        set_highlight_progress(
+            scope,
+            parent_id,
+            percent=15,
+            phase="extracting",
+            message="Analisando jogadas (sem reprocessar estatísticas)...",
+        )
+
+        uploader_steam = None
+        if meta and meta.get("is_personal") and meta.get("uploader_steam_id"):
+            uploader_steam = str(meta["uploader_steam_id"])
+
+        hl = extract_highlights(resolved, uploader_steam_id=uploader_steam)
+
+        set_highlight_progress(
+            scope,
+            parent_id,
+            percent=45,
+            phase="saving",
+            message="Salvando destaques...",
+        )
+
+        if not hl:
+            set_highlight_progress(
+                scope,
+                parent_id,
+                percent=100,
+                phase="completed",
+                message="Nenhum destaque encontrado nesta demo.",
+            )
+            print(f"[highlights] nenhum destaque para demo {demo_id}")
+            return
+
+        if meta and meta.get("match_id"):
+            post_match_highlights(meta["match_id"], demo_id, hl)
+        elif meta and meta.get("is_personal"):
+            post_demo_highlights(demo_id, hl)
+        else:
+            post_demo_highlights(demo_id, hl)
+
+        set_highlight_progress(
+            scope,
+            parent_id,
+            percent=50,
+            phase="rendering",
+            message=f"{len(hl)} destaque(s) detectado(s). Gerando vídeos...",
+        )
+        print(f"[highlights] extração sob demanda concluída para demo {demo_id} ({len(hl)} clips)")
+    except Exception as err:
+        message = str(err)[:500]
+        set_highlight_progress(
+            scope,
+            parent_id,
+            percent=100,
+            phase="failed",
+            message="Falha ao gerar destaques.",
+            error=message,
+        )
+        raise
 
 
 def extract_map_name(file_path: str) -> str | None:

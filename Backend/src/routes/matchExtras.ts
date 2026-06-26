@@ -18,6 +18,7 @@ import {
   enqueueHighlightExtractJob,
   findLatestCompletedDemoForMatch,
 } from '../lib/highlightExtractQueue';
+import { getHighlightProgress } from '../lib/highlightProgress';
 import { requireDemoQueue } from '../middleware/demoQueue';
 import { getSeriesForMatch } from '../lib/matchSeriesService';
 import { encodeUploadedImageToDataUrl } from '../lib/uploadAssets';
@@ -406,6 +407,21 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
+  router.get('/:id/highlights/progress', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
+      if (!access.allowed) {
+        res.status(403).json({ error: access.error });
+        return;
+      }
+      const progress = await getHighlightProgress('match', req.params.id);
+      res.json(progress ?? { percent: 0, phase: 'idle', message: 'Nenhuma geração em andamento' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao consultar progresso dos destaques' });
+    }
+  });
+
   router.get('/:id/highlights/:highlightId/clip', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
@@ -467,7 +483,7 @@ export function registerMatchExtras(router: Router): void {
         res.status(400).json({ error: 'Nenhuma demo processada encontrada para esta partida' });
         return;
       }
-      await enqueueHighlightExtractJob(demoId);
+      await enqueueHighlightExtractJob(demoId, 'match', req.params.id);
       setAuditContext(req, audit.of('match.highlights.generate', 'Match', req.params.id, {
         metadata: { demoId },
       }));

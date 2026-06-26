@@ -119,9 +119,16 @@
           (click)="generateHighlights()">
           {{ generateHighlightsLabel }}
         </button>
-        <span *ngIf="generatingHighlights" class="meta">Gerando destaques...</span>
+        <span *ngIf="generatingHighlights || pollingHighlights" class="meta highlight-progress-label">
+          {{ highlightProgressMessage || 'Gerando destaques...' }}
+          <strong *ngIf="highlightProgressPercent > 0"> {{ highlightProgressPercent }}%</strong>
+        </span>
       </div>
-      <p class="meta mb-4">Melhores jogadas detectadas na demo. O MP4 é gerado automaticamente após a extração. Use "Baixar spec" para ticks HLAE/GOTV.</p>
+      <div *ngIf="generatingHighlights || pollingHighlights" class="highlight-progress-bar" [style.--pct]="highlightProgressPercent + '%'">
+        <div class="highlight-progress-fill"></div>
+      </div>
+      <p *ngIf="highlightProgressError" class="meta highlight-error">{{ highlightProgressError }}</p>
+      <p class="meta mb-4">Melhores jogadas detectadas na demo. A extração não reprocessa estatísticas. O MP4 é gerado após a detecção.</p>
       <p *ngIf="!visibleHighlights.length && !generatingHighlights" class="meta">Nenhum destaque encontrado ainda. Clique em "Gerar destaques" para analisar a demo.</p>
       <ul *ngIf="visibleHighlights.length" class="gc-list">
         <li *ngFor="let h of visibleHighlights" class="gc-list-item highlight-item">
@@ -183,8 +190,8 @@
         <h1 class="demo-view-filename" [title]="demo.fileName">{{ demo.fileName }}</h1>
       </div>
       <div class="match-meta demo-view-meta">
-        <app-demo-status-loader *ngIf="pollingDemo || isDemoProcessing(demo)" [status]="demo.status" [compact]="true"></app-demo-status-loader>
-        <span *ngIf="!pollingDemo && !isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getDemoStatusLabel(demo.status) }}</span>
+        <app-demo-status-loader *ngIf="isPollingDemoStats" [status]="demo.status" [compact]="true"></app-demo-status-loader>
+        <span *ngIf="!isPollingDemoStats && !isDemoProcessing(demo)" class="badge status-{{ demo.status }}">{{ getDemoStatusLabel(demo.status) }}</span>
         <span class="badge badge-gray" *ngIf="demo.isPersonal">Pessoal</span>
         <span class="meta" *ngIf="demo.matchId && !demo.isPersonal">
           Partida: <a [routerLink]="['/match', demo.matchId]">Ver partida</a>
@@ -202,10 +209,16 @@
         <a routerLink="/demos" class="btn btn-ghost btn-small">Voltar às Demos</a>
       </div>
       <app-demo-status-loader
-        *ngIf="pollingDemo"
+        *ngIf="isPollingDemoStats"
         [block]="true"
         [status]="demo.status"
         message="Atualizando estatísticas da demo...">
+      </app-demo-status-loader>
+      <app-demo-status-loader
+        *ngIf="pollingHighlights && !isPollingDemoStats"
+        [block]="true"
+        status="processing"
+        [message]="highlightProgressMessage || 'Gerando destaques...'">
       </app-demo-status-loader>
       <p *ngIf="demo.errorMessage && !pollingDemo" class="error-message">{{ demo.errorMessage }}</p>
     </div>

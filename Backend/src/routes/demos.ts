@@ -22,6 +22,7 @@ import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
 import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
+import { getHighlightProgress } from '../lib/highlightProgress';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
 import { serializeHighlight } from '../lib/highlightSerialization';
 
@@ -457,6 +458,29 @@ router.get('/:id/highlights', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
+router.get('/:id/highlights/progress', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const demo = await prisma.demo.findUnique({
+      where: { id: req.params.id },
+      select: { uploadedById: true, isPersonal: true, matchId: true },
+    });
+    if (!demo) {
+      res.status(404).json({ error: 'Demo não encontrada' });
+      return;
+    }
+    const access = await canUserViewDemo(req.user!.userId, req.user!.role, demo);
+    if (!access.allowed) {
+      res.status(403).json({ error: access.error });
+      return;
+    }
+    const progress = await getHighlightProgress('demo', req.params.id);
+    res.json(progress ?? { percent: 0, phase: 'idle', message: 'Nenhuma geração em andamento' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao consultar progresso dos destaques' });
+  }
+});
+
 router.get('/:id/highlights/:highlightId/clip', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const demo = await prisma.demo.findUnique({
@@ -537,7 +561,7 @@ router.post('/:id/highlights/generate', authMiddleware, requireDemoQueue, async 
       res.status(403).json({ error: access.error });
       return;
     }
-    await enqueueHighlightExtractJob(demo.id);
+    await enqueueHighlightExtractJob(demo.id, 'demo', demo.id);
     setAuditContext(req, audit.of('demo.highlights.generate', 'Demo', demo.id, {
       metadata: { matchId: demo.matchId, isPersonal: demo.isPersonal },
     }));

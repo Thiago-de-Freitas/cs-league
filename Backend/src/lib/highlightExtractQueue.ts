@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { connectRedis, redis } from './redis';
 import { isValidResourceId } from './pathSafe';
 import { resolveDemoFilePath, tryResolveDemoFilePath } from './demoStorage';
+import { initHighlightProgress } from './highlightProgress';
 
 export const HIGHLIGHT_EXTRACT_QUEUE = 'highlight:extract:queue';
 
@@ -10,14 +11,18 @@ export interface HighlightExtractJob {
   filePath: string;
 }
 
-export async function enqueueHighlightExtractJob(demoId: string): Promise<void> {
+export async function enqueueHighlightExtractJob(
+  demoId: string,
+  scope: 'demo' | 'match' = 'demo',
+  parentId?: string
+): Promise<void> {
   if (!isValidResourceId(demoId)) {
     throw new Error('ID de demo inválido');
   }
 
   const demo = await prisma.demo.findUnique({
     where: { id: demoId },
-    select: { filePath: true, status: true, isManual: true },
+    select: { filePath: true, status: true, isManual: true, matchId: true, isPersonal: true },
   });
   if (!demo) {
     throw new Error('Demo não encontrada');
@@ -38,6 +43,15 @@ export async function enqueueHighlightExtractJob(demoId: string): Promise<void> 
     demoId,
     filePath: resolveDemoFilePath(demoPath),
   };
+
+  const progressScope =
+    scope === 'match' || (!demo.isPersonal && demo.matchId) ? 'match' : 'demo';
+  const progressParentId =
+    progressScope === 'match'
+      ? (parentId ?? demo.matchId ?? demoId)
+      : demoId;
+
+  await initHighlightProgress(progressScope, progressParentId);
 
   await connectRedis();
   try {
