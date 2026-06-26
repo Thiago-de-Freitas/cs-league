@@ -41,6 +41,7 @@ import {
 } from '../lib/matchSchedule';
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
+import { releasePickupPlayers } from '../lib/pickupLeague';
 import { roundDifference } from '../lib/matchResult';
 import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
@@ -50,8 +51,15 @@ import { afterMatchCreated, initializeMatchMapVeto, upsertMatchLineup } from '..
 import { getMapLabel, parseMapPool, validateMapPoolForSeriesFormat } from '../lib/cs2Maps';
 import { createPlayoffSlot } from '../lib/playoffMatchFactory';
 import { createMatchSeries } from '../lib/matchSeriesService';
+import {
+  isValidPickupPlayersPerTeam,
+  isValidPickupTeamCount,
+  parsePickupBalanceMode,
+} from '../lib/pickupBalance';
+import leaguePickupRoutes from './leaguePickup';
 
 const router = Router();
+router.use(leaguePickupRoutes);
 router.use(auditResponseMiddleware);
 
 const teamWithRosterSelect = {
@@ -328,6 +336,10 @@ function formatLeague(
     mapPool: parseMapPool(league.mapPool),
     mapVetoEnabled: league.mapVetoEnabled,
     seriesFormat: league.seriesFormat.toLowerCase(),
+    pickupTeamCount: league.pickupTeamCount,
+    pickupPlayersPerTeam: league.pickupPlayersPerTeam,
+    pickupBalanceMode: league.pickupBalanceMode?.toLowerCase() ?? 'rating',
+    pickupBalancedAt: league.pickupBalancedAt,
     groups,
     teams: league.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
     matches: league.matches.map(formatMatch),
@@ -519,12 +531,22 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       }
       const mapVetoEnabled = seriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
 
+      const pickupTeamCount = isValidPickupTeamCount(Number(req.body?.pickupTeamCount))
+        ? Number(req.body.pickupTeamCount)
+        : isValidPickupTeamCount(Number(maxTeams))
+          ? Number(maxTeams)
+          : 2;
+      const pickupPlayersPerTeam = isValidPickupPlayersPerTeam(Number(req.body?.pickupPlayersPerTeam))
+        ? Number(req.body.pickupPlayersPerTeam)
+        : 5;
+      const pickupBalanceMode = parsePickupBalanceMode(req.body?.pickupBalanceMode);
+
       const league = await prisma.league.create({
         data: {
           name,
           description: description || '',
-          maxTeams: 2,
-          registrationOpen: registrationOpen === true,
+          maxTeams: null,
+          registrationOpen: false,
           format: 'ONE_VS_ONE',
           groupCount: 1,
           advancePerGroup: 1,
@@ -533,6 +555,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           mapVetoEnabled,
           mapPool,
           seriesFormat,
+          pickupTeamCount,
+          pickupPlayersPerTeam,
+          pickupBalanceMode,
           ownerId: req.user!.userId,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
@@ -784,6 +809,10 @@ router.post('/:id/archive', authMiddleware, async (req: AuthRequest, res: Respon
       WHERE id = ${req.params.id}
     `;
 
+    if (check.league.format === 'ONE_VS_ONE') {
+      await releasePickupPlayers(req.params.id);
+    }
+
     const league = await prisma.league.findUnique({ where: { id: req.params.id } });
     if (!league) {
       res.status(404).json({ error: 'Liga não encontrada' });
@@ -871,6 +900,13 @@ router.post('/:id/register', authMiddleware, async (req: AuthRequest, res: Respo
       return;
     }
 
+    if (league.format === 'ONE_VS_ONE') {
+      res.status(400).json({
+        error: 'Ligas individuais não aceitam inscrição de times. O organizador convoca jogadores diretamente.',
+      });
+      return;
+    }
+
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       select: { id: true, ownerId: true },
@@ -938,6 +974,13 @@ router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Res
       return;
     }
 
+    if (check.league.format === 'ONE_VS_ONE') {
+      res.status(400).json({
+        error: 'Use o painel de jogadores para montar times temporários nesta liga.',
+      });
+      return;
+    }
+
     const { teamIds } = req.body as { teamIds: string[] };
     if (!teamIds?.length) {
       res.status(400).json({ error: 'Lista de teamIds é obrigatória' });
@@ -975,6 +1018,13 @@ router.post('/:id/teams', authMiddleware, async (req: AuthRequest, res: Response
     const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
     if (!check.league) {
       res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.format === 'ONE_VS_ONE') {
+      res.status(400).json({
+        error: 'Use o painel de jogadores para montar times temporários nesta liga.',
+      });
       return;
     }
 
@@ -1082,7 +1132,10 @@ router.get('/:id/available-teams', authMiddleware, async (req: AuthRequest, res:
     const excludeIds = inLeague.map((lt) => lt.teamId);
 
     const teams = await prisma.team.findMany({
-      where: excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {},
+      where: {
+        leagueId: null,
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+      },
       select: { id: true, name: true, tag: true },
       orderBy: { name: 'asc' },
     });

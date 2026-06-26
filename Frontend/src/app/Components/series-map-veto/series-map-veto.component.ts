@@ -12,7 +12,17 @@ import { getMapLabel } from '../../Utils/maps';
     <section class="gc-card map-veto-card" *ngIf="series && series.format === 'bo3'">
       <h2 class="section-title">Veto BO3 (estilo Valve)</h2>
       <p class="meta map-veto-intro" *ngIf="series.vetoStatus === 'ban_phase'">
-        2 bans alternados, depois 2 picks. O mapa restante é o decider. Timeout de 15 min sorteia ações pendentes.
+        2 bans alternados, depois 2 picks. O mapa restante é o decider.
+        Prazo final: <strong>2 dias antes</strong> do início da partida.
+      </p>
+      <p class="meta map-veto-deadline" *ngIf="series.vetoDeadlineAt">
+        Veto permitido até {{ formatDeadline(series.vetoDeadlineAt) }}.
+      </p>
+      <p class="meta map-veto-warning" *ngIf="series.deadlineExpired">
+        Prazo de veto encerrado. Somente um administrador pode reabrir o map pool.
+      </p>
+      <p class="meta map-veto-reopened" *ngIf="series.vetoReopenedByAdmin">
+        Map pool reaberto por administrador — nova rodada de veto em andamento.
       </p>
       <p class="meta map-veto-intro" *ngIf="series.vetoStatus === 'pick_phase'">
         Escolha os mapas do BO3. Cada time faz um pick alternado.
@@ -22,6 +32,15 @@ import { getMapLabel } from '../../Utils/maps';
         <span *ngIf="series.autoResolved"> (ações automáticas por tempo esgotado)</span>.
         Placar da série: {{ series.team1MapWins }} – {{ series.team2MapWins }}
       </p>
+
+      <button
+        *ngIf="canAdminReopen"
+        type="button"
+        class="btn btn-primary btn-small map-veto-reopen"
+        [disabled]="reopenLoading"
+        (click)="reopenVeto()">
+        {{ reopenLoading ? 'Reabrindo...' : 'Reabrir map pool (admin)' }}
+      </button>
 
       <div class="map-pool-grid">
         <span
@@ -93,6 +112,10 @@ import { getMapLabel } from '../../Utils/maps';
     .map-ban-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .map-veto-actions { margin-top: 0.75rem; }
     .series-games { margin-top: 1rem; }
+    .map-veto-deadline { margin-bottom: 0.5rem; }
+    .map-veto-warning { color: var(--gc-red); margin-bottom: 0.5rem; }
+    .map-veto-reopened { color: var(--gc-orange); margin-bottom: 0.5rem; }
+    .map-veto-reopen { margin-bottom: 0.75rem; }
   `],
 })
 export class SeriesMapVetoComponent implements OnChanges {
@@ -100,19 +123,25 @@ export class SeriesMapVetoComponent implements OnChanges {
   @Input() series: SeriesVetoState | null = null;
   @Input() seriesMatches: { id: string; seriesGameNumber: number | null; map: string | null; status: string }[] = [];
   @Input() canAct = false;
+  @Input() canAdminReopen = false;
   @Input() myCaptainTeamIds: string[] = [];
   @Output() seriesUpdated = new EventEmitter<void>();
 
   actionLoading = false;
+  reopenLoading = false;
   actionError = '';
   getMapLabel = getMapLabel;
 
   constructor(private matchService: MatchService) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['series'] && this.series?.isStale) {
+    if (changes['series'] && (this.series?.isStale || this.series?.deadlineExpired)) {
       this.refreshSeries();
     }
+  }
+
+  formatDeadline(value: string): string {
+    return new Date(value).toLocaleString('pt-BR');
   }
 
   get availableMaps(): string[] {
@@ -174,6 +203,22 @@ export class SeriesMapVetoComponent implements OnChanges {
     if (!this.match) return;
     this.matchService.getMatchSeries(this.match.id).subscribe({
       next: () => this.seriesUpdated.emit(),
+    });
+  }
+
+  reopenVeto(): void {
+    if (!this.series) return;
+    this.reopenLoading = true;
+    this.actionError = '';
+    this.matchService.reopenSeriesVeto(this.series.seriesId).subscribe({
+      next: () => {
+        this.reopenLoading = false;
+        this.seriesUpdated.emit();
+      },
+      error: (err) => {
+        this.actionError = err.error?.error || 'Erro ao reabrir veto.';
+        this.reopenLoading = false;
+      },
     });
   }
 }

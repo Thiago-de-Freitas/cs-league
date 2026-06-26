@@ -64,7 +64,8 @@
       [match]="match"
       [series]="match.series?.series ?? null"
       [seriesMatches]="match.series?.matches ?? []"
-      [canAct]="!!match.permissions?.canRegisterResult"
+      [canAct]="!!match.permissions?.canVeto"
+      [canAdminReopen]="!!match.permissions?.canAdminReopenVeto"
       [myCaptainTeamIds]="myCaptainTeamIds"
       (seriesUpdated)="onVetoUpdated()">
     </app-series-map-veto>
@@ -74,7 +75,8 @@
       [match]="match"
       [veto]="match.mapVeto ?? null"
       [enabled]="!!match.mapVetoEnabled"
-      [canAct]="!!match.permissions?.canRegisterResult"
+      [canAct]="!!match.permissions?.canVeto"
+      [canAdminReopen]="!!match.permissions?.canAdminReopenVeto"
       [myCaptainTeamIds]="myCaptainTeamIds"
       (vetoUpdated)="onVetoUpdated()">
     </app-match-map-veto>

@@ -5,6 +5,18 @@ import { parseRankingPositionFilter, RANKING_POSITION_OPTIONS, type RankingPosit
 
 const router = Router();
 
+function parsePage(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+}
+
+function parsePageSize(value: unknown): number | undefined {
+  const parsed = Number(value);
+  if ([10, 20, 30].includes(parsed)) return parsed;
+  return undefined;
+}
+
 router.get('/positions', authMiddleware, (_req: AuthRequest, res: Response) => {
   res.json(RANKING_POSITION_OPTIONS);
 });
@@ -23,8 +35,11 @@ router.get('/players', authMiddleware, async (req: AuthRequest, res: Response) =
       position = parsed;
     }
 
-    const players = await getPlayerRankings(10, { leagueId, position });
-    res.json(players);
+    const page = parsePage(req.query.page);
+    const pageSize = parsePageSize(req.query.limit ?? req.query.pageSize);
+
+    const result = await getPlayerRankings({ leagueId, position, page, pageSize });
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao carregar ranking de jogadores' });

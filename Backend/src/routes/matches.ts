@@ -26,6 +26,7 @@ import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, recordAuditInTransaction, setAuditContext, skipAudit } from '../lib/audit';
 import { registerMatchExtras } from './matchExtras';
 import { ensureMatchMapVeto } from '../lib/mapVetoService';
+import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
 import { getMapLabel } from '../lib/cs2Maps';
 import { getSeriesForMatch, advanceSeriesAfterMapWin } from '../lib/matchSeriesService';
 
@@ -120,6 +121,8 @@ function formatMatchResponse(
     canRegisterResult: boolean;
     canEditManualStats: boolean;
     captainTeamIds?: string[];
+    canVeto?: boolean;
+    canAdminReopenVeto?: boolean;
   },
   roster?: Awaited<ReturnType<typeof loadMatchRoster>>,
   extras?: {
@@ -285,6 +288,17 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       : [];
     const userById = new Map(lineupUsers.map((u) => [u.id, u]));
 
+    const isBo3Series = seriesData?.series?.format === 'bo3';
+    const matchVetoDeadline = buildVetoDeadlineInfo(
+      match.scheduledAt,
+      (mapVeto as { vetoReopenedByAdmin?: boolean } | null)?.vetoReopenedByAdmin ?? false
+    );
+    const seriesVetoDeadline = seriesData?.series?.deadlineExpired ?? false;
+    const vetoDeadlineBlocked = isBo3Series
+      ? seriesVetoDeadline &&
+        (seriesData?.series?.vetoStatus === 'ban_phase' || seriesData?.series?.vetoStatus === 'pick_phase')
+      : matchVetoDeadline.deadlineExpired;
+
     res.json(
       formatMatchResponse(
         match,
@@ -293,6 +307,10 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
           canRegisterResult: resultAccess.allowed && match.status !== 'COMPLETED',
           canEditManualStats: statsAccess.allowed,
           captainTeamIds,
+          canVeto: resultAccess.allowed && !vetoDeadlineBlocked,
+          canAdminReopenVeto:
+            req.user!.role === 'ADMIN' &&
+            (isBo3Series ? seriesVetoDeadline : matchVetoDeadline.deadlineExpired),
         },
         roster,
         {

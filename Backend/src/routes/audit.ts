@@ -14,6 +14,22 @@ function parseLimit(value: unknown, fallback = 50, max = 200): number {
   return Math.min(Math.floor(parsed), max);
 }
 
+const AUDIT_PAGE_SIZES = [10, 20, 50] as const;
+
+function parsePage(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+}
+
+function parsePageSize(value: unknown, fallback: (typeof AUDIT_PAGE_SIZES)[number] = 10): number {
+  const parsed = Number(value);
+  if (AUDIT_PAGE_SIZES.includes(parsed as (typeof AUDIT_PAGE_SIZES)[number])) {
+    return parsed;
+  }
+  return fallback;
+}
+
 router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     if (!isAdmin(req.user!)) {
@@ -21,8 +37,8 @@ router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) =>
       return;
     }
 
-    const limit = parseLimit(req.query.limit);
-    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const page = parsePage(req.query.page);
+    const pageSize = parsePageSize(req.query.limit ?? req.query.pageSize);
     const action = typeof req.query.action === 'string' ? req.query.action : undefined;
     const entityType = typeof req.query.entityType === 'string' ? req.query.entityType : undefined;
     const entityId = typeof req.query.entityId === 'string' ? req.query.entityId : undefined;
@@ -41,22 +57,29 @@ router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) =>
         : {}),
     };
 
-    const events = await prisma.auditEvent.findMany({
-      where,
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      include: {
-        actorUser: { select: { id: true, displayName: true, email: true } },
-      },
-    });
+    const skip = (page - 1) * pageSize;
 
-    const hasMore = events.length > limit;
-    const page = hasMore ? events.slice(0, limit) : events;
+    const [total, events] = await Promise.all([
+      prisma.auditEvent.count({ where }),
+      prisma.auditEvent.findMany({
+        where,
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: pageSize,
+        skip,
+        include: {
+          actorUser: { select: { id: true, displayName: true, email: true } },
+        },
+      }),
+    ]);
+
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
 
     res.json({
-      events: page.map(formatAuditEventForApi),
-      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+      events: events.map(formatAuditEventForApi),
+      page,
+      pageSize,
+      total,
+      totalPages,
     });
   } catch (err) {
     console.error(err);

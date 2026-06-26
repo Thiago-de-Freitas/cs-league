@@ -15,6 +15,7 @@ import {
 } from './mapVetoBo3';
 import { computeBo3SeriesAfterMapWin } from './seriesAdvance';
 import { initializeMatchMapVeto } from './mapVetoService';
+import { buildVetoDeadlineInfo, isVetoActionAllowed } from './mapVetoDeadline';
 
 function parseStringArray(value: Prisma.JsonValue): string[] {
   if (!Array.isArray(value)) return [];
@@ -36,11 +37,18 @@ export type SeriesVetoView = {
   team2MapWins: number;
   isStale: boolean;
   autoResolved: boolean;
+  vetoDeadlineAt: string | null;
+  deadlineExpired: boolean;
+  vetoReopenedByAdmin: boolean;
 };
 
 const STALE_MS = 15 * 60 * 1000;
 
-export function formatSeriesVetoView(series: MatchSeries, now = new Date()): SeriesVetoView {
+export function formatSeriesVetoView(
+  series: MatchSeries,
+  scheduledAt: Date | null = null,
+  now = new Date()
+): SeriesVetoView {
   const banned = parseStringArray(series.bannedMaps);
   const picked = parseStringArray(series.pickedMaps);
   const assigned = resolveBo3MapAssignment(parseStringArray(series.mapPool), banned, picked);
@@ -52,6 +60,8 @@ export function formatSeriesVetoView(series: MatchSeries, now = new Date()): Ser
           { game: 3, map: assigned?.map3 ?? null },
         ]
       : [{ game: 1, map: assigned?.map1 ?? null }];
+
+  const deadline = buildVetoDeadlineInfo(scheduledAt, series.vetoReopenedByAdmin, now);
 
   return {
     seriesId: series.id,
@@ -68,6 +78,9 @@ export function formatSeriesVetoView(series: MatchSeries, now = new Date()): Ser
     team2MapWins: series.team2MapWins,
     isStale: now.getTime() - series.lastActionAt.getTime() > STALE_MS,
     autoResolved: series.autoResolved,
+    vetoDeadlineAt: deadline.vetoDeadlineAt?.toISOString() ?? null,
+    deadlineExpired: deadline.deadlineExpired,
+    vetoReopenedByAdmin: series.vetoReopenedByAdmin,
   };
 }
 
@@ -186,24 +199,31 @@ async function startSideVetoForMatch(matchId: string, series: MatchSeries): Prom
 export async function seriesBanMap(
   seriesId: string,
   actingTeamId: string,
-  mapId: string
+  mapId: string,
+  scheduledAt: Date | null = null
 ): Promise<{ series: SeriesVetoView; error?: string }> {
   const series = await prisma.matchSeries.findUnique({ where: { id: seriesId } });
   if (!series || series.format !== 'BO3') {
-    return { series: formatSeriesVetoView(series!), error: 'Série inválida.' };
+    return { series: formatSeriesVetoView(series!, scheduledAt), error: 'Série inválida.' };
   }
   if (series.vetoStatus !== 'BAN_PHASE') {
-    return { series: formatSeriesVetoView(series), error: 'Fase de banimento encerrada.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Fase de banimento encerrada.' };
+  }
+  if (!isVetoActionAllowed(scheduledAt, series.vetoReopenedByAdmin, series.vetoStatus)) {
+    return {
+      series: formatSeriesVetoView(series, scheduledAt),
+      error: 'O prazo de veto expirou (2 dias antes da partida). Aguarde um administrador reabrir o map pool.',
+    };
   }
   if (series.vetoTurnTeamId !== actingTeamId) {
-    return { series: formatSeriesVetoView(series), error: 'Não é a vez deste time.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Não é a vez deste time.' };
   }
 
   const pool = parseStringArray(series.mapPool);
   const banned = parseStringArray(series.bannedMaps);
   const map = mapId.trim().toLowerCase();
   if (!pool.includes(map) || banned.includes(map)) {
-    return { series: formatSeriesVetoView(series), error: 'Mapa inválido.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Mapa inválido.' };
   }
 
   const nextBanned = [...banned, map];
@@ -228,23 +248,30 @@ export async function seriesBanMap(
     },
   });
 
-  return { series: formatSeriesVetoView(updated) };
+  return { series: formatSeriesVetoView(updated, scheduledAt) };
 }
 
 export async function seriesPickMap(
   seriesId: string,
   actingTeamId: string,
-  mapId: string
+  mapId: string,
+  scheduledAt: Date | null = null
 ): Promise<{ series: SeriesVetoView; error?: string }> {
   const series = await prisma.matchSeries.findUnique({ where: { id: seriesId } });
   if (!series || series.format !== 'BO3') {
-    return { series: formatSeriesVetoView(series!), error: 'Série inválida.' };
+    return { series: formatSeriesVetoView(series!, scheduledAt), error: 'Série inválida.' };
   }
   if (series.vetoStatus !== 'PICK_PHASE') {
-    return { series: formatSeriesVetoView(series), error: 'Fase de pick encerrada.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Fase de pick encerrada.' };
+  }
+  if (!isVetoActionAllowed(scheduledAt, series.vetoReopenedByAdmin, series.vetoStatus)) {
+    return {
+      series: formatSeriesVetoView(series, scheduledAt),
+      error: 'O prazo de veto expirou (2 dias antes da partida). Aguarde um administrador reabrir o map pool.',
+    };
   }
   if (series.vetoTurnTeamId !== actingTeamId) {
-    return { series: formatSeriesVetoView(series), error: 'Não é a vez deste time.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Não é a vez deste time.' };
   }
 
   const pool = parseStringArray(series.mapPool);
@@ -253,7 +280,7 @@ export async function seriesPickMap(
   const map = mapId.trim().toLowerCase();
   const available = remainingMaps(pool, banned).filter((m) => !picked.includes(m));
   if (!available.includes(map)) {
-    return { series: formatSeriesVetoView(series), error: 'Mapa indisponível para pick.' };
+    return { series: formatSeriesVetoView(series, scheduledAt), error: 'Mapa indisponível para pick.' };
   }
 
   const nextPicked = [...picked, map];
@@ -289,7 +316,7 @@ export async function seriesPickMap(
   }
 
   const fresh = await prisma.matchSeries.findUnique({ where: { id: seriesId } });
-  return { series: formatSeriesVetoView(fresh!) };
+  return { series: formatSeriesVetoView(fresh!, scheduledAt) };
 }
 
 export async function advanceSeriesAfterMapWin(
@@ -395,18 +422,80 @@ export async function autoResolveStaleSeries(series: MatchSeries): Promise<Match
   return current;
 }
 
+export async function getSeriesScheduledAt(seriesId: string): Promise<Date | null> {
+  const match = await prisma.match.findFirst({
+    where: { seriesId },
+    orderBy: { seriesGameNumber: 'asc' },
+    select: { scheduledAt: true },
+  });
+  return match?.scheduledAt ?? null;
+}
+
+export async function reopenSeriesMapVeto(seriesId: string): Promise<SeriesVetoView> {
+  const series = await prisma.matchSeries.findUnique({ where: { id: seriesId } });
+  if (!series || series.format !== 'BO3') {
+    throw new Error('Série inválida para reabrir veto.');
+  }
+
+  const firstActionTeamId = coinFlipFirstBanTeam(series.team1Id, series.team2Id);
+  const mapPool = parseStringArray(series.mapPool);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.matchSeries.update({
+      where: { id: seriesId },
+      data: {
+        bannedMaps: [],
+        pickedMaps: [],
+        firstActionTeamId,
+        vetoTurnTeamId: firstActionTeamId,
+        vetoStatus: 'BAN_PHASE',
+        activeGameNumber: 1,
+        autoResolved: false,
+        vetoReopenedByAdmin: true,
+        lastActionAt: new Date(),
+      },
+    });
+
+    const matches = await tx.match.findMany({
+      where: { seriesId },
+      select: { id: true },
+    });
+    const matchIds = matches.map((m) => m.id);
+
+    if (matchIds.length > 0) {
+      await tx.matchMapVeto.deleteMany({ where: { matchId: { in: matchIds } } });
+      await tx.match.updateMany({
+        where: { id: { in: matchIds } },
+        data: {
+          map: null,
+          team1StartingSide: null,
+          team2StartingSide: null,
+        },
+      });
+    }
+  });
+
+  const fresh = await prisma.matchSeries.findUnique({ where: { id: seriesId } });
+  const scheduledAt = await getSeriesScheduledAt(seriesId);
+  return formatSeriesVetoView(fresh!, scheduledAt);
+}
+
 export async function getSeriesForMatch(matchId: string) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { seriesId: true },
+    select: { seriesId: true, scheduledAt: true },
   });
   if (!match?.seriesId) return null;
 
   let series = await prisma.matchSeries.findUnique({ where: { id: match.seriesId } });
   if (!series) return null;
 
+  const scheduledAt = (await getSeriesScheduledAt(series.id)) ?? match.scheduledAt;
+  const view = formatSeriesVetoView(series, scheduledAt);
+  const deadline = buildVetoDeadlineInfo(scheduledAt, series.vetoReopenedByAdmin);
+
   if (
-    formatSeriesVetoView(series).isStale &&
+    (deadline.deadlineExpired || view.isStale) &&
     series.vetoStatus !== 'MAPS_ASSIGNED' &&
     series.vetoStatus !== 'COMPLETED'
   ) {
@@ -416,11 +505,13 @@ export async function getSeriesForMatch(matchId: string) {
   const matches = await prisma.match.findMany({
     where: { seriesId: series.id },
     orderBy: { seriesGameNumber: 'asc' },
-    select: { id: true, seriesGameNumber: true, map: true, status: true },
+    select: { id: true, seriesGameNumber: true, map: true, status: true, scheduledAt: true },
   });
 
+  const seriesScheduledAt = matches[0]?.scheduledAt ?? scheduledAt;
+
   return {
-    series: formatSeriesVetoView(series),
+    series: formatSeriesVetoView(series, seriesScheduledAt),
     matches: matches.map((m) => ({
       id: m.id,
       seriesGameNumber: m.seriesGameNumber,

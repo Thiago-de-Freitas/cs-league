@@ -5,8 +5,15 @@ import { AuditEvent } from '../Models/interfaces';
 
 export interface AuditEventsPage {
   events: AuditEvent[];
-  nextCursor: string | null;
+  nextCursor?: string | null;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  totalPages?: number;
 }
+
+export const AUDIT_PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+export type AuditPageSize = (typeof AUDIT_PAGE_SIZE_OPTIONS)[number];
 
 @Injectable({ providedIn: 'root' })
 export class AuditService {
@@ -21,8 +28,8 @@ export class AuditService {
   }
 
   getGlobalEvents(options: {
-    limit?: number;
-    cursor?: string | null;
+    page?: number;
+    pageSize?: number;
     action?: string;
     entityType?: string;
     entityId?: string;
@@ -30,8 +37,9 @@ export class AuditService {
     from?: string;
     to?: string;
   } = {}): Observable<AuditEventsPage> {
-    let params = new HttpParams().set('limit', String(options.limit ?? 50));
-    if (options.cursor) params = params.set('cursor', options.cursor);
+    let params = new HttpParams()
+      .set('page', String(options.page ?? 1))
+      .set('limit', String(options.pageSize ?? 10));
     if (options.action) params = params.set('action', options.action);
     if (options.entityType) params = params.set('entityType', options.entityType);
     if (options.entityId) params = params.set('entityId', options.entityId);

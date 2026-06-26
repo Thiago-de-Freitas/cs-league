@@ -182,7 +182,7 @@ export function aggregatePlayerRankingsByLeagueMatches(
     }
   }
 
-  return [...perPlayer.values()]
+  const sorted = [...perPlayer.values()]
     .map((p) => {
       const kills = Math.round(p.kills);
       const deaths = Math.round(p.deaths);
@@ -206,8 +206,8 @@ export function aggregatePlayerRankingsByLeagueMatches(
         rating,
       };
     })
-    .sort((a, b) => b.adr - a.adr || b.kd - a.kd || b.matches - a.matches)
-    .slice(0, limit);
+    .sort((a, b) => b.adr - a.adr || b.kd - a.kd || b.matches - a.matches);
+  return limit > 0 ? sorted.slice(0, limit) : sorted;
 }
 
 function leagueDemoStatsWhere(leagueId?: string) {
@@ -280,10 +280,38 @@ function resolveCurrentPosition(
 export type PlayerRankingOptions = {
   leagueId?: string;
   position?: RankingPositionFilter;
+  page?: number;
+  pageSize?: number;
 };
 
-export async function getPlayerRankings(limit = 10, options: PlayerRankingOptions = {}): Promise<PlayerRankingEntry[]> {
+export const PLAYER_RANKING_PAGE_SIZES = [10, 20, 30] as const;
+
+export type PlayerRankingsPageResult = {
+  players: PlayerRankingEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+function parsePlayerRankingPage(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+}
+
+function parsePlayerRankingPageSize(value: unknown, fallback: (typeof PLAYER_RANKING_PAGE_SIZES)[number] = 10): number {
+  const parsed = Number(value);
+  if (PLAYER_RANKING_PAGE_SIZES.includes(parsed as (typeof PLAYER_RANKING_PAGE_SIZES)[number])) {
+    return parsed;
+  }
+  return fallback;
+}
+
+export async function getPlayerRankings(options: PlayerRankingOptions = {}): Promise<PlayerRankingsPageResult> {
   const { leagueId, position } = options;
+  const page = parsePlayerRankingPage(options.page);
+  const pageSize = parsePlayerRankingPageSize(options.pageSize);
 
   const stats = await prisma.matchPlayerStat.findMany({
     where: {
@@ -337,10 +365,17 @@ export async function getPlayerRankings(limit = 10, options: PlayerRankingOption
 
   const displayBySteam = new Map(users.map((u) => [u.steamId!, u.displayName]));
 
-  const ranked = aggregatePlayerRankingsByLeagueMatches(rows, limit).map((entry, index) => {
+  const allRanked = aggregatePlayerRankingsByLeagueMatches(rows, 0);
+  const total = allRanked.length;
+  const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
+  const safePage = Math.min(page, totalPages);
+  const skip = (safePage - 1) * pageSize;
+  const pageSlice = allRanked.slice(skip, skip + pageSize);
+
+  const ranked = pageSlice.map((entry, index) => {
     const currentPosition = resolveCurrentPosition(entry.steamId, memberships);
     return {
-      rank: index + 1,
+      rank: skip + index + 1,
       ...entry,
       position: currentPosition,
       positionLabel: currentPosition ? getPlayerPositionLabel(currentPosition) : null,
@@ -348,7 +383,13 @@ export async function getPlayerRankings(limit = 10, options: PlayerRankingOption
     };
   });
 
-  return ranked;
+  return {
+    players: ranked,
+    page: safePage,
+    pageSize,
+    total,
+    totalPages,
+  };
 }
 
 export type PlayerProfileStats = {

@@ -12,7 +12,17 @@ import { getMapLabel } from '../../Utils/maps';
     <section class="gc-card map-veto-card" *ngIf="enabled && veto">
       <h2 class="section-title">Veto de mapas (estilo Valve)</h2>
       <p class="meta map-veto-intro" *ngIf="veto.status === 'ban_phase'">
-        Capitães alternam bans até restar um mapa. Se não agir em 15 min, o sistema sorteia.
+        Capitães alternam bans até restar um mapa. Prazo final: <strong>2 dias antes</strong> do início da partida.
+        Se não agir em 15 min no seu turno, o sistema sorteia.
+      </p>
+      <p class="meta map-veto-deadline" *ngIf="veto.vetoDeadlineAt">
+        Veto permitido até {{ formatDeadline(veto.vetoDeadlineAt) }}.
+      </p>
+      <p class="meta map-veto-warning" *ngIf="veto.deadlineExpired">
+        Prazo de veto encerrado. Somente um administrador pode reabrir o map pool.
+      </p>
+      <p class="meta map-veto-reopened" *ngIf="veto.vetoReopenedByAdmin">
+        Map pool reaberto por administrador — nova rodada de veto em andamento.
       </p>
       <p class="meta map-veto-intro" *ngIf="veto.status === 'side_phase'">
         Escolha se seu time começa como <strong>CT</strong> ou <strong>T</strong> no mapa decidido.
@@ -20,6 +30,15 @@ import { getMapLabel } from '../../Utils/maps';
       <p class="meta map-veto-intro" *ngIf="veto.status === 'completed'">
         Veto concluído<span *ngIf="veto.autoResolved"> (ações automáticas por tempo esgotado)</span>.
       </p>
+
+      <button
+        *ngIf="canAdminReopen"
+        type="button"
+        class="btn btn-primary btn-small map-veto-reopen"
+        [disabled]="reopenLoading"
+        (click)="reopenVeto()">
+        {{ reopenLoading ? 'Reabrindo...' : 'Reabrir map pool (admin)' }}
+      </button>
 
       <div class="map-pool-grid">
         <span
@@ -78,6 +97,10 @@ import { getMapLabel } from '../../Utils/maps';
     .map-chip.is-available { border-color: var(--gc-border-light); }
     .map-ban-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .map-veto-actions { margin-top: 0.75rem; }
+    .map-veto-deadline { margin-bottom: 0.5rem; }
+    .map-veto-warning { color: var(--gc-red); margin-bottom: 0.5rem; }
+    .map-veto-reopened { color: var(--gc-orange); margin-bottom: 0.5rem; }
+    .map-veto-reopen { margin-bottom: 0.75rem; }
   `],
 })
 export class MatchMapVetoComponent implements OnChanges {
@@ -85,10 +108,12 @@ export class MatchMapVetoComponent implements OnChanges {
   @Input() veto: MapVetoState | null = null;
   @Input() enabled = false;
   @Input() canAct = false;
+  @Input() canAdminReopen = false;
   @Input() myCaptainTeamIds: string[] = [];
   @Output() vetoUpdated = new EventEmitter<MapVetoState>();
 
   actionLoading = false;
+  reopenLoading = false;
   actionError = '';
   getMapLabel = getMapLabel;
 
@@ -98,6 +123,13 @@ export class MatchMapVetoComponent implements OnChanges {
     if (changes['veto'] && this.veto?.isStale && this.enabled) {
       this.refreshVeto();
     }
+    if (changes['veto'] && this.veto?.deadlineExpired && this.enabled) {
+      this.refreshVeto();
+    }
+  }
+
+  formatDeadline(value: string): string {
+    return new Date(value).toLocaleString('pt-BR');
   }
 
   get availableMaps(): string[] {
@@ -160,6 +192,23 @@ export class MatchMapVetoComponent implements OnChanges {
           this.veto = res.veto;
           this.vetoUpdated.emit(res.veto);
         }
+      },
+    });
+  }
+
+  reopenVeto(): void {
+    if (!this.match) return;
+    this.reopenLoading = true;
+    this.actionError = '';
+    this.matchService.reopenMapVeto(this.match.id).subscribe({
+      next: (res) => {
+        this.veto = res.veto;
+        this.vetoUpdated.emit(res.veto);
+        this.reopenLoading = false;
+      },
+      error: (err) => {
+        this.actionError = err.error?.error || 'Erro ao reabrir veto.';
+        this.reopenLoading = false;
       },
     });
   }

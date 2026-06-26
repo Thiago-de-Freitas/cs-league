@@ -41,10 +41,22 @@ export class MatchService {
     });
   }
 
-  getMapVeto(matchId: string): Observable<{ enabled: boolean; veto: MapVetoState | null; canAct?: boolean }> {
-    return this.http.get<{ enabled: boolean; veto: MapVetoState | null; canAct?: boolean }>(
-      `${this.apiUrl}/${matchId}/map-veto`
-    );
+  getMapVeto(matchId: string): Observable<{
+    enabled: boolean;
+    veto: MapVetoState | null;
+    canAct?: boolean;
+    canAdminReopen?: boolean;
+  }> {
+    return this.http.get<{
+      enabled: boolean;
+      veto: MapVetoState | null;
+      canAct?: boolean;
+      canAdminReopen?: boolean;
+    }>(`${this.apiUrl}/${matchId}/map-veto`);
+  }
+
+  reopenMapVeto(matchId: string): Observable<{ veto: MapVetoState }> {
+    return this.http.post<{ veto: MapVetoState }>(`${this.apiUrl}/${matchId}/map-veto/reopen`, {});
   }
 
   banMap(matchId: string, map: string): Observable<{ veto: MapVetoState }> {
@@ -83,6 +95,10 @@ export class MatchService {
 
   seriesPickMap(seriesId: string, map: string): Observable<MatchSeriesInfo> {
     return this.http.post<MatchSeriesInfo>(`/api/series/${seriesId}/veto/pick`, { map });
+  }
+
+  reopenSeriesVeto(seriesId: string): Observable<MatchSeriesInfo> {
+    return this.http.post<MatchSeriesInfo>(`/api/series/${seriesId}/veto/reopen`, {});
   }
 
   downloadHighlightClip(matchId: string, highlightId: string): Observable<Blob> {

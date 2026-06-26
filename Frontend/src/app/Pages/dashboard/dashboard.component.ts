@@ -6,7 +6,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, finalize, timeout } from 'rxjs/operators';
 import { LeagueService } from '../../Services/league.service';
 import { TeamService } from '../../Services/team.service';
-import { RankingsService } from '../../Services/rankings.service';
+import { RankingsService, PLAYER_RANKING_PAGE_SIZE_OPTIONS, PlayerRankingPageSize, PlayerRankingsPage } from '../../Services/rankings.service';
 import { AuthService } from '../../Services/auth.service';
 import { League, Team, TeamInvite, PlayerRankingEntry, TeamRankingEntry } from '../../Models/interfaces';
 import { CreateLeagueModalComponent } from '../../Components/create-league-modal/create-league-modal.component';
@@ -45,7 +45,12 @@ export class DashboardComponent implements OnInit {
   teamRankingsLoading = true;
   rankingLeagueId = '';
   rankingPosition = '';
+  rankingPage = 1;
+  rankingPageSize: PlayerRankingPageSize = 10;
+  rankingTotal = 0;
+  rankingTotalPages = 1;
   readonly rankingPositionOptions = RANKING_POSITION_OPTIONS;
+  readonly rankingPageSizeOptions = PLAYER_RANKING_PAGE_SIZE_OPTIONS;
   formatTeamCapacity = formatTeamCapacity;
   private brokenRankingLogoIds = new Set<string>();
 
@@ -80,6 +85,12 @@ export class DashboardComponent implements OnInit {
 
     const leagueId = this.rankingLeagueId || undefined;
     const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
+    const rankingQuery = {
+      leagueId,
+      position,
+      page: this.rankingPage,
+      pageSize: this.rankingPageSize,
+    };
     this.playerRankingsLoading = true;
     this.teamRankingsLoading = true;
 
@@ -88,7 +99,9 @@ export class DashboardComponent implements OnInit {
       openLeagues: this.leagueService.getOpenLeagues().pipe(safe('ligas abertas', [] as League[])),
       teams: this.teamService.getTeams().pipe(safe('times', [] as Team[])),
       invites: this.teamService.getPendingInvites().pipe(safe('convites', [] as TeamInvite[])),
-      playerRankings: this.rankingsService.getPlayerRankings({ leagueId, position }).pipe(safe('ranking de jogadores', [] as PlayerRankingEntry[])),
+      playerRankings: this.rankingsService.getPlayerRankings(rankingQuery).pipe(
+        safe('ranking de jogadores', { players: [], page: 1, pageSize: 10, total: 0, totalPages: 1 } as PlayerRankingsPage)
+      ),
       teamRankings: this.rankingsService.getTeamRankings().pipe(safe('ranking de times', [] as TeamRankingEntry[])),
     })
       .pipe(finalize(() => {
@@ -105,7 +118,7 @@ export class DashboardComponent implements OnInit {
           this.teams = teams;
           this.clampTeamsPage();
           this.pendingInvites = invites;
-          this.playerRankings = playerRankings;
+          this.applyPlayerRankingsPage(playerRankings);
           this.teamRankings = teamRankings;
         },
       });
@@ -116,25 +129,76 @@ export class DashboardComponent implements OnInit {
     const leagueId = this.rankingLeagueId || undefined;
     const position = (this.rankingPosition || undefined) as RankingPositionFilter | undefined;
     this.rankingsService
-      .getPlayerRankings({ leagueId, position })
+      .getPlayerRankings({
+        leagueId,
+        position,
+        page: this.rankingPage,
+        pageSize: this.rankingPageSize,
+      })
       .pipe(
         finalize(() => (this.playerRankingsLoading = false)),
         catchError(() => {
           this.playerRankings = [];
-          return of([] as PlayerRankingEntry[]);
+          this.rankingTotal = 0;
+          this.rankingTotalPages = 1;
+          return of({ players: [], page: 1, pageSize: this.rankingPageSize, total: 0, totalPages: 1 });
         })
       )
-      .subscribe((playerRankings) => {
-        this.playerRankings = playerRankings;
+      .subscribe((page) => {
+        this.applyPlayerRankingsPage(page);
       });
   }
 
+  private applyPlayerRankingsPage(page: {
+    players: PlayerRankingEntry[];
+    page?: number;
+    pageSize?: number;
+    total?: number;
+    totalPages?: number;
+  }): void {
+    this.playerRankings = page.players;
+    this.rankingPage = page.page ?? this.rankingPage;
+    this.rankingPageSize = (page.pageSize ?? this.rankingPageSize) as PlayerRankingPageSize;
+    this.rankingTotal = page.total ?? 0;
+    this.rankingTotalPages = page.totalPages ?? 1;
+  }
+
   onRankingLeagueChange(): void {
+    this.rankingPage = 1;
     this.loadPlayerRankings();
   }
 
   onRankingPositionChange(): void {
+    this.rankingPage = 1;
     this.loadPlayerRankings();
+  }
+
+  onRankingPageSizeChange(): void {
+    this.rankingPage = 1;
+    this.loadPlayerRankings();
+  }
+
+  goToRankingPage(page: number): void {
+    if (page < 1 || page > this.rankingTotalPages || page === this.rankingPage || this.playerRankingsLoading) {
+      return;
+    }
+    this.rankingPage = page;
+    this.loadPlayerRankings();
+  }
+
+  get rankingRangeLabel(): string {
+    if (this.rankingTotal === 0) return 'Nenhum jogador';
+    const start = (this.rankingPage - 1) * this.rankingPageSize + 1;
+    const end = Math.min(this.rankingPage * this.rankingPageSize, this.rankingTotal);
+    return `${start}–${end} de ${this.rankingTotal}`;
+  }
+
+  get rankingPageLabel(): string {
+    return `${this.rankingPage} de ${this.rankingTotalPages}`;
+  }
+
+  get showRankingPagination(): boolean {
+    return !this.playerRankingsLoading && this.rankingTotalPages > 1;
   }
 
   get rankingPlayersTitle(): string {

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, shareReplay, tap } from 'rxjs';
-import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride } from '../Models/interfaces';
+import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride, PickupLeagueState } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class LeagueService {
@@ -76,6 +76,9 @@ export class LeagueService {
     mapPool?: string[];
     seriesFormat?: string;
     mapVetoEnabled?: boolean;
+    pickupTeamCount?: number;
+    pickupPlayersPerTeam?: number;
+    pickupBalanceMode?: string;
   }): Observable<League> {
     return this.http.post<League>(this.apiUrl, data).pipe(this.afterLeagueMutation());
   }
@@ -189,5 +192,43 @@ export class LeagueService {
       `${this.apiUrl}/${leagueId}/schedule/regenerate`,
       {}
     );
+  }
+
+  getPickupState(leagueId: string): Observable<PickupLeagueState> {
+    return this.http.get<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup`);
+  }
+
+  addPickupPlayer(leagueId: string, userId: string): Observable<PickupLeagueState> {
+    return this.http
+      .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/players`, { userId })
+      .pipe(this.afterLeagueMutation());
+  }
+
+  removePickupPlayer(leagueId: string, userId: string): Observable<PickupLeagueState> {
+    return this.http
+      .delete<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/players/${userId}`)
+      .pipe(this.afterLeagueMutation());
+  }
+
+  assignPickupPlayer(leagueId: string, userId: string, teamId: string | null): Observable<PickupLeagueState> {
+    return this.http
+      .patch<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/assign`, { userId, teamId })
+      .pipe(this.afterLeagueMutation());
+  }
+
+  balancePickupLeague(
+    leagueId: string,
+    data: { teamCount: number; playersPerTeam: number; balanceMode: string }
+  ): Observable<PickupLeagueState> {
+    return this.http
+      .post<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/balance`, data)
+      .pipe(this.afterLeagueMutation());
+  }
+
+  updatePickupSettings(
+    leagueId: string,
+    data: { teamCount?: number; playersPerTeam?: number; balanceMode?: string }
+  ): Observable<PickupLeagueState> {
+    return this.http.patch<PickupLeagueState>(`${this.apiUrl}/${leagueId}/pickup/settings`, data);
   }
 }

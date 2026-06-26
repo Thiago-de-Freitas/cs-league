@@ -5,9 +5,12 @@ import { canUserAccessMatch } from '../lib/matchPermissions';
 import { isValidMapId } from '../lib/cs2Maps';
 import {
   getSeriesForMatch,
+  getSeriesScheduledAt,
+  reopenSeriesMapVeto,
   seriesBanMap,
   seriesPickMap,
 } from '../lib/matchSeriesService';
+import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
 import { setAuditContext } from '../lib/audit';
 import { audit } from '../lib/audit';
 
@@ -105,7 +108,7 @@ router.post('/:id/veto/ban', authMiddleware, async (req: AuthRequest, res: Respo
       return;
     }
 
-    const { series: view, error } = await seriesBanMap(series.id, actingTeamId, mapId);
+    const { series: view, error } = await seriesBanMap(series.id, actingTeamId, mapId, await getSeriesScheduledAt(series.id));
     if (error) {
       res.status(400).json({ error, series: view });
       return;
@@ -163,7 +166,7 @@ router.post('/:id/veto/pick', authMiddleware, async (req: AuthRequest, res: Resp
       return;
     }
 
-    const { series: view, error } = await seriesPickMap(series.id, actingTeamId, mapId);
+    const { series: view, error } = await seriesPickMap(series.id, actingTeamId, mapId, await getSeriesScheduledAt(series.id));
     if (error) {
       res.status(400).json({ error, series: view });
       return;
@@ -184,6 +187,49 @@ router.post('/:id/veto/pick', authMiddleware, async (req: AuthRequest, res: Resp
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao escolher mapa na série' });
+  }
+});
+
+router.post('/:id/veto/reopen', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Apenas administradores podem reabrir o veto de mapas.' });
+      return;
+    }
+
+    const series = await prisma.matchSeries.findUnique({
+      where: { id: req.params.id },
+      include: { league: { select: { ownerId: true, mapVetoEnabled: true } } },
+    });
+    if (!series) {
+      res.status(404).json({ error: 'Série não encontrada' });
+      return;
+    }
+    if (!series.league.mapVetoEnabled) {
+      res.status(400).json({ error: 'Veto de mapas desativado nesta liga.' });
+      return;
+    }
+
+    const scheduledAt = await getSeriesScheduledAt(series.id);
+    const deadline = buildVetoDeadlineInfo(scheduledAt, series.vetoReopenedByAdmin);
+    if (!deadline.deadlineExpired) {
+      res.status(400).json({ error: 'O prazo de veto ainda não expirou.' });
+      return;
+    }
+
+    const view = await reopenSeriesMapVeto(series.id);
+    setAuditContext(req, audit.withParent('series.map_veto.reopen', 'MatchSeries', series.id, 'League', series.leagueId));
+
+    const firstMatch = await prisma.match.findFirst({
+      where: { seriesId: series.id },
+      orderBy: { seriesGameNumber: 'asc' },
+      select: { id: true },
+    });
+    const full = firstMatch ? await getSeriesForMatch(firstMatch.id) : { series: view, matches: [] };
+    res.json(full);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao reabrir veto da série.' });
   }
 });
 

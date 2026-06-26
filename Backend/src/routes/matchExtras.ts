@@ -8,8 +8,10 @@ import {
   banMapForMatch,
   ensureMatchMapVeto,
   pickSideForMatch,
+  reopenMatchMapVeto,
   upsertMatchLineup,
 } from '../lib/mapVetoService';
+import { buildVetoDeadlineInfo } from '../lib/mapVetoDeadline';
 import { buildVdmClipSpec } from '../lib/clipExport';
 import { getSeriesForMatch } from '../lib/matchSeriesService';
 import { encodeUploadedImageToDataUrl } from '../lib/uploadAssets';
@@ -86,10 +88,13 @@ export function registerMatchExtras(router: Router): void {
       }
       const veto = await ensureMatchMapVeto(match);
       const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
+      const deadline = buildVetoDeadlineInfo(match.scheduledAt, veto?.vetoReopenedByAdmin ?? false);
+      const canAdminReopen = req.user!.role === 'ADMIN' && deadline.deadlineExpired;
       res.json({
         enabled: true,
         veto,
-        canAct: resultAccess.allowed,
+        canAct: resultAccess.allowed && !deadline.deadlineExpired,
+        canAdminReopen,
       });
     } catch (err) {
       console.error(err);
@@ -138,6 +143,42 @@ export function registerMatchExtras(router: Router): void {
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Erro ao banir mapa' });
+    }
+  });
+
+  router.post('/:id/map-veto/reopen', async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user!.role !== 'ADMIN') {
+        res.status(403).json({ error: 'Apenas administradores podem reabrir o veto de mapas.' });
+        return;
+      }
+
+      const match = await loadMatchContext(req.params.id);
+      if (!match) {
+        res.status(404).json({ error: 'Partida não encontrada' });
+        return;
+      }
+      if (!match.league.mapVetoEnabled) {
+        res.status(400).json({ error: 'Veto de mapas desativado nesta liga.' });
+        return;
+      }
+
+      const deadline = buildVetoDeadlineInfo(match.scheduledAt, match.mapVeto?.vetoReopenedByAdmin ?? false);
+      if (!deadline.deadlineExpired) {
+        res.status(400).json({ error: 'O prazo de veto ainda não expirou.' });
+        return;
+      }
+
+      if (!match.mapVeto) {
+        await ensureMatchMapVeto(match);
+      }
+
+      const veto = await reopenMatchMapVeto(match);
+      setAuditContext(req, audit.withParent('match.map_veto.reopen', 'Match', match.id, 'League', match.leagueId));
+      res.json({ veto });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao reabrir veto de mapas.' });
     }
   });
 

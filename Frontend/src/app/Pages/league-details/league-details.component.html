@@ -11,7 +11,7 @@
       <span *ngIf="league.endDate && !isSingleGroupFormat">Fim: {{ league.endDate | date:'mediumDate' }}</span>
       <span class="status-badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
       <span *ngIf="isGroupStageFormat" class="badge badge-orange">{{ formatBadgeLabel }}</span>
-      <span *ngIf="isOneVsOneFormat" class="badge badge-orange">1x1 · {{ seriesFormatLabel }}</span>
+      <span *ngIf="isOneVsOneFormat" class="badge badge-orange">Liga individual · {{ seriesFormatLabel }}</span>
       <span *ngIf="!isOneVsOneFormat && !isGroupStageFormat && league.seriesFormat" class="badge badge-orange">{{ seriesFormatLabel }} · veto {{ league.mapVetoEnabled !== false ? 'on' : 'off' }}</span>
       <span *ngIf="league.registrationOpen && league.status === 'upcoming'" class="badge badge-orange">Pública</span>
     </div>
@@ -23,38 +23,16 @@
 
   <section class="league-content">
     <div class="section-card" *ngIf="isOneVsOneFormat && isAdmin && !hasLeagueMatches">
-      <h2 class="section-title">Partida 1x1</h2>
-      <p class="admin-hint">
-        Escolha os dois times e os jogadores que disputarão o duelo.
-        <span *ngIf="isBo3League">Série em melhor de 3 mapas — veto com 2 bans e 2 picks na página da partida.</span>
-        <span *ngIf="!isBo3League && league?.mapVetoEnabled !== false">Veto BO1 na página da partida (bans até 1 mapa).</span>
-        <span *ngIf="!isBo3League && league?.mapVetoEnabled === false">Sem veto — informe o mapa ao registrar o resultado.</span>
+      <h2 class="section-title">Jogadores e times da liga</h2>
+      <app-league-pickup-manager
+        *ngIf="leagueId"
+        [leagueId]="leagueId"
+        [disabled]="isArchived"
+        (stateChanged)="onPickupStateChanged()">
+      </app-league-pickup-manager>
+      <p class="admin-hint" *ngIf="!isArchived">
+        Após balancear os times, use <strong>Gerar chaveamento</strong> na administração para criar as partidas.
       </p>
-      <div class="admin-form admin-form-stacked">
-        <label class="form-label" for="ov1-team1">Time 1</label>
-        <select id="ov1-team1" class="input-field" [(ngModel)]="oneVsOneTeam1Id">
-          <option value="">Selecione</option>
-          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
-        </select>
-        <label class="form-label" for="ov1-p1">Jogador do time 1</label>
-        <select id="ov1-p1" class="input-field" [(ngModel)]="oneVsOnePlayer1Id" [disabled]="!oneVsOneTeam1Id">
-          <option value="">Selecione</option>
-          <option *ngFor="let p of oneVsOneTeam1Players" [value]="p.id">{{ p.name || p.IGN }}</option>
-        </select>
-        <label class="form-label" for="ov1-team2">Time 2</label>
-        <select id="ov1-team2" class="input-field" [(ngModel)]="oneVsOneTeam2Id">
-          <option value="">Selecione</option>
-          <option *ngFor="let t of league.teams" [value]="t.id">{{ t.name }}</option>
-        </select>
-        <label class="form-label" for="ov1-p2">Jogador do time 2</label>
-        <select id="ov1-p2" class="input-field" [(ngModel)]="oneVsOnePlayer2Id" [disabled]="!oneVsOneTeam2Id">
-          <option value="">Selecione</option>
-          <option *ngFor="let p of oneVsOneTeam2Players" [value]="p.id">{{ p.name || p.IGN }}</option>
-        </select>
-        <button type="button" class="btn btn-primary" [disabled]="oneVsOneSetupLoading" (click)="setupOneVsOneMatch()">
-          {{ oneVsOneSetupLoading ? 'Criando...' : (isBo3League ? 'Criar série BO3' : 'Criar partida e iniciar veto') }}
-        </button>
-      </div>
     </div>
 
     <div class="section-card">
@@ -67,12 +45,6 @@
         (editTeam)="onEditTeam($event)"
         (removeTeam)="onRemoveTeam($event)">
       </app-league-teams-table>
-    </div>
-
-    <div class="section-card">
-      <h2 class="section-title">Atividade e auditoria</h2>
-      <p class="admin-hint">Registro de ações realizadas nesta liga — quem fez o quê e quando.</p>
-      <app-league-activity [leagueId]="league.id"></app-league-activity>
     </div>
 
     <div class="section-card" *ngIf="canShowPlayerRegistration">
@@ -250,7 +222,7 @@
 
       <div class="admin-toolbar">
         <ng-container *ngIf="!isArchived">
-          <button type="button" class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity">
+          <button type="button" class="btn btn-primary" (click)="openAddTeam()" [disabled]="teamsAtCapacity" *ngIf="!isOneVsOneFormat">
             Adicionar time
           </button>
           <button
@@ -309,7 +281,8 @@
       </div>
 
       <p *ngIf="!hasBracketGenerated && !isArchived && !isGroupStageFormat" class="admin-footnote">
-        Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.
+        <span *ngIf="isOneVsOneFormat">Balanceie os times na seção de jogadores e clique em <strong>Gerar chaveamento</strong>.</span>
+        <span *ngIf="!isOneVsOneFormat">Defina os times na chave abaixo e clique em <strong>Gerar chaveamento</strong> para criar as partidas.</span>
       </p>
       <p *ngIf="isSingleGroupFormat && !hasGroupPhaseGenerated && !isArchived" class="admin-footnote">
         Configure o <strong>Calendário</strong>, adicione pelo menos 3 times e clique em <strong>Gerar confrontos</strong>.
@@ -326,7 +299,7 @@
         Fase de grupos concluída. Clique em <strong>Gerar chaveamento</strong> para criar o mata-mata com os classificados.
       </p>
 
-      <div *ngIf="showAddTeam && !isArchived" class="admin-inline-panel">
+      <div *ngIf="showAddTeam && !isArchived && !isOneVsOneFormat" class="admin-inline-panel">
         <h3 class="admin-panel-title">Adicionar times</h3>
         <p class="admin-panel-desc">Selecione um ou mais times para incluir na liga.</p>
         <div class="admin-form admin-form-stacked">
@@ -368,8 +341,8 @@
     <div class="section-card confrontos-card">
       <h2 class="section-title">Confrontos</h2>
 
-      <!-- Eliminatória direta ou 1x1 -->
-      <ng-container *ngIf="!isGroupStageFormat && !isOneVsOneFormat">
+      <!-- Eliminatória direta (inclui liga individual) -->
+      <ng-container *ngIf="!isGroupStageFormat">
         <app-league-bracket
           [teams]="league.teams"
           [bracketSize]="league.bracketSize ?? null"
@@ -398,36 +371,9 @@
         </div>
       </ng-container>
 
-      <!-- Duelo 1x1 (BO1 ou BO3) -->
-      <ng-container *ngIf="isOneVsOneFormat">
-        <p *ngIf="!hasLeagueMatches" class="confrontos-empty">
-          Configure a partida na seção acima após inscrever os dois times.
-        </p>
-        <div *ngIf="hasLeagueMatches" class="one-vs-one-series">
-          <p class="meta" *ngIf="isBo3League && oneVsOneSeriesMatches.length">
-            Placar da série: <strong>{{ oneVsOneSeriesMapWins.team1 }} – {{ oneVsOneSeriesMapWins.team2 }}</strong>
-            (melhor de 3)
-          </p>
-          <ul class="gc-list">
-            <li *ngFor="let match of oneVsOneSeriesMatches.length ? oneVsOneSeriesMatches : league.matches" class="gc-list-item match-row">
-              <div>
-                <strong *ngIf="match.seriesGameNumber">Mapa {{ match.seriesGameNumber }}</strong>
-                <span *ngIf="match.map"> · {{ match.mapLabel || getMapLabel(match.map) }}</span>
-                <p class="meta">{{ match.team1.name }} vs {{ match.team2.name }}</p>
-              </div>
-              <span class="match-status">{{ getMatchStatusLabel(match.status) }}</span>
-              <button type="button" class="btn btn-secondary btn-small" (click)="goToMatch(match.id)">Abrir</button>
-              <button
-                *ngIf="canRegisterResultForMatch(match) && match.status !== 'completed'"
-                type="button"
-                class="btn btn-primary btn-small"
-                (click)="registerResult(match)">
-                Resultado
-              </button>
-            </li>
-          </ul>
-        </div>
-      </ng-container>
+      <p *ngIf="isOneVsOneFormat && !hasLeagueMatches && !isAdmin" class="confrontos-empty">
+        O organizador ainda está montando os times desta liga.
+      </p>
 
       <!-- Formato com fase de grupos -->
       <ng-container *ngIf="isGroupStageFormat">

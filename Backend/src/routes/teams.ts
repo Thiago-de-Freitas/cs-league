@@ -114,8 +114,9 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const userIsAdmin = isAdmin(req.user!);
     const teams = await prisma.team.findMany({
       where: userIsAdmin
-        ? {}
+        ? { leagueId: null }
         : {
+            leagueId: null,
             OR: [
               { ownerId: userId },
               { members: { some: { userId } } },

@@ -128,21 +128,37 @@
     <div class="dashboard-rankings">
       <section class="dashboard-card gc-card ranking-card">
         <div class="ranking-card-header">
-          <h2 class="gc-card-title">{{ rankingPlayersTitle }}</h2>
-          <p class="meta ranking-subtitle">{{ rankingPlayersSubtitle }}</p>
-          <div class="ranking-filters">
-            <div class="ranking-filter" *ngIf="leagues.length > 0">
-              <label class="form-label" for="ranking-league">Filtrar por liga</label>
+          <div class="ranking-card-intro">
+            <h2 class="gc-card-title">{{ rankingPlayersTitle }}</h2>
+            <p class="meta ranking-subtitle">{{ rankingPlayersSubtitle }}</p>
+          </div>
+          <span class="meta ranking-range" *ngIf="!playerRankingsLoading">{{ rankingRangeLabel }}</span>
+        </div>
+
+        <div class="ranking-filters-bar">
+          <div class="ranking-filters-grid">
+            <div class="form-group" *ngIf="leagues.length > 0">
+              <label class="form-label" for="ranking-league">Liga</label>
               <select id="ranking-league" class="input-field" [(ngModel)]="rankingLeagueId" (ngModelChange)="onRankingLeagueChange()">
                 <option value="">Todas as ligas</option>
                 <option *ngFor="let league of leagues" [value]="league.id">{{ league.name }}</option>
               </select>
             </div>
-            <div class="ranking-filter">
-              <label class="form-label" for="ranking-position">Filtrar por posição</label>
+            <div class="form-group">
+              <label class="form-label" for="ranking-position">Posição</label>
               <select id="ranking-position" class="input-field" [(ngModel)]="rankingPosition" (ngModelChange)="onRankingPositionChange()">
                 <option value="">Todas as posições</option>
                 <option *ngFor="let option of rankingPositionOptions" [value]="option.id">{{ option.label }}</option>
+              </select>
+            </div>
+            <div class="form-group ranking-page-size">
+              <label class="form-label" for="ranking-page-size">Por página</label>
+              <select
+                id="ranking-page-size"
+                class="input-field"
+                [(ngModel)]="rankingPageSize"
+                (ngModelChange)="onRankingPageSizeChange()">
+                <option *ngFor="let size of rankingPageSizeOptions" [ngValue]="size">{{ size }}</option>
               </select>
             </div>
           </div>
@@ -184,6 +200,26 @@
         <p *ngIf="!playerRankingsLoading && playerRankings.length === 0" class="meta">
           {{ rankingPosition ? 'Nenhum jogador com esta posição possui estatísticas ainda.' : 'Nenhuma estatística disponível ainda.' }}
         </p>
+        <nav
+          *ngIf="showRankingPagination"
+          class="gc-pagination"
+          aria-label="Paginação do ranking de jogadores">
+          <button
+            type="button"
+            class="btn btn-secondary btn-small"
+            [disabled]="rankingPage <= 1"
+            (click)="goToRankingPage(rankingPage - 1)">
+            Anterior
+          </button>
+          <span class="gc-pagination-meta">{{ rankingPageLabel }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-small"
+            [disabled]="rankingPage >= rankingTotalPages"
+            (click)="goToRankingPage(rankingPage + 1)">
+            Próxima
+          </button>
+        </nav>
       </section>
 
       <section class="dashboard-card gc-card ranking-card ranking-card-wide">

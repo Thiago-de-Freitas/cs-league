@@ -20,30 +20,40 @@ describe('RankingsService', () => {
   });
 
   it('getPlayerRankings requests default endpoint', (done) => {
-    service.getPlayerRankings().subscribe((rows) => {
-      expect(rows).toEqual([]);
+    service.getPlayerRankings().subscribe((page) => {
+      expect(page.players).toEqual([]);
       done();
     });
-    const req = httpMock.expectOne('/api/rankings/players');
-    req.flush([]);
+    const req = httpMock.expectOne('/api/rankings/players?page=1&limit=10');
+    req.flush({ players: [], page: 1, pageSize: 10, total: 0, totalPages: 1 });
   });
 
   it('getPlayerRankings can filter by league', (done) => {
-    service.getPlayerRankings({ leagueId: 'league-1' }).subscribe((rows) => {
-      expect(rows).toEqual([]);
+    service.getPlayerRankings({ leagueId: 'league-1' }).subscribe((page) => {
+      expect(page.players).toEqual([]);
       done();
     });
-    const req = httpMock.expectOne('/api/rankings/players?leagueId=league-1');
-    req.flush([]);
+    const req = httpMock.expectOne('/api/rankings/players?page=1&limit=10&leagueId=league-1');
+    req.flush({ players: [], page: 1, pageSize: 10, total: 0, totalPages: 1 });
   });
 
   it('getPlayerRankings can filter by position', (done) => {
-    service.getPlayerRankings({ position: 'AWP' }).subscribe((rows) => {
-      expect(rows).toEqual([]);
+    service.getPlayerRankings({ position: 'AWP' }).subscribe((page) => {
+      expect(page.players).toEqual([]);
       done();
     });
-    const req = httpMock.expectOne('/api/rankings/players?position=AWP');
-    req.flush([]);
+    const req = httpMock.expectOne('/api/rankings/players?page=1&limit=10&position=AWP');
+    req.flush({ players: [], page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  });
+
+  it('getPlayerRankings can paginate', (done) => {
+    service.getPlayerRankings({ page: 2, pageSize: 20 }).subscribe((page) => {
+      expect(page.page).toBe(2);
+      expect(page.pageSize).toBe(20);
+      done();
+    });
+    const req = httpMock.expectOne('/api/rankings/players?page=2&limit=20');
+    req.flush({ players: [], page: 2, pageSize: 20, total: 0, totalPages: 1 });
   });
 
   it('getTeamRankings requests team ranking endpoint', (done) => {

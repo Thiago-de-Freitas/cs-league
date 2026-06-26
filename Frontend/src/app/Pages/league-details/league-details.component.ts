@@ -13,7 +13,7 @@ import { LeagueBracketComponent, BracketSeedAssignEvent } from '../../Components
 import { LeagueGroupsComponent } from '../../Components/league-groups/league-groups.component';
 import { LeagueGroupsPreviewComponent } from '../../Components/league-groups-preview/league-groups-preview.component';
 import { LeagueScheduleComponent } from '../../Components/league-schedule/league-schedule.component';
-import { LeagueActivityComponent } from '../../Components/league-activity/league-activity.component';
+import { LeaguePickupManagerComponent } from '../../Components/league-pickup-manager/league-pickup-manager.component';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
 import { NotificationService } from '../../Services/notification.service';
 import { getFairBracketSize, formatTeamCapacity, MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
@@ -56,7 +56,7 @@ interface ConfirmConfig {
     LeagueGroupsComponent,
     LeagueGroupsPreviewComponent,
     LeagueScheduleComponent,
-    LeagueActivityComponent,
+    LeaguePickupManagerComponent,
     ConfirmModalComponent,
     LeagueSeriesMapSettingsComponent,
   ],
@@ -209,7 +209,14 @@ export class LeagueDetailsComponent implements OnInit {
   }
 
   get canShowPlayerRegistration(): boolean {
-    return !this.isAdmin && this.isRegistrationOpen;
+    return !this.isAdmin && this.isRegistrationOpen && !this.isOneVsOneFormat;
+  }
+
+  onPickupStateChanged(): void {
+    if (!this.leagueId) return;
+    this.leagueService.getLeagueById(this.leagueId).subscribe({
+      next: (league) => (this.league = league),
+    });
   }
 
   private loadMyTeamsForRegistration(): void {

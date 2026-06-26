@@ -85,6 +85,45 @@ export interface League {
   mapPool?: string[];
   mapVetoEnabled?: boolean;
   seriesFormat?: 'bo1' | 'bo3' | string;
+  pickupTeamCount?: number | null;
+  pickupPlayersPerTeam?: number;
+  pickupBalanceMode?: 'rating' | 'adr' | 'hs_percent' | 'position_mix' | string;
+  pickupBalancedAt?: string | null;
+}
+
+export type PickupBalanceMode = 'rating' | 'adr' | 'hs_percent' | 'position_mix';
+
+export interface PickupPlayer {
+  id: string;
+  userId: string;
+  displayName: string;
+  steamId: string | null;
+  avatarUrl: string | null;
+  position: string | null;
+  positionLabel: string | null;
+  teamId: string | null;
+  adr: number | null;
+  hsPercent: number | null;
+  rating: number | null;
+  matches: number;
+}
+
+export interface PickupSquad {
+  id: string;
+  name: string;
+  tag: string;
+  seed: number | null;
+  players: PickupPlayer[];
+  teamRating: number | null;
+}
+
+export interface PickupLeagueState {
+  teamCount: number;
+  playersPerTeam: number;
+  balanceMode: PickupBalanceMode;
+  balancedAt: string | null;
+  pool: PickupPlayer[];
+  squads: PickupSquad[];
 }
 
 export interface LeagueGroup {
@@ -160,6 +199,8 @@ export interface Match {
     canRegisterResult?: boolean;
     canEditManualStats?: boolean;
     captainTeamIds?: string[];
+    canVeto?: boolean;
+    canAdminReopenVeto?: boolean;
   };
   mapVetoEnabled?: boolean;
   mapVeto?: MapVetoState | null;
@@ -184,6 +225,9 @@ export interface SeriesVetoState {
   team2MapWins: number;
   isStale: boolean;
   autoResolved?: boolean;
+  vetoDeadlineAt?: string | null;
+  deadlineExpired?: boolean;
+  vetoReopenedByAdmin?: boolean;
 }
 
 export interface MatchSeriesInfo {
@@ -206,6 +250,9 @@ export interface MapVetoState {
   bansCompleted: number;
   isStale: boolean;
   autoResolved?: boolean;
+  vetoDeadlineAt?: string | null;
+  deadlineExpired?: boolean;
+  vetoReopenedByAdmin?: boolean;
 }
 
 export interface MatchLineupEntry {

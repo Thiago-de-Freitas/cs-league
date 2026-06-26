@@ -17,6 +17,9 @@ export type MapVetoState = {
   bansRequired: number;
   bansCompleted: number;
   isStale: boolean;
+  vetoDeadlineAt: string | null;
+  deadlineExpired: boolean;
+  vetoReopenedByAdmin: boolean;
 };
 
 export function getOtherTeamId(team1Id: string, team2Id: string, teamId: string): string {
@@ -93,6 +96,9 @@ export function buildMapVetoView(input: {
     bansRequired,
     bansCompleted: input.bannedMaps.length,
     isStale: now.getTime() - input.lastActionAt.getTime() > VETO_ACTION_TIMEOUT_MS,
+    vetoDeadlineAt: null,
+    deadlineExpired: false,
+    vetoReopenedByAdmin: false,
   };
 }
 

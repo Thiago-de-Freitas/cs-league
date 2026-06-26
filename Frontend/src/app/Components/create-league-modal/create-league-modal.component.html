@@ -34,13 +34,14 @@
       <div class="form-group">
         <label for="format" class="form-label">Formato do torneio</label>
         <select id="format" formControlName="format" class="input-field">
-          <option value="one_vs_one">1x1 — duelo entre dois times (um jogador por time)</option>
+          <option value="one_vs_one">Liga individual — jogadores balanceados em times temporários</option>
           <option value="single_elimination">Liga — eliminatória direta</option>
           <option value="single_group">Grupo único — todos contra todos → fase de liga</option>
           <option value="multi_group">Vários grupos — top N de cada → fase de liga</option>
         </select>
         <p class="form-hint" *ngIf="isOneVsOne">
-          Partida única entre dois times. Você escolhe um jogador de cada time após inscrevê-los. Inclui veto de mapas estilo Valve e upload de imagens da partida.
+          Você convoca jogadores, o sistema cria times que existem só nesta liga e balanceia por rating, ADR, HS% ou posição.
+          Depois, gere o chaveamento normalmente.
         </p>
         <p class="form-hint" *ngIf="form.get('format')?.value === 'single_elimination'">
           Mata-mata desde o início. Sem fase de grupos.
@@ -55,6 +56,26 @@
           <strong>{{ form.get('homeAndAway')?.value ? 'duas vezes (ida e volta)' : 'uma vez' }}</strong>.
           Os melhores de cada grupo avançam para a fase de liga (mata-mata).
         </p>
+      </div>
+
+      <div class="form-group" *ngIf="isOneVsOne">
+        <label class="form-label" for="pickup-team-count">Número de times temporários</label>
+        <input id="pickup-team-count" type="number" class="input-field" formControlName="pickupTeamCount" min="2" max="16">
+      </div>
+
+      <div class="form-group" *ngIf="isOneVsOne">
+        <label class="form-label" for="pickup-players-per-team">Jogadores por time</label>
+        <input id="pickup-players-per-team" type="number" class="input-field" formControlName="pickupPlayersPerTeam" min="1" max="5">
+      </div>
+
+      <div class="form-group" *ngIf="isOneVsOne">
+        <label class="form-label" for="pickup-balance-mode">Balanceamento padrão</label>
+        <select id="pickup-balance-mode" class="input-field" formControlName="pickupBalanceMode">
+          <option value="rating">Rating geral</option>
+          <option value="adr">ADR médio</option>
+          <option value="hs_percent">% de headshot</option>
+          <option value="position_mix">Posições (AWP, lurker…)</option>
+        </select>
       </div>
 
       <div class="form-group" *ngIf="showMapSeriesOptions">
@@ -116,7 +137,7 @@
         </p>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" *ngIf="!isOneVsOne">
         <label for="max-teams" class="form-label">Limite de vagas (opcional)</label>
         <input
           id="max-teams"

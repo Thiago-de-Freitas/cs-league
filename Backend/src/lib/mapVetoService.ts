@@ -13,6 +13,7 @@ import {
   remainingMaps,
   type MapVetoState,
 } from './mapVeto';
+import { buildVetoDeadlineInfo, isVetoActionAllowed } from './mapVetoDeadline';
 
 type MatchContext = {
   id: string;
@@ -21,6 +22,7 @@ type MatchContext = {
   map: string | null;
   team1StartingSide: GameSide | null;
   team2StartingSide: GameSide | null;
+  scheduledAt?: Date | null;
   league: {
     mapPool: Prisma.JsonValue;
     mapVetoEnabled: boolean;
@@ -61,6 +63,7 @@ export async function ensureMatchMapVeto(match: MatchContext): Promise<MapVetoSt
 }
 
 async function resolveStaleVetoIfNeeded(match: MatchContext, veto: MatchMapVeto) {
+  const deadline = buildVetoDeadlineInfo(match.scheduledAt, veto.vetoReopenedByAdmin);
   const view = buildMapVetoView({
     mapPool: parseMapPoolJson(veto.mapPool),
     bannedMaps: parseBannedMaps(veto.bannedMaps),
@@ -76,7 +79,11 @@ async function resolveStaleVetoIfNeeded(match: MatchContext, veto: MatchMapVeto)
     lastActionAt: veto.lastActionAt,
   });
 
-  if (!view.isStale || veto.status === 'COMPLETED') {
+  const shouldAutoResolve =
+    veto.status !== 'COMPLETED' &&
+    (deadline.deadlineExpired || view.isStale);
+
+  if (!shouldAutoResolve) {
     return veto;
   }
 
@@ -94,6 +101,12 @@ export async function banMapForMatch(
   }
   if (veto.status !== 'BAN_PHASE') {
     return { veto: formatVetoState(match, veto), error: 'Fase de banimento já encerrada.' };
+  }
+  if (!isVetoActionAllowed(match.scheduledAt, veto.vetoReopenedByAdmin, veto.status)) {
+    return {
+      veto: formatVetoState(match, veto),
+      error: 'O prazo de veto expirou (2 dias antes da partida). Aguarde um administrador reabrir o map pool.',
+    };
   }
   if (veto.vetoTurnTeamId !== actingTeamId) {
     return { veto: formatVetoState(match, veto), error: 'Não é a vez deste time banir.' };
@@ -157,6 +170,12 @@ export async function pickSideForMatch(
   }
   if (veto.status !== 'SIDE_PHASE') {
     return { veto: formatVetoState(match, veto), error: 'Escolha de lado não está disponível.' };
+  }
+  if (!isVetoActionAllowed(match.scheduledAt, veto.vetoReopenedByAdmin, veto.status)) {
+    return {
+      veto: formatVetoState(match, veto),
+      error: 'O prazo de veto expirou (2 dias antes da partida). Aguarde um administrador reabrir o map pool.',
+    };
   }
   if (veto.sidePickTeamId !== actingTeamId) {
     return { veto: formatVetoState(match, veto), error: 'Não é a vez deste time escolher o lado.' };
@@ -274,6 +293,7 @@ async function autoCompleteVeto(match: MatchContext, veto: MatchMapVeto, autoRes
 }
 
 export function formatVetoState(match: MatchContext, veto: MatchMapVeto): MapVetoState & { autoResolved: boolean } {
+  const deadline = buildVetoDeadlineInfo(match.scheduledAt, veto.vetoReopenedByAdmin);
   const view = buildMapVetoView({
     mapPool: parseMapPoolJson(veto.mapPool),
     bannedMaps: parseBannedMaps(veto.bannedMaps),
@@ -292,7 +312,51 @@ export function formatVetoState(match: MatchContext, veto: MatchMapVeto): MapVet
     ...view,
     status: view.status.toLowerCase() as MapVetoState['status'],
     autoResolved: veto.autoResolved,
+    vetoDeadlineAt: deadline.vetoDeadlineAt?.toISOString() ?? null,
+    deadlineExpired: deadline.deadlineExpired,
+    vetoReopenedByAdmin: veto.vetoReopenedByAdmin,
   };
+}
+
+export async function reopenMatchMapVeto(
+  match: MatchContext
+): Promise<MapVetoState & { autoResolved: boolean }> {
+  const mapPool = parseMapPoolJson(match.league.mapPool);
+  const firstBanTeamId = coinFlipFirstBanTeam(match.team1Id, match.team2Id);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const v = await tx.matchMapVeto.update({
+      where: { matchId: match.id },
+      data: {
+        mapPool,
+        bannedMaps: [],
+        firstBanTeamId,
+        vetoTurnTeamId: firstBanTeamId,
+        sidePickTeamId: null,
+        status: 'BAN_PHASE',
+        autoResolved: false,
+        vetoReopenedByAdmin: true,
+        lastActionAt: new Date(),
+      },
+    });
+    await tx.match.update({
+      where: { id: match.id },
+      data: {
+        map: null,
+        team1StartingSide: null,
+        team2StartingSide: null,
+      },
+    });
+    return v;
+  });
+
+  const freshMatch = {
+    ...match,
+    map: null,
+    team1StartingSide: null,
+    team2StartingSide: null,
+  };
+  return formatVetoState(freshMatch, updated);
 }
 
 export async function initializeMatchMapVeto(

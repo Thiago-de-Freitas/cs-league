@@ -17,13 +17,28 @@
           <label class="form-label" for="entity-filter">Entidade</label>
           <input id="entity-filter" class="input-field" [(ngModel)]="entityTypeFilter" placeholder="ex: Match" />
         </div>
+        <div class="form-group">
+          <label class="form-label" for="page-size">Por página</label>
+          <select
+            id="page-size"
+            class="input-field"
+            [(ngModel)]="pageSize"
+            (ngModelChange)="onPageSizeChange()">
+            <option *ngFor="let size of pageSizeOptions" [ngValue]="size">{{ size }}</option>
+          </select>
+        </div>
         <button type="button" class="btn btn-primary" (click)="applyFilters()">Filtrar</button>
       </div>
     </div>
 
     <div class="gc-card">
-      <h2 class="section-title">Eventos</h2>
+      <div class="audit-list-header">
+        <h2 class="section-title">Eventos</h2>
+        <span class="meta audit-range" *ngIf="!loading">{{ rangeLabel }}</span>
+      </div>
+
       <div *ngIf="loading" class="meta">Carregando...</div>
+
       <ul class="gc-list" *ngIf="!loading && events.length > 0">
         <li *ngFor="let event of events" class="gc-list-item audit-row" [class.is-failure]="!event.success">
           <div>
@@ -39,15 +54,26 @@
           </span>
         </li>
       </ul>
+
       <p class="meta" *ngIf="!loading && events.length === 0">Nenhum evento encontrado.</p>
-      <button
-        *ngIf="!loading && nextCursor"
-        type="button"
-        class="btn btn-secondary btn-small"
-        [disabled]="loadingMore"
-        (click)="loadMore()">
-        {{ loadingMore ? 'Carregando...' : 'Carregar mais' }}
-      </button>
+
+      <nav *ngIf="!loading && totalPages > 1" class="audit-pagination" aria-label="Paginação da auditoria">
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="page <= 1"
+          (click)="goToPage(page - 1)">
+          Anterior
+        </button>
+        <span class="audit-page-label">Página {{ page }} de {{ totalPages }}</span>
+        <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          [disabled]="page >= totalPages"
+          (click)="goToPage(page + 1)">
+          Próxima
+        </button>
+      </nav>
     </div>
   </div>
 </div>

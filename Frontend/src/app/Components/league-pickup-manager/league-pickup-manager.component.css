@@ -1,0 +1,99 @@
+.pickup-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.pickup-subtitle {
+  margin: 0 0 0.75rem;
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+.pickup-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+
+.pickup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.pickup-squad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.pickup-squad-card {
+  padding: 1rem;
+}
+
+.pickup-squad-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.pickup-player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pickup-player-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: 4px;
+}
+
+.pickup-player-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.pickup-player-name {
+  color: var(--gc-text);
+  font-weight: 600;
+}
+
+.pickup-player-stats {
+  font-size: 0.85rem;
+}
+
+.pickup-player-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pickup-move-select {
+  min-width: 8rem;
+  max-width: 12rem;
+}
+
+.pickup-empty,
+.pickup-empty-squad {
+  margin: 0;
+}

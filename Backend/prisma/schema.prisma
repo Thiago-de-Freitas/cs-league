@@ -103,6 +103,13 @@ enum AuditActorType {
   ANONYMOUS
 }
 
+enum PickupBalanceMode {
+  RATING
+  ADR
+  HS_PERCENT
+  POSITION_MIX
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -121,6 +128,7 @@ model User {
   ownedLeagues League[]     @relation("LeagueOwner")
   demos        Demo[]
   auditEvents  AuditEvent[] @relation("AuditActor")
+  leaguePlayerEntries LeaguePlayerEntry[]
 }
 
 model Team {
@@ -129,16 +137,21 @@ model Team {
   tag       String
   logoUrl   String?
   ownerId   String
+  leagueId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  league      League?      @relation("EphemeralTeams", fields: [leagueId], references: [id], onDelete: Cascade)
   members     TeamMember[]
   invites     TeamInvite[]
   leagueTeams LeagueTeam[]
+  leaguePlayerEntries LeaguePlayerEntry[]
   matchesAsTeam1 Match[]   @relation("MatchTeam1")
   matchesAsTeam2 Match[]   @relation("MatchTeam2")
   matchesWon     Match[]   @relation("MatchWinner")
+
+  @@index([leagueId])
 }
 
 model TeamMember {
@@ -189,6 +202,10 @@ model League {
   mapPool           Json?
   mapVetoEnabled    Boolean      @default(true)
   seriesFormat      SeriesFormat @default(BO1)
+  pickupTeamCount      Int?
+  pickupPlayersPerTeam Int          @default(5)
+  pickupBalanceMode    PickupBalanceMode @default(RATING)
+  pickupBalancedAt     DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -198,6 +215,24 @@ model League {
   matches         Match[]
   scheduleWeeks   LeagueScheduleWeek[]
   matchSeries     MatchSeries[]
+  playerEntries   LeaguePlayerEntry[]
+  ephemeralTeams  Team[]               @relation("EphemeralTeams")
+}
+
+model LeaguePlayerEntry {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  teamId    String?
+  createdAt DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([leagueId, userId])
+  @@index([leagueId])
+  @@index([teamId])
 }
 
 model LeagueScheduleWeek {
@@ -378,6 +413,7 @@ model MatchSeries {
   vetoStatus        SeriesVetoStatus @default(BAN_PHASE)
   activeGameNumber  Int              @default(1)
   autoResolved      Boolean          @default(false)
+  vetoReopenedByAdmin Boolean        @default(false)
   lastActionAt      DateTime         @default(now())
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -398,6 +434,7 @@ model MatchMapVeto {
   sidePickTeamId String?
   status         MapVetoStatus @default(BAN_PHASE)
   autoResolved   Boolean       @default(false)
+  vetoReopenedByAdmin Boolean  @default(false)
   lastActionAt   DateTime      @default(now())
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

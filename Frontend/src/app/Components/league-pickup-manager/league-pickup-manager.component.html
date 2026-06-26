@@ -1,0 +1,107 @@
+<div class="pickup-manager" *ngIf="!loading; else loadingTpl">
+  <p class="admin-hint">
+    Convide jogadores individualmente. Eles serão alocados em <strong>times temporários</strong> que existem só nesta liga
+    e não aparecem no restante do sistema. Balanceie automaticamente ou ajuste manualmente cada jogador.
+  </p>
+
+  <div class="pickup-add" *ngIf="!disabled">
+    <app-user-search-picker
+      label="Convidar jogador"
+      placeholder="Buscar por nome, e-mail ou Steam ID..."
+      actionLabel="Convidar"
+      [disabled]="disabled"
+      (userPick)="onPlayerPicked($event)">
+    </app-user-search-picker>
+  </div>
+
+  <div class="pickup-settings" *ngIf="!disabled">
+    <h3 class="pickup-subtitle">Balanceamento</h3>
+    <div class="pickup-settings-grid">
+      <div class="form-group">
+        <label class="form-label" for="pickup-team-count">Número de times</label>
+        <input id="pickup-team-count" type="number" class="input-field" [(ngModel)]="teamCount" min="2" max="16">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pickup-pp-team">Jogadores por time</label>
+        <input id="pickup-pp-team" type="number" class="input-field" [(ngModel)]="playersPerTeam" min="1" max="5">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pickup-mode">Critério</label>
+        <select id="pickup-mode" class="input-field" [(ngModel)]="balanceMode">
+          <option *ngFor="let mode of balanceModes" [value]="mode.value">{{ mode.label }}</option>
+        </select>
+      </div>
+    </div>
+    <div class="pickup-actions">
+      <button type="button" class="btn btn-secondary" [disabled]="savingSettings" (click)="saveSettings()">
+        {{ savingSettings ? 'Salvando...' : 'Salvar configurações' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="balancing || totalPlayers < teamCount"
+        (click)="balanceTeams()">
+        {{ balancing ? 'Balanceando...' : 'Balancear times automaticamente' }}
+      </button>
+    </div>
+    <p class="form-hint" *ngIf="state?.balancedAt">
+      Último balanceamento: {{ state!.balancedAt | date:'short' }}
+    </p>
+  </div>
+
+  <div class="pickup-pool" *ngIf="state && state.pool.length > 0">
+    <h3 class="pickup-subtitle">Sem time ({{ state.pool.length }})</h3>
+    <ul class="pickup-player-list">
+      <li *ngFor="let player of state.pool; trackBy: trackPlayer" class="pickup-player-row">
+        <ng-container *ngTemplateOutlet="playerRow; context: { $implicit: player }"></ng-container>
+      </li>
+    </ul>
+  </div>
+
+  <div class="pickup-squads" *ngIf="state && state.squads.length > 0">
+    <h3 class="pickup-subtitle">Times da liga</h3>
+    <div class="pickup-squad-grid">
+      <div *ngFor="let squad of state.squads; trackBy: trackSquad" class="gc-card pickup-squad-card">
+        <div class="pickup-squad-header">
+          <strong>{{ squad.name }}</strong>
+          <span class="meta">[{{ squad.tag }}]</span>
+          <span *ngIf="squad.teamRating != null" class="badge badge-orange">Rating {{ squad.teamRating }}</span>
+        </div>
+        <ul class="pickup-player-list" *ngIf="squad.players.length > 0; else emptySquad">
+          <li *ngFor="let player of squad.players; trackBy: trackPlayer" class="pickup-player-row">
+            <ng-container *ngTemplateOutlet="playerRow; context: { $implicit: player, squadId: squad.id }"></ng-container>
+          </li>
+        </ul>
+        <ng-template #emptySquad>
+          <p class="meta pickup-empty-squad">Nenhum jogador</p>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <p *ngIf="state && totalPlayers === 0" class="meta pickup-empty">Nenhum jogador convidado ainda.</p>
+</div>
+
+<ng-template #loadingTpl>
+  <p class="meta">Carregando elenco...</p>
+</ng-template>
+
+<ng-template #playerRow let-player let-squadId="squadId">
+  <div class="pickup-player-main">
+    <span class="pickup-player-name">{{ player.displayName }}</span>
+    <span *ngIf="player.positionLabel" class="badge badge-gray">{{ player.positionLabel }}</span>
+    <span class="pickup-player-stats meta">
+      ADR {{ formatStat(player.adr) }} · HS {{ formatStat(player.hsPercent, '%') }} · Rating {{ formatStat(player.rating) }}
+    </span>
+  </div>
+  <div class="pickup-player-actions" *ngIf="!disabled">
+    <select
+      class="input-field pickup-move-select"
+      [ngModel]="player.teamId || ''"
+      (ngModelChange)="movePlayer(player, $event)">
+      <option value="">Sem time</option>
+      <option *ngFor="let squad of state?.squads" [value]="squad.id">{{ squad.name }}</option>
+    </select>
+    <button type="button" class="btn btn-secondary btn-small" (click)="removePlayer(player)">Remover</button>
+  </div>
+</ng-template>
