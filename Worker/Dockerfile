@@ -9,6 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY worker.py .
+COPY worker.py highlight_extraction.py highlight_progress.py highlight_renderer.py ./
 
 CMD ["python", "-u", "worker.py"]
