@@ -74,18 +74,53 @@ function getClientIp(req: Request): string | null {
   return req.socket.remoteAddress ?? null;
 }
 
+function resolveActorFromAuditContext(
+  ctx: AuditContextInput | undefined
+): {
+  actorType: AuditActorType;
+  actorUserId: string | null;
+  actorLabel: string | null;
+} | null {
+  if (!ctx) return null;
+
+  if (ctx.actorUserId || ctx.actorType) {
+    return {
+      actorType: ctx.actorType ?? AuditActorType.USER,
+      actorUserId: ctx.actorUserId ?? null,
+      actorLabel: ctx.actorLabel ?? null,
+    };
+  }
+
+  if (ctx.entityType === 'User' && ctx.entityId) {
+    const after = ctx.after as { email?: string; displayName?: string } | undefined;
+    const metadata = ctx.metadata as { email?: string } | undefined;
+    const email =
+      (typeof after?.email === 'string' && after.email) ||
+      (typeof metadata?.email === 'string' && metadata.email) ||
+      null;
+    const displayName =
+      typeof after?.displayName === 'string' && after.displayName.trim()
+        ? after.displayName.trim()
+        : null;
+
+    return {
+      actorType: AuditActorType.USER,
+      actorUserId: ctx.entityId,
+      actorLabel: displayName ?? email,
+    };
+  }
+
+  return null;
+}
+
 function resolveActor(req: Request): {
   actorType: AuditActorType;
   actorUserId: string | null;
   actorLabel: string | null;
 } {
-  const override = req.auditContext;
-  if (override?.actorType) {
-    return {
-      actorType: override.actorType,
-      actorUserId: override.actorUserId ?? null,
-      actorLabel: override.actorLabel ?? null,
-    };
+  const fromContext = resolveActorFromAuditContext(req.auditContext);
+  if (fromContext) {
+    return fromContext;
   }
 
   const authReq = req as AuthRequest;
@@ -135,6 +170,11 @@ export function setAuditContext(req: Request, context: AuditContextInput): void 
     ...req.auditContext,
     ...context,
   };
+}
+
+/** Usado nos testes unitários. */
+export function resolveAuditActorFromContext(ctx: AuditContextInput | undefined) {
+  return resolveActorFromAuditContext(ctx);
 }
 
 export function skipAudit(req: Request): void {
@@ -272,7 +312,7 @@ export async function recordWorkerAudit(input: AuditContextInput): Promise<void>
   });
 }
 
-export function formatAuditEventForApi(event: {
+type AuditEventRecord = {
   id: string;
   occurredAt: Date;
   actorType: AuditActorType;
@@ -292,14 +332,68 @@ export function formatAuditEventForApi(event: {
   success: boolean;
   errorCode: string | null;
   actorUser?: { id: string; displayName: string; email: string } | null;
-}) {
+};
+
+function resolveAuditEventActorFields(
+  event: AuditEventRecord,
+  entityUser?: { displayName: string; email: string } | null
+): {
+  actorType: string;
+  actorUserId: string | null;
+  actorLabel: string | null;
+  actorEmail: string | null;
+} {
+  const after = event.after as { email?: string; displayName?: string } | null | undefined;
+  const metadata = event.metadata as { email?: string } | null | undefined;
+
+  const emailFromPayload =
+    (typeof after?.email === 'string' && after.email) ||
+    (typeof metadata?.email === 'string' && metadata.email) ||
+    null;
+  const displayNameFromPayload =
+    typeof after?.displayName === 'string' && after.displayName.trim()
+      ? after.displayName.trim()
+      : null;
+
+  const linkedUser = event.actorUser ?? entityUser ?? null;
+  const actorEmail = linkedUser?.email ?? emailFromPayload;
+  const actorLabel =
+    event.actorLabel ??
+    linkedUser?.displayName ??
+    displayNameFromPayload ??
+    emailFromPayload;
+
+  let actorUserId = event.actorUserId;
+  let actorType = event.actorType;
+
+  if (event.entityType === 'User' && event.entityId && (actorLabel || actorEmail)) {
+    actorUserId = actorUserId ?? event.entityId;
+    if (actorType === AuditActorType.ANONYMOUS) {
+      actorType = AuditActorType.USER;
+    }
+  }
+
+  return {
+    actorType: actorType.toLowerCase(),
+    actorUserId,
+    actorLabel,
+    actorEmail,
+  };
+}
+
+export function formatAuditEventForApi(
+  event: AuditEventRecord,
+  entityUser?: { displayName: string; email: string } | null
+) {
+  const actor = resolveAuditEventActorFields(event, entityUser);
+
   return {
     id: event.id,
     occurredAt: event.occurredAt,
-    actorType: event.actorType.toLowerCase(),
-    actorUserId: event.actorUserId,
-    actorLabel: event.actorLabel ?? event.actorUser?.displayName ?? null,
-    actorEmail: event.actorUser?.email ?? null,
+    actorType: actor.actorType,
+    actorUserId: actor.actorUserId,
+    actorLabel: actor.actorLabel,
+    actorEmail: actor.actorEmail,
     action: event.action,
     entityType: event.entityType,
     entityId: event.entityId,
@@ -314,6 +408,35 @@ export function formatAuditEventForApi(event: {
     success: event.success,
     errorCode: event.errorCode,
   };
+}
+
+export async function formatAuditEventsForApi(events: AuditEventRecord[]) {
+  const entityUserIds = [
+    ...new Set(
+      events
+        .filter((event) => event.entityType === 'User' && event.entityId && !event.actorUserId)
+        .map((event) => event.entityId as string)
+    ),
+  ];
+
+  const entityUsers =
+    entityUserIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: entityUserIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+
+  const entityUsersById = new Map(entityUsers.map((user) => [user.id, user]));
+
+  return events.map((event) =>
+    formatAuditEventForApi(
+      event,
+      event.entityType === 'User' && event.entityId
+        ? entityUsersById.get(event.entityId) ?? null
+        : null
+    )
+  );
 }
 
 /** Atalhos para handlers de rota. */

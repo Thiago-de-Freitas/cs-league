@@ -170,7 +170,7 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
     setAuditContext(req, audit.of('auth.login.success', 'User', user.id, {
-      after: { email: user.email, role: user.role },
+      after: { email: user.email, displayName: user.displayName, role: user.role },
     }));
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {

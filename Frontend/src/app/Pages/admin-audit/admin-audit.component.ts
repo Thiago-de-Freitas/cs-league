@@ -9,6 +9,7 @@ import {
 } from '../../Services/audit.service';
 import { AuthService } from '../../Services/auth.service';
 import { AuditEvent } from '../../Models/interfaces';
+import { formatAuditActor } from '../../Utils/audit-display.util';
 
 @Component({
   selector: 'app-admin-audit',
@@ -98,7 +99,7 @@ export class AdminAuditComponent implements OnInit {
   }
 
   formatActor(event: AuditEvent): string {
-    return event.actorLabel || event.actorEmail || event.actorType;
+    return formatAuditActor(event);
   }
 
   formatDate(value: string): string {

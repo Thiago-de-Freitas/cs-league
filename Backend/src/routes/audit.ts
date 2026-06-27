@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isAdmin } from '../lib/permissions';
 import { canUserAccessLeague } from '../lib/leaguePermissions';
-import { formatAuditEventForApi } from '../lib/audit';
+import { formatAuditEventsForApi } from '../lib/audit';
 
 const router = Router();
 
@@ -75,7 +75,7 @@ router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) =>
     const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
 
     res.json({
-      events: events.map(formatAuditEventForApi),
+      events: await formatAuditEventsForApi(events),
       page,
       pageSize,
       total,
@@ -118,7 +118,7 @@ router.get('/leagues/:leagueId/activity', authMiddleware, async (req: AuthReques
     const page = hasMore ? events.slice(0, limit) : events;
 
     res.json({
-      events: page.map(formatAuditEventForApi),
+      events: await formatAuditEventsForApi(page),
       nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
     });
   } catch (err) {

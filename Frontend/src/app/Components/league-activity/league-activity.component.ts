@@ -2,6 +2,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuditService } from '../../Services/audit.service';
 import { AuditEvent } from '../../Models/interfaces';
+import { formatAuditActor } from '../../Utils/audit-display.util';
 
 const ACTION_LABELS: Record<string, string> = {
   'auth.register': 'Cadastro de usuário',
@@ -108,11 +109,7 @@ export class LeagueActivityComponent implements OnInit {
   }
 
   formatActor(event: AuditEvent): string {
-    if (event.actorLabel) return event.actorLabel;
-    if (event.actorType === 'worker') return 'Worker';
-    if (event.actorType === 'system') return 'Sistema';
-    if (event.actorType === 'anonymous') return 'Anônimo';
-    return 'Usuário';
+    return formatAuditActor(event);
   }
 
   formatDate(value: string): string {

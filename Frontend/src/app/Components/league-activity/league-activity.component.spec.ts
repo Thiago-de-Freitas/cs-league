@@ -78,4 +78,19 @@ describe('LeagueActivityComponent', () => {
     expect(component.formatActor(event)).toBe('Admin');
     expect(component.formatActor({ ...event, actorLabel: undefined, actorType: 'system' })).toBe('Sistema');
   });
+
+  it('formatActor resolve login antigo sem actorLabel', () => {
+    expect(
+      component.formatActor({
+        id: 'e-login',
+        occurredAt: '2025-06-01T12:00:00Z',
+        action: 'auth.login.success',
+        entityType: 'User',
+        entityId: 'user-1',
+        actorType: 'anonymous',
+        success: true,
+        after: { email: 'player@test.com' },
+      })
+    ).toBe('player@test.com');
+  });
 });
