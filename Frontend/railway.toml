@@ -1,9 +1,9 @@
-# Serviço frontend — cs-league-front
+# Serviço frontend — gamers-league-front
 #
 # OBRIGATÓRIO: Settings → Root Directory = Frontend
 #
 # Variáveis: Frontend/railway.env (não coloque no railway.toml)
-#   railway variable import --file railway.env --service cs-league-front --yes
+#   railway variable import --file railway.env --service gamers-league-front --yes
 # Ou: ..\scripts\railway-import-vars.ps1 -Target front
 
 [build]

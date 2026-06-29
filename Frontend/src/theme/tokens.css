@@ -1,5 +1,5 @@
 /**
- * CS League — Design Tokens (fonte única de cores e espaçamento)
+ * Gamers League — Design Tokens (fonte única de cores e espaçamento)
  * Sempre use var(--gc-*) em CSS/HTML. Nunca hardcode hex em componentes.
  */
 :root {

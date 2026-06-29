@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BUILD_INFO, BuildInfo } from '../generated/build-info';
+import { APP_NAME } from '../Utils/brand';
 
 export interface AppVersionInfo {
   frontend: BuildInfo;
@@ -60,6 +61,6 @@ export class VersionService {
   getSystemVersionTooltip(): string {
     const front = BUILD_INFO;
     const dirty = front.dirty ? ' (dirty)' : '';
-    return `CS League ${front.version} · build ${front.buildTime} · ${front.branch}${dirty}`;
+    return `${APP_NAME} ${front.version} · build ${front.buildTime} · ${front.branch}${dirty}`;
   }
 }

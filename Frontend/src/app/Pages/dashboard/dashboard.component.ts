@@ -14,6 +14,7 @@ import { CreateTeamModalComponent, TeamCreatedEvent } from '../../Components/cre
 import { formatTeamCapacity } from '../../Utils/bracket.util';
 import { RANKING_POSITION_OPTIONS, RankingPositionFilter, getPlayerPositionLabel } from '../../Utils/player-positions';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
+import { APP_NAME_PARTS, APP_TAGLINE } from '../../Utils/brand';
 
 @Component({
   selector: 'app-dashboard',
@@ -23,6 +24,8 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
   styleUrls: ['./dashboard.component.css']
 })
 export class DashboardComponent implements OnInit {
+  readonly brand = APP_NAME_PARTS;
+  readonly tagline = APP_TAGLINE;
   readonly pageSize = 10;
   leaguesPage = 0;
   teamsPage = 0;

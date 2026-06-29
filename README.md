@@ -1,6 +1,6 @@
-# CS League - Plataforma de Análise e Gerenciamento de Ligas CS2
+# Gamers League — Plataforma de Ligas e Competições
 
-MVP com backend Node.js, worker Python para demos, PostgreSQL, Redis e frontend Angular.
+MVP com backend Node.js, worker Python para demos, PostgreSQL, Redis e frontend Angular. Suporte inicial a Counter-Strike 2, com arquitetura preparada para outros jogos.
 
 ## Pré-requisitos
 
@@ -15,9 +15,11 @@ MVP com backend Node.js, worker Python para demos, PostgreSQL, Redis e frontend 
 Abra o **Docker Desktop**, depois:
 
 ```powershell
-cd cs-league
+cd gamers-league
 docker compose -f docker-compose.dev.yml up -d
 ```
+
+> Se você clonou o repositório com o nome antigo (`cs-league`), use essa pasta ou renomeie localmente.
 
 ### 2. Backend
 
@@ -48,7 +50,7 @@ npm run worker:dev
 cd Worker
 pip install -r requirements.txt
 # PowerShell — use o mesmo DATABASE_URL e REDIS_URL do Backend/.env
-$env:DATABASE_URL="postgresql://csleague:csleague@localhost:5432/csleague"
+$env:DATABASE_URL="postgresql://gamersleague:gamersleague@localhost:5432/gamersleague"
 $env:REDIS_URL="redis://localhost:6379"
 python worker.py
 ```
@@ -95,8 +97,8 @@ npm run db:seed
 | Email | Senha | Papel |
 |-------|-------|-------|
 | `admin@test.com` | `123456` | Admin |
-| `thiago@csleague.com` | `123456` | Dono de ligas |
-| `player1@csleague.com` | `123456` | Capitão FURIA Academy |
+| `thiago@gamersleague.com` | `123456` | Dono de ligas |
+| `player1@gamersleague.com` | `123456` | Capitão FURIA Academy |
 
 ## Fluxo de teste
 
@@ -116,11 +118,12 @@ npm run db:seed
 | `UNABLE_TO_VERIFY_LEAF_SIGNATURE` no npm | Use Node 20 LTS; ou `npm config set strict-ssl false` temporariamente |
 | API não conecta ao banco | Verifique se `docker compose -f docker-compose.dev.yml up -d` está rodando |
 | Demo fica em "pending" | Inicie o worker Python |
+| Postgres com credenciais antigas (`csleague`) | `docker compose -f docker-compose.dev.yml down -v` e suba de novo |
 
 ## Estrutura
 
 ```
-cs-league/
+gamers-league/
 ├── Frontend/     Angular 19
 ├── Backend/      Express + Prisma
 ├── Worker/       Python + demoparser2

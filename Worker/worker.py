@@ -21,7 +21,7 @@ from highlight_progress import set_highlight_progress
 from highlight_renderer import HIGHLIGHT_RENDER_QUEUE, process_highlight_render_job
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://csleague:csleague@localhost:5432/csleague")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://gamersleague:gamersleague@localhost:5432/gamersleague")
 DEMO_STORAGE_PATH = os.environ.get("DEMO_STORAGE_PATH")
 BACKEND_INTERNAL_URL = os.environ.get("BACKEND_INTERNAL_URL", "").rstrip("/")
 INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
@@ -178,7 +178,7 @@ def fetch_demo_from_api(demo_id: str) -> tuple[str | None, str | None]:
         if err.code == 403:
             return None, "API rejeitou a chave (403) — INTERNAL_SERVICE_KEY deve ser igual no back e no worker"
         if err.code == 503 and "INTERNAL_SERVICE_KEY" in body:
-            return None, "API sem INTERNAL_SERVICE_KEY — configure no cs-league-back e redeploy"
+            return None, "API sem INTERNAL_SERVICE_KEY — configure no gamers-league-back e redeploy"
         if err.code == 404:
             return None, "Arquivo não encontrado na API (404) — demo pode ter sido enviada antes do volume /data"
         return None, f"Erro HTTP {err.code} ao baixar da API: {body}"
@@ -245,8 +245,8 @@ def validate_backend_internal_url(url: str) -> str | None:
     if "::" in url or url.rstrip("/").endswith(":"):
         return (
             f"BACKEND_INTERNAL_URL sem porta (valor: {url}). "
-            "No cs-league-worker use Add Reference → serviço cs-league-back → "
-            "RAILWAY_PRIVATE_DOMAIN e PORT. Ex.: http://cs-league-back.railway.internal:8080"
+            "No gamers-league-worker use Add Reference → serviço gamers-league-back → "
+            "RAILWAY_PRIVATE_DOMAIN e PORT. Ex.: http://gamers-league-back.railway.internal:8080"
         )
     from urllib.parse import urlparse
 
@@ -256,7 +256,7 @@ def validate_backend_internal_url(url: str) -> str | None:
     if parsed.port is None:
         return (
             f"BACKEND_INTERNAL_URL sem porta (valor: {url}). "
-            "Inclua a porta do cs-league-back (geralmente ${{cs-league-back.PORT}})."
+            "Inclua a porta do gamers-league-back (geralmente ${{gamers-league-back.PORT}})."
         )
     if not parsed.hostname.endswith(".railway.internal"):
         print(f"AVISO: hostname {parsed.hostname} não parece rede privada Railway (.railway.internal)")

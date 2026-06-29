@@ -11,7 +11,7 @@ export interface BuildInfo {
 
 const DEV_FALLBACK: BuildInfo = {
   component: 'backend',
-  name: 'cs-league-api',
+  name: 'gamers-league-api',
   version: '0.0.0-dev',
   commit: 'dev',
   commitFull: 'dev',

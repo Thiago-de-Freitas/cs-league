@@ -16,13 +16,13 @@ import_env() {
 }
 
 case "$TARGET" in
-  back)   import_env cs-league-back   "$ROOT/railway.back.env" ;;
-  front)  import_env cs-league-front  "$ROOT/Frontend/railway.env" ;;
-  worker) import_env cs-league-worker "$ROOT/Worker/railway.env" ;;
+  back)   import_env gamers-league-back   "$ROOT/railway.back.env" ;;
+  front)  import_env gamers-league-front  "$ROOT/Frontend/railway.env" ;;
+  worker) import_env gamers-league-worker "$ROOT/Worker/railway.env" ;;
   all)
-    import_env cs-league-back   "$ROOT/railway.back.env"
-    import_env cs-league-front  "$ROOT/Frontend/railway.env"
-    import_env cs-league-worker "$ROOT/Worker/railway.env"
+    import_env gamers-league-back   "$ROOT/railway.back.env"
+    import_env gamers-league-front  "$ROOT/Frontend/railway.env"
+    import_env gamers-league-worker "$ROOT/Worker/railway.env"
     ;;
   *) echo "Uso: $0 [back|front|worker|all]" >&2; exit 1 ;;
 esac

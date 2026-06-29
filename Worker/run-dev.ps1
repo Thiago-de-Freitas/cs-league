@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 if (-not $env:DATABASE_URL) {
-  $env:DATABASE_URL = "postgresql://csleague:csleague@localhost:5432/csleague"
+  $env:DATABASE_URL = "postgresql://gamersleague:gamersleague@localhost:5432/gamersleague"
 }
 if (-not $env:REDIS_URL) {
   $env:REDIS_URL = "redis://localhost:6379"
@@ -42,7 +42,7 @@ if (-not $env:HIGHLIGHT_RENDER_MODE) {
 
 Set-Location $PSScriptRoot
 $env:PYTHONUNBUFFERED = "1"
-Write-Host ("Worker CS League - DATABASE_URL=" + $env:DATABASE_URL)
+Write-Host ("Worker Gamers League - DATABASE_URL=" + $env:DATABASE_URL)
 Write-Host ("DEMO_STORAGE_PATH=" + $env:DEMO_STORAGE_PATH)
 if ($env:STEAM_EXE_PATH) { Write-Host ("STEAM_EXE_PATH=" + $env:STEAM_EXE_PATH) }
 if ($env:CS2_EXE_PATH) { Write-Host ("CS2_EXE_PATH=" + $env:CS2_EXE_PATH) }

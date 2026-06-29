@@ -14,7 +14,7 @@ function isLocalDevHost(hostname: string): boolean {
 
 /**
  * Em produção (front separado), uploads grandes vão direto à API pública
- * para evitar timeout do proxy Railway (~30–40s no cs-league-front).
+ * para evitar timeout do proxy Railway (~30–40s no gamers-league-front).
  * Em dev local, também bypassa o proxy do ng serve para arquivos grandes.
  */
 @Injectable({ providedIn: 'root' })

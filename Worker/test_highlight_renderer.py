@@ -35,7 +35,7 @@ class HighlightRendererTest(unittest.TestCase):
 
     def test_sanitize_movie_basename(self):
         self.assertEqual(_sanitize_movie_basename("cmqv8wo6k00040w0gyjyb254o"), "cmqv8wo6k00040w0gyjyb254o")
-        self.assertTrue(_sanitize_movie_basename("").startswith("csleague"))
+        self.assertTrue(_sanitize_movie_basename("").startswith("gamersleague"))
 
     @patch("highlight_renderer.Path.is_file", return_value=True)
     def test_resolve_steam_exe_prefers_env(self, _mock):

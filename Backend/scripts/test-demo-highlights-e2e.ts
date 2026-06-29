@@ -8,7 +8,7 @@ import path from 'path';
 import { Blob } from 'node:buffer';
 
 const API = process.env.API_URL ?? 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@csleague.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@gamersleague.com';
 const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin123';
 
 const DEFAULT_DEMO = String.raw`C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\csgo\replays\match730_003816032273745052085_0593011861_201.dem`;

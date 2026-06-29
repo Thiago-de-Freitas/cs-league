@@ -1,7 +1,7 @@
-# Serviço Worker — cs-league-worker (Root Directory = Worker)
+# Serviço Worker — gamers-league-worker (Root Directory = Worker)
 #
 # Variáveis: Worker/railway.env
-#   railway variable import --file railway.env --service cs-league-worker --yes
+#   railway variable import --file railway.env --service gamers-league-worker --yes
 # Ou: ..\scripts\railway-import-vars.ps1 -Target worker
 
 [build]

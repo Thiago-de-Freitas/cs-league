@@ -1,4 +1,4 @@
-# CS League — imagem de produção (API + frontend estático)
+# Gamers League — imagem de produção (API + frontend estático)
 # Build a partir da raiz do repositório: docker build -f Dockerfile .
 
 # --- Frontend (Angular) ---
@@ -59,7 +59,7 @@ COPY Backend/prisma ./prisma/
 RUN npm ci --omit=dev && npm install --no-save prisma@^6.1.0 && npx prisma generate
 
 COPY --from=backend-build /repo/Backend/dist ./dist
-COPY --from=frontend-build /repo/Frontend/dist/cs-league/browser ./public
+COPY --from=frontend-build /repo/Frontend/dist/gamers-league/browser ./public
 
 EXPOSE 3000
 

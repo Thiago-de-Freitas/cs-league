@@ -16,7 +16,7 @@ describe('buildInfo', () => {
   it('formata label legível', () => {
     const label = formatBuildLabel({
       component: 'backend',
-      name: 'cs-league-api',
+      name: 'gamers-league-api',
       version: '1.2.3',
       commit: 'abc1234',
       commitFull: 'abc1234567890',
@@ -30,7 +30,7 @@ describe('buildInfo', () => {
   it('marca dirty no label', () => {
     const label = formatBuildLabel({
       component: 'backend',
-      name: 'cs-league-api',
+      name: 'gamers-league-api',
       version: '1.0.0',
       commit: 'deadbeef',
       commitFull: 'deadbeef',

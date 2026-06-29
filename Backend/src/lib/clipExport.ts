@@ -21,7 +21,7 @@ export function buildVdmClipSpec(input: {
   description: string;
 }): string {
   const lines = [
-    '// CS League — especificação de clipe para HLAE / demo tools',
+    '// Gamers League — especificação de clipe para HLAE / demo tools',
     `// Jogador: ${input.playerName} · Round ${input.round}`,
     `// ${input.description}`,
     `// Reproduza a demo e use os ticks abaixo (64 tick/s ≈ 5s de margem)`,

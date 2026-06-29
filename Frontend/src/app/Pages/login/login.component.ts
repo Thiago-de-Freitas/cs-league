@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../Services/auth.service';
 import { NotificationService } from '../../Services/notification.service';
+import { APP_NAME_PARTS } from '../../Utils/brand';
 
 @Component({
   selector: 'app-login',
@@ -14,6 +15,7 @@ import { NotificationService } from '../../Services/notification.service';
   styleUrls: ['./login.component.css']
 })
 export class LoginComponent implements OnInit {
+  readonly brand = APP_NAME_PARTS;
   loginForm: FormGroup;
   loginError = '';
   loading = false;

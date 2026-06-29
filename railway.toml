@@ -1,8 +1,8 @@
-# Serviço API — cs-league-back (Root Directory = /)
+# Serviço API — gamers-league-back (Root Directory = /)
 #
 # Variáveis de ambiente NÃO vão no railway.toml (limitação da Railway).
 # Use o arquivo companion railway.back.env na mesma pasta:
-#   railway variable import --file railway.back.env --service cs-league-back --yes
+#   railway variable import --file railway.back.env --service gamers-league-back --yes
 # Ou: .\scripts\railway-import-vars.ps1 -Target back
 #
 # Opção A (monolito): use railway.back.monolith.env no serviço único.

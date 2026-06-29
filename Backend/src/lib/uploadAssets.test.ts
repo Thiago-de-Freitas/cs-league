@@ -16,7 +16,7 @@ describe('uploadAssets', () => {
   let tempDir = '';
 
   before(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-league-uploads-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gamers-league-uploads-'));
     process.env.TEAM_LOGO_STORAGE_PATH = path.join(tempDir, 'team-logos');
     fs.mkdirSync(process.env.TEAM_LOGO_STORAGE_PATH, { recursive: true });
     fs.writeFileSync(path.join(process.env.TEAM_LOGO_STORAGE_PATH, 'abc.png'), 'x');

@@ -354,7 +354,7 @@ def render_card_clip(
         raise RuntimeError("FFmpeg não encontrado no PATH")
 
     duration = clip_duration_seconds(clip_start_tick, clip_end_tick)
-    title = _sanitize_drawtext("CS League")
+    title = _sanitize_drawtext("Gamers League")
     player = _sanitize_drawtext(player_name)
     label = _sanitize_drawtext(_type_label(highlight_type))
     desc = _sanitize_drawtext(description)
@@ -400,7 +400,7 @@ def resolve_cs2_csgo_dir(cs2_exe: str) -> Path:
 
 def _sanitize_movie_basename(value: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_]", "", value)
-    return (cleaned[:48] or "csleaguehl")
+    return (cleaned[:48] or "gamersleaguehl")
 
 
 def _cleanup_cs2_movie_files(csgo_dir: Path, basename: str) -> None:
@@ -513,8 +513,8 @@ def render_cs2_clip(
     cfg_dir = csgo_dir / "cfg"
     cfg_dir.mkdir(parents=True, exist_ok=True)
 
-    frame_basename = _sanitize_movie_basename(f"csleague_{highlight_id}")
-    cfg_name = _sanitize_movie_basename(f"csleague_{highlight_id}")
+    frame_basename = _sanitize_movie_basename(f"gamersleague_{highlight_id}")
+    cfg_name = _sanitize_movie_basename(f"gamersleague_{highlight_id}")
     cfg_path = cfg_dir / f"{cfg_name}.cfg"
 
     duration = clip_duration_seconds(clip_start_tick, clip_end_tick)

@@ -1,5 +1,5 @@
 {
-  "name": "cs-league",
+  "name": "gamers-league",
   "version": "1.0.0",
   "scripts": {
     "version:generate": "node scripts/generate-version.mjs",

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VersionService } from '../../Services/version.service';
+import { APP_NAME } from '../../Utils/brand';
 
 @Component({
   selector: 'app-build-version',
@@ -9,7 +10,7 @@ import { VersionService } from '../../Services/version.service';
   template: `
     <footer class="gc-app-footer">
       <p class="gc-app-version" [title]="tooltip">
-        CS League <span class="gc-app-version-number">{{ systemVersion }}</span>
+        {{ appName }} <span class="gc-app-version-number">{{ systemVersion }}</span>
       </p>
       <p class="gc-app-copyright">
         © {{ currentYear }}
@@ -24,6 +25,7 @@ import { VersionService } from '../../Services/version.service';
   `,
 })
 export class BuildVersionComponent implements OnInit {
+  readonly appName = APP_NAME;
   systemVersion = '';
   tooltip = '';
   currentYear = new Date().getFullYear();

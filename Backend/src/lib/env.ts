@@ -52,7 +52,7 @@ export function getRedisEnvErrors(): string[] {
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) {
     errors.push(
-      'REDIS_URL não configurado — adicione o plugin Redis na Railway e defina REDIS_URL=${{Redis.REDIS_URL}} no cs-league-back e no cs-league-worker'
+      'REDIS_URL não configurado — adicione o plugin Redis na Railway e defina REDIS_URL=${{Redis.REDIS_URL}} no gamers-league-back e no gamers-league-worker'
     );
     return errors;
   }
@@ -75,7 +75,7 @@ export function getRedisEnvErrors(): string[] {
     );
   } else if (hostname.includes('worker')) {
     errors.push(
-      'REDIS_URL aponta para o serviço Worker — use a URL do plugin Redis (${{Redis.REDIS_URL}}), não cs-league-worker.railway.internal'
+      'REDIS_URL aponta para o serviço Worker — use a URL do plugin Redis (${{Redis.REDIS_URL}}), não gamers-league-worker.railway.internal'
     );
   }
 

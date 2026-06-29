@@ -3,15 +3,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-csleague}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-csleague}
-      POSTGRES_DB: ${POSTGRES_DB:-csleague}
+      POSTGRES_USER: ${POSTGRES_USER:-gamersleague}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gamersleague}
+      POSTGRES_DB: ${POSTGRES_DB:-gamersleague}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-csleague}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gamersleague}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,7 +31,7 @@ services:
       context: ./Worker
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-csleague}:${POSTGRES_PASSWORD:-csleague}@postgres:5432/${POSTGRES_DB:-csleague}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gamersleague}:${POSTGRES_PASSWORD:-gamersleague}@postgres:5432/${POSTGRES_DB:-gamersleague}
       REDIS_URL: redis://redis:6379
       DEMO_STORAGE_PATH: /data/demos
     volumes:

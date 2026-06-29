@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../Services/auth.service';
+import { APP_NAME_PARTS } from '../../Utils/brand';
 
 @Component({
   selector: 'app-navbar',
@@ -19,8 +20,8 @@ import { AuthService } from '../../Services/auth.service';
     <nav class="gc-navbar">
       <div class="gc-navbar-inner">
         <a class="gc-logo" routerLink="/" (click)="closeMenu()">
-          <span class="gc-logo-icon">CS</span>
-          <span class="gc-logo-text">LEAGUE</span>
+          <span class="gc-logo-icon">{{ brand.icon }}</span>
+          <span class="gc-logo-text">{{ brand.primary }} {{ brand.secondary }}</span>
         </a>
 
         <button
@@ -61,6 +62,7 @@ import { AuthService } from '../../Services/auth.service';
 })
 export class NavbarComponent {
   menuOpen = false;
+  readonly brand = APP_NAME_PARTS;
 
   constructor(public auth: AuthService) {}
 

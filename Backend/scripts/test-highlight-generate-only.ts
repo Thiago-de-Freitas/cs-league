@@ -8,7 +8,7 @@ async function main() {
   const login = await fetch(`${API}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@csleague.com', password: 'admin123' }),
+    body: JSON.stringify({ email: 'admin@gamersleague.com', password: 'admin123' }),
   }).then((r) => r.json() as Promise<{ token?: string }>);
 
   const token = login.token;

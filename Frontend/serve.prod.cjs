@@ -1,6 +1,6 @@
 /**
  * Servidor de produção do Angular: arquivos estáticos + proxy /api e /uploads para a API.
- * Usado pelo serviço cs-league-front na Railway (deploy separado da API).
+ * Usado pelo serviço gamers-league-front na Railway (deploy separado da API).
  */
 const express = require('express');
 const path = require('path');
@@ -13,7 +13,7 @@ const HOST = '0.0.0.0';
 const isProduction = process.env.NODE_ENV === 'production';
 const rawApiUrl = (process.env.API_URL || '').trim();
 const API_URL = (rawApiUrl || 'http://localhost:3000').replace(/\/+$/, '');
-const distPath = path.join(__dirname, 'dist/cs-league/browser');
+const distPath = path.join(__dirname, 'dist/gamers-league/browser');
 const PROXY_TIMEOUT_MS = 120_000;
 const SERVER_TIMEOUT_MS = 120_000;
 
@@ -24,7 +24,7 @@ if (!fs.existsSync(path.join(distPath, 'index.html'))) {
 
 if (isProduction) {
   if (!rawApiUrl) {
-    console.error('[front] API_URL é obrigatória em produção (URL pública do cs-league-back, sem /api no final).');
+    console.error('[front] API_URL é obrigatória em produção (URL pública do gamers-league-back, sem /api no final).');
     process.exit(1);
   }
   if (/localhost|127\.0\.0\.1/i.test(API_URL)) {
@@ -44,7 +44,7 @@ function isApiPath(pathname) {
 
 // Liveness — healthcheck Railway (não passa pelo proxy da API)
 app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', service: 'cs-league-front' });
+  res.status(200).json({ status: 'ok', service: 'gamers-league-front' });
 });
 
 // Config em runtime — browser usa URL direta da API para uploads grandes
@@ -83,7 +83,7 @@ app.use(
         if (!res.headersSent && typeof res.writeHead === 'function') {
           res.writeHead(502, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
-            error: 'Não foi possível contatar a API. Verifique API_URL no serviço cs-league-front.',
+            error: 'Não foi possível contatar a API. Verifique API_URL no serviço gamers-league-front.',
             detail: err.message,
           }));
         }
@@ -96,7 +96,7 @@ app.use(
 app.get('*', (req, res, next) => {
   if (isApiPath(req.path)) {
     return res.status(502).json({
-      error: 'Proxy /api não encaminhou a requisição. Redeploy o cs-league-front com serve.prod.cjs atualizado.',
+      error: 'Proxy /api não encaminhou a requisição. Redeploy o gamers-league-front com serve.prod.cjs atualizado.',
       path: req.path,
     });
   }

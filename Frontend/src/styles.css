@@ -2,7 +2,7 @@
 @import './theme/tokens.css';
 @import './theme/responsive.css';
 
-/* ===== CS League — Estilos globais (tokens em theme/tokens.css) ===== */
+/* ===== Gamers League — Estilos globais (tokens em theme/tokens.css) ===== */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

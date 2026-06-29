@@ -174,7 +174,7 @@ app.get('/api/health/ready', async (_req, res) => {
 
     if (demoQueueLength !== null && demoQueueLength > 0 && !worker.alive) {
       demoWarnings.push(
-        `${demoQueueLength} job(s) na fila, mas o worker não envia heartbeat — verifique se cs-league-worker está Online e com REDIS_URL do plugin Redis`
+        `${demoQueueLength} job(s) na fila, mas o worker não envia heartbeat — verifique se gamers-league-worker está Online e com REDIS_URL do plugin Redis`
       );
     } else if (demoQueueLength !== null && demoQueueLength > 0 && worker.alive) {
       demoWarnings.push(
@@ -188,7 +188,7 @@ app.get('/api/health/ready', async (_req, res) => {
       demoFilesOnDisk > 0
     ) {
       demoWarnings.push(
-        `Worker não acessa o disco da API (${demoFilesOnDisk} .dem na API). Na Railway volumes não são compartilhados — configure BACKEND_INTERNAL_URL e INTERNAL_SERVICE_KEY no cs-league-worker.`
+        `Worker não acessa o disco da API (${demoFilesOnDisk} .dem na API). Na Railway volumes não são compartilhados — configure BACKEND_INTERNAL_URL e INTERNAL_SERVICE_KEY no gamers-league-worker.`
       );
     }
 
@@ -465,7 +465,7 @@ app.use('/api', (req, res, next) => {
   const coreErrors = getCoreEnvErrors();
   if (coreErrors.length > 0) {
     res.status(503).json({
-      error: 'Serviço em configuração. Configure as variáveis no serviço cs-league-back (API), não no front.',
+      error: 'Serviço em configuração. Configure as variáveis no serviço gamers-league-back (API), não no front.',
       errors: coreErrors,
       hint: 'GET /api/health/config na URL da API (ou via proxy do front) lista o que falta',
     });

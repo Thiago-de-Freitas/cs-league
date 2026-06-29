@@ -25,13 +25,13 @@ function Import-RailwayEnv {
 }
 
 switch ($Target) {
-    "back"   { Import-RailwayEnv "cs-league-back"   (Join-Path $root "railway.back.env") }
-    "front"  { Import-RailwayEnv "cs-league-front"  (Join-Path $root "Frontend\railway.env") }
-    "worker" { Import-RailwayEnv "cs-league-worker" (Join-Path $root "Worker\railway.env") }
+    "back"   { Import-RailwayEnv "gamers-league-back"   (Join-Path $root "railway.back.env") }
+    "front"  { Import-RailwayEnv "gamers-league-front"  (Join-Path $root "Frontend\railway.env") }
+    "worker" { Import-RailwayEnv "gamers-league-worker" (Join-Path $root "Worker\railway.env") }
     "all" {
-        Import-RailwayEnv "cs-league-back"   (Join-Path $root "railway.back.env")
-        Import-RailwayEnv "cs-league-front"  (Join-Path $root "Frontend\railway.env")
-        Import-RailwayEnv "cs-league-worker" (Join-Path $root "Worker\railway.env")
+        Import-RailwayEnv "gamers-league-back"   (Join-Path $root "railway.back.env")
+        Import-RailwayEnv "gamers-league-front"  (Join-Path $root "Frontend\railway.env")
+        Import-RailwayEnv "gamers-league-worker" (Join-Path $root "Worker\railway.env")
     }
 }
 

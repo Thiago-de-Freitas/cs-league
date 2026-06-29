@@ -1,6 +1,6 @@
 import { MatchHighlight } from '../Models/interfaces';
 
-export const HIGHLIGHT_GENERATE_PENDING_KEY = 'cs-league:highlight-generate-pending';
+export const HIGHLIGHT_GENERATE_PENDING_KEY = 'gamers-league:highlight-generate-pending';
 export const HIGHLIGHT_GENERATE_TTL_MS = 15 * 60 * 1000;
 
 export interface HighlightGeneratePending {

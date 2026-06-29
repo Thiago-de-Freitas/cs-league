@@ -3,9 +3,9 @@
     <div class="dashboard-hero-inner">
       <div class="dashboard-hero-main">
         <div class="dashboard-hero-copy">
-          <h1>CS <span>LEAGUE</span></h1>
+          <h1>{{ brand.primary }} <span>{{ brand.secondary }}</span></h1>
           <p *ngIf="userName">Bem-vindo de volta, <strong>{{ userName }}</strong></p>
-          <p *ngIf="!userName">Sua plataforma competitiva de Counter-Strike 2</p>
+          <p *ngIf="!userName">{{ tagline }}</p>
         </div>
       </div>
 

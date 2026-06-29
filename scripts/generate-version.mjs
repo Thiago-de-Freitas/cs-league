@@ -70,13 +70,13 @@ function resolveBuildTargets(root) {
   }
 
   const pkg = readJson(rootPkgPath);
-  if (pkg.name === 'cs-league-api') {
+  if (pkg.name === 'gamers-league-api') {
     targets.push({
       component: 'backend',
       pkg,
       tsOut: path.join(root, 'src', 'generated', 'build-info.ts'),
     });
-  } else if (pkg.name === 'cs-league') {
+  } else if (pkg.name === 'gamers-league') {
     targets.push({
       component: 'frontend',
       pkg,
