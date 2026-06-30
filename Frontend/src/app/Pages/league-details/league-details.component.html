@@ -38,8 +38,13 @@
     </div>
 
     <div class="section-card">
-      <h2 class="section-title">Classificação</h2>
+      <h2 class="section-title section-title-split">
+        <span>Classificação</span>
+        <span class="league-team-count meta">{{ league.teams?.length || 0 }} time(s) na liga</span>
+      </h2>
+      <p *ngIf="!league.teams?.length" class="no-teams-message">Nenhum time inscrito nesta liga ainda.</p>
       <app-league-teams-table
+        *ngIf="league.teams?.length"
         [teams]="league.teams || []"
         [canManageLeague]="isAdmin && !isArchived && !hasTournamentStarted"
         [canRemoveTeams]="isAdmin && !isArchived"
@@ -240,6 +245,14 @@
           <button
             type="button"
             class="btn btn-success"
+            *ngIf="canSyncGroupMatches"
+            (click)="syncGroupMatches()"
+            [disabled]="syncingGroups">
+            {{ syncingGroups ? 'Atualizando...' : 'Atualizar confrontos' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-success"
             *ngIf="canGenerateLeaguePhase"
             (click)="generateBracket()"
             [disabled]="generatingBracket">
@@ -307,25 +320,49 @@
       <div *ngIf="showAddTeam && !isArchived && !isOneVsOneFormat" class="admin-inline-panel">
         <h3 class="admin-panel-title">Adicionar times</h3>
         <p class="admin-panel-desc">Selecione um ou mais times para incluir na liga.</p>
+
+        <div *ngIf="league.teams?.length" class="league-enrolled-block">
+          <h4 class="form-label league-enrolled-label">Times na liga</h4>
+          <ul class="league-enrolled-list">
+            <li *ngFor="let t of league.teams" class="league-enrolled-chip">
+              <span class="league-enrolled-tag">{{ t.tag }}</span>
+              <span class="league-enrolled-name">{{ t.name }}</span>
+            </li>
+          </ul>
+        </div>
+
         <div class="admin-form admin-form-stacked">
-          <label class="form-label" for="team-multi-select">Times disponíveis</label>
-          <select
-            id="team-multi-select"
-            multiple
-            [(ngModel)]="selectedTeamIds"
-            class="input-field multi-select"
-            [disabled]="availableTeams.length === 0"
-            [size]="availableTeams.length > 6 ? 6 : (availableTeams.length || 3)">
-            <option *ngFor="let t of availableTeams" [value]="t.id">{{ t.name }} [{{ t.tag }}]</option>
-          </select>
-          <p *ngIf="availableTeams.length === 0" class="admin-hint">
-            Nenhum time disponível. Crie times na página <a routerLink="/create-team">Times</a>.
-          </p>
-          <p class="admin-hint">
-            Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd>) para selecionar vários.
+          <label class="form-label" for="team-picker-list">Times disponíveis</label>
+          <p class="league-picker-summary meta">
             {{ selectedTeamIds.length }} selecionado(s)
             <span *ngIf="remainingSlots != null"> · {{ remainingSlots }} vaga(s) restante(s)</span>
           </p>
+
+          <p *ngIf="loadingAvailableTeams" class="admin-hint">Carregando times...</p>
+
+          <ul
+            *ngIf="!loadingAvailableTeams && availableTeams.length > 0"
+            id="team-picker-list"
+            class="gc-list league-team-picker-list"
+            role="listbox"
+            aria-multiselectable="true">
+            <li *ngFor="let t of availableTeams" class="gc-list-item league-team-picker-item">
+              <label class="league-team-picker-label">
+                <input
+                  type="checkbox"
+                  class="league-team-picker-checkbox"
+                  [checked]="isTeamSelected(t.id)"
+                  (change)="toggleTeamSelection(t.id)">
+                <span class="league-team-picker-tag">{{ t.tag }}</span>
+                <span class="league-team-picker-name">{{ t.name }}</span>
+              </label>
+            </li>
+          </ul>
+
+          <p *ngIf="!loadingAvailableTeams && availableTeams.length === 0" class="admin-hint">
+            Nenhum time disponível para adicionar. Remova um time da liga ou crie novos em <a routerLink="/create-team">Times</a>.
+          </p>
+
           <p *ngIf="selectionOverLimit && remainingSlots != null" class="error-message">
             Você selecionou mais times do que as vagas disponíveis. Desmarque {{ selectedTeamIds.length - remainingSlots! }} time(s).
           </p>
@@ -334,7 +371,7 @@
               type="button"
               class="btn btn-primary"
               (click)="addTeamsToLeague()"
-              [disabled]="addingTeams || !canSubmitTeamSelection">
+              [disabled]="addingTeams || loadingAvailableTeams || !canSubmitTeamSelection">
               {{ addingTeams ? 'Adicionando...' : (selectedTeamIds.length ? 'Adicionar ' + selectedTeamIds.length + ' time(s)' : 'Adicionar times') }}
             </button>
             <button type="button" class="btn btn-secondary" (click)="cancelAddTeams()" [disabled]="addingTeams">Cancelar</button>
@@ -559,7 +596,25 @@
     <div class="gc-modal-body">
       <div class="form-group">
         <label class="form-label" for="reschedule-datetime">Nova data e horário</label>
-        <input id="reschedule-datetime" type="datetime-local" class="input-field" [(ngModel)]="rescheduleDateTime" [disabled]="rescheduleLoading" />
+        <div class="gc-native-datetime-field">
+          <input
+            #rescheduleDatetimeInput
+            id="reschedule-datetime"
+            type="datetime-local"
+            class="input-field gc-native-datetime-input"
+            [(ngModel)]="rescheduleDateTime"
+            [disabled]="rescheduleLoading"
+            appNativeInputPicker />
+          <button
+            type="button"
+            class="gc-native-datetime-trigger"
+            (click)="openReschedulePicker(rescheduleDatetimeInput)"
+            [disabled]="rescheduleLoading"
+            aria-label="Abrir calendário"
+            title="Abrir calendário">
+            <span class="gc-native-datetime-icon" aria-hidden="true"></span>
+          </button>
+        </div>
       </div>
       <p class="admin-hint">Apenas este jogo será alterado. A previsão de término da liga será recalculada.</p>
       <div class="gc-modal-footer">

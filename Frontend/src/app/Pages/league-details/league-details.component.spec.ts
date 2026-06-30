@@ -34,6 +34,7 @@ describe('LeagueDetailsComponent', () => {
       'getLeagueById',
       'registerTeamInLeague',
       'updateLeague',
+      'getAvailableTeams',
     ]);
     authServiceSpy = jasmine.createSpyObj('AuthService', ['isLeagueOwner', 'isSystemAdmin'], {
       currentUser: { id: 'u1', email: 'a@test.com', displayName: 'Admin', role: 'ADMIN' },
@@ -41,6 +42,9 @@ describe('LeagueDetailsComponent', () => {
     notifySpy = jasmine.createSpyObj('NotificationService', ['success', 'error', 'info']);
 
     leagueServiceSpy.getLeagueById.and.returnValue(of(mockLeague()));
+    leagueServiceSpy.getAvailableTeams.and.returnValue(of([
+      { id: 'team-2', name: 'Syntax Slayers', tag: 'SS' },
+    ]));
     authServiceSpy.isLeagueOwner.and.returnValue(true);
     authServiceSpy.isSystemAdmin.and.returnValue(true);
 
@@ -136,6 +140,23 @@ describe('LeagueDetailsComponent', () => {
     component.selectedTeamIds = ['a', 'b', 'c', 'd'];
     expect(component.selectionOverLimit).toBeTrue();
     expect(component.canSubmitTeamSelection).toBeFalse();
+  });
+
+  it('openAddTeam carrega times disponíveis', () => {
+    component.league = mockLeague({ maxTeams: 8, teams: [] });
+    component.openAddTeam();
+    expect(component.showAddTeam).toBeTrue();
+    expect(leagueServiceSpy.getAvailableTeams).toHaveBeenCalledWith('league-1');
+    expect(component.availableTeams.length).toBe(1);
+  });
+
+  it('toggleTeamSelection alterna ids selecionados', () => {
+    component.toggleTeamSelection('team-a');
+    expect(component.selectedTeamIds).toEqual(['team-a']);
+    component.toggleTeamSelection('team-b');
+    expect(component.selectedTeamIds).toEqual(['team-a', 'team-b']);
+    component.toggleTeamSelection('team-a');
+    expect(component.selectedTeamIds).toEqual(['team-b']);
   });
 
   it('formato de grupos calcula jogos esperados', () => {

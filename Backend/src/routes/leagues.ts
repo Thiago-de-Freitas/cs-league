@@ -48,6 +48,8 @@ import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMembe
 import { publicUploadUrlForResponse } from '../lib/uploadAssets';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import { buildAvailableTeamsWhere } from '../lib/leagueAvailableTeams';
+import { syncGroupStageMatches } from '../lib/syncGroupStageMatches';
 import { afterMatchCreated, initializeMatchMapVeto, upsertMatchLineup } from '../lib/mapVetoService';
 import { getMapLabel, parseMapPool, validateMapPoolForSeriesFormat } from '../lib/cs2Maps';
 import { createPlayoffSlot } from '../lib/playoffMatchFactory';
@@ -359,6 +361,19 @@ async function assertLeagueOwner(leagueId: string, userId: string, role: string)
     return { error: 'Sem permissão', status: 403 as const, league: null };
   }
   return { error: null, status: 200 as const, league };
+}
+
+async function syncGroupStageMatchesIfNeeded(leagueId: string) {
+  const groupMatchCount = await prisma.match.count({
+    where: { leagueId, phase: 'GROUP' },
+  });
+  if (groupMatchCount === 0) return null;
+
+  const result = await prisma.$transaction((tx) => syncGroupStageMatches(tx, leagueId));
+  for (const match of result.createdMatchRecords) {
+    await afterMatchCreated(match.id, match.team1Id, match.team2Id, leagueId);
+  }
+  return result;
 }
 
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -1016,9 +1031,11 @@ router.post('/:id/teams/bulk', authMiddleware, async (req: AuthRequest, res: Res
       count++;
     }
 
+    const syncResult = await syncGroupStageMatchesIfNeeded(req.params.id);
+
     const full = await getLeagueWithDetails(req.params.id);
     setAuditContext(req, audit.of('league.team.bulk_add', 'League', req.params.id, {
-      metadata: { teamIds: uniqueIds, added: count },
+      metadata: { teamIds: uniqueIds, added: count, syncedMatches: syncResult?.createdMatches ?? 0 },
     }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
@@ -1066,9 +1083,11 @@ router.post('/:id/teams', authMiddleware, async (req: AuthRequest, res: Response
       },
     });
 
+    const syncResult = await syncGroupStageMatchesIfNeeded(req.params.id);
+
     const full = await getLeagueWithDetails(req.params.id);
     setAuditContext(req, audit.withParent('league.team.add', 'LeagueTeam', teamId, 'League', req.params.id, {
-      after: { teamId, seed: seed ?? count + 1 },
+      after: { teamId, seed: seed ?? count + 1, syncedMatches: syncResult?.createdMatches ?? 0 },
     }));
     res.status(201).json(formatLeague(full!));
   } catch (err) {
@@ -1146,10 +1165,7 @@ router.get('/:id/available-teams', authMiddleware, async (req: AuthRequest, res:
     const excludeIds = inLeague.map((lt) => lt.teamId);
 
     const teams = await prisma.team.findMany({
-      where: {
-        leagueId: null,
-        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
-      },
+      where: buildAvailableTeamsWhere(req.params.id, excludeIds),
       select: { id: true, name: true, tag: true },
       orderBy: { name: 'asc' },
     });
@@ -1589,6 +1605,61 @@ router.post('/:id/groups/generate', authMiddleware, async (req: AuthRequest, res
     }
     console.error(err);
     res.status(500).json({ error: 'Erro ao gerar fase de grupos' });
+  }
+});
+
+router.post('/:id/groups/sync', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await assertLeagueOwner(req.params.id, req.user!.userId, req.user!.role);
+    if (!check.league) {
+      res.status(check.status).json({ error: check.error });
+      return;
+    }
+
+    if (check.league.format !== 'GROUP_STAGE') {
+      res.status(400).json({ error: 'Esta liga não usa formato de fase de grupos.' });
+      return;
+    }
+
+    const leagueTeams = await prisma.leagueTeam.findMany({
+      where: { leagueId: req.params.id },
+    });
+    const validation = validateGroupStageConfig(
+      leagueTeams.length,
+      check.league.groupCount,
+      check.league.advancePerGroup
+    );
+    if (!validation.valid) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    const result = await prisma.$transaction((tx) => syncGroupStageMatches(tx, req.params.id));
+    for (const match of result.createdMatchRecords) {
+      await afterMatchCreated(match.id, match.team1Id, match.team2Id, req.params.id);
+    }
+
+    const full = await getLeagueWithDetails(req.params.id);
+    setAuditContext(req, audit.of('league.groups.sync', 'League', req.params.id, {
+      metadata: {
+        createdMatches: result.createdMatches,
+        assignedTeams: result.assignedTeams,
+      },
+    }));
+    res.json({
+      ...formatLeague(full!),
+      syncInfo: {
+        createdMatches: result.createdMatches,
+        assignedTeams: result.assignedTeams,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'GROUP_PHASE_NOT_GENERATED') {
+      res.status(400).json({ error: 'Gere os confrontos antes de sincronizar a fase de grupos.' });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar confrontos da fase de grupos' });
   }
 });
 

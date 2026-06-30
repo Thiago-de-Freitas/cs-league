@@ -42,7 +42,12 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
           (error)="onTeamLogoError(team.id)">
         <span *ngIf="!teamLogoSrc(team)" class="team-tag-mini">{{ team.tag }}</span>
       </td>
-      <td>{{ team.name }}</td>
+      <td>
+        <div class="team-name-cell">
+          <span class="team-name-text">{{ team.name }}</span>
+          <span class="team-tag-badge">{{ team.tag }}</span>
+        </div>
+      </td>
       <td>{{ team.wins }}</td>
       <td>{{ team.losses }}</td>
       <td>{{ team.draws }}</td>

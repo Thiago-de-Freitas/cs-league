@@ -490,7 +490,25 @@
     <div class="gc-modal-body">
       <div class="form-group">
         <label class="form-label" for="match-reschedule-datetime">Nova data e horário</label>
-        <input id="match-reschedule-datetime" type="datetime-local" class="input-field" [(ngModel)]="rescheduleDateTime" [disabled]="rescheduleLoading" />
+        <div class="gc-native-datetime-field">
+          <input
+            #matchRescheduleDatetimeInput
+            id="match-reschedule-datetime"
+            type="datetime-local"
+            class="input-field gc-native-datetime-input"
+            [(ngModel)]="rescheduleDateTime"
+            [disabled]="rescheduleLoading"
+            appNativeInputPicker />
+          <button
+            type="button"
+            class="gc-native-datetime-trigger"
+            (click)="openReschedulePicker(matchRescheduleDatetimeInput)"
+            [disabled]="rescheduleLoading"
+            aria-label="Abrir calendário"
+            title="Abrir calendário">
+            <span class="gc-native-datetime-icon" aria-hidden="true"></span>
+          </button>
+        </div>
       </div>
       <div class="gc-modal-footer">
         <button type="button" class="btn btn-ghost" (click)="closeReschedule()" [disabled]="rescheduleLoading">Cancelar</button>

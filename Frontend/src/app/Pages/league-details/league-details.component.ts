@@ -29,6 +29,8 @@ import {
   validateLeagueMapSettings,
   type LeagueSeriesFormat,
 } from '../../Utils/series-map.util';
+import { NativeInputPickerDirective } from '../../Directives/native-input-picker.directive';
+import { openNativeInputPicker } from '../../Utils/native-input-picker.util';
 
 interface ConfirmConfig {
   title: string;
@@ -59,6 +61,7 @@ interface ConfirmConfig {
     LeaguePickupManagerComponent,
     ConfirmModalComponent,
     LeagueSeriesMapSettingsComponent,
+    NativeInputPickerDirective,
   ],
   templateUrl: './league-details.component.html',
   styleUrls: ['./league-details.component.css'],
@@ -73,6 +76,7 @@ export class LeagueDetailsComponent implements OnInit {
   selectedTeamIds: string[] = [];
   addingTeams = false;
   availableTeams: Pick<Team, 'id' | 'name' | 'tag'>[] = [];
+  loadingAvailableTeams = false;
   bracketSizes = [] as number[];
   editMaxTeams = false;
   editRegistrationVisibility = false;
@@ -81,6 +85,7 @@ export class LeagueDetailsComponent implements OnInit {
   maxTeamsLimit = MAX_LEAGUE_TEAMS;
   generatingBracket = false;
   generatingGroups = false;
+  syncingGroups = false;
   deletingLeague = false;
   archivingLeague = false;
   unarchivingLeague = false;
@@ -580,6 +585,17 @@ export class LeagueDetailsComponent implements OnInit {
     return this.isAdmin && !this.isArchived && this.isSingleGroupFormat;
   }
 
+  get canSyncGroupMatches(): boolean {
+    return (
+      this.isAdmin &&
+      !this.isArchived &&
+      this.isGroupStageFormat &&
+      this.hasGroupPhaseGenerated &&
+      !this.groupPhaseComplete &&
+      (this.league?.teams.length ?? 0) >= this.minTeamsForGroupPhase
+    );
+  }
+
   get canGenerateLeaguePhase(): boolean {
     return (
       this.isAdmin &&
@@ -731,6 +747,28 @@ export class LeagueDetailsComponent implements OnInit {
     });
   }
 
+  syncGroupMatches(): void {
+    if (!this.leagueId) return;
+    this.syncingGroups = true;
+    this.leagueService.syncGroupMatches(this.leagueId).subscribe({
+      next: (league) => {
+        this.league = league;
+        this.syncingGroups = false;
+        this.syncConfrontosTab();
+        const created = league.syncInfo?.createdMatches ?? 0;
+        this.notify.success(
+          created > 0
+            ? `${created} confronto(s) adicionado(s) para os times da liga.`
+            : 'Confrontos já estavam atualizados.'
+        );
+      },
+      error: (err) => {
+        this.syncingGroups = false;
+        this.apiError(err, 'Erro ao atualizar confrontos');
+      },
+    });
+  }
+
   onScheduleUpdated(league: League): void {
     this.league = { ...this.league!, ...league };
   }
@@ -745,6 +783,10 @@ export class LeagueDetailsComponent implements OnInit {
     if (this.rescheduleLoading) return;
     this.rescheduleModalMatch = null;
     this.rescheduleDateTime = '';
+  }
+
+  openReschedulePicker(input: HTMLInputElement): void {
+    openNativeInputPicker(input);
   }
 
   confirmReschedule(): void {
@@ -811,16 +853,35 @@ export class LeagueDetailsComponent implements OnInit {
     }
     this.showAddTeam = true;
     this.selectedTeamIds = [];
-    this.availableTeams = [];
+    this.loadAvailableTeams();
+  }
+
+  loadAvailableTeams(): void {
+    if (!this.leagueId) return;
+    this.loadingAvailableTeams = true;
     this.leagueService.getAvailableTeams(this.leagueId).subscribe({
       next: (teams) => {
         this.availableTeams = teams;
+        this.loadingAvailableTeams = false;
       },
       error: () => {
+        this.loadingAvailableTeams = false;
         this.notify.error('Erro ao carregar times disponíveis.');
         this.showAddTeam = false;
-      }
+      },
     });
+  }
+
+  isTeamSelected(teamId: string): boolean {
+    return this.selectedTeamIds.includes(teamId);
+  }
+
+  toggleTeamSelection(teamId: string): void {
+    if (this.isTeamSelected(teamId)) {
+      this.selectedTeamIds = this.selectedTeamIds.filter((id) => id !== teamId);
+      return;
+    }
+    this.selectedTeamIds = [...this.selectedTeamIds, teamId];
   }
 
   addTeamsToLeague(): void {
@@ -845,14 +906,18 @@ export class LeagueDetailsComponent implements OnInit {
 
     this.addingTeams = true;
     const count = this.selectedTeamIds.length;
+    const hadGroupPhase = this.hasGroupPhaseGenerated;
     this.leagueService.addTeamsToLeague(this.leagueId, this.selectedTeamIds).subscribe({
       next: (league) => {
         this.league = league;
         this.showAddTeam = false;
         this.selectedTeamIds = [];
         this.addingTeams = false;
+        this.syncConfrontosTab();
         this.notify.success(
-          `${count} time(s) adicionado(s) à liga.`,
+          hadGroupPhase
+            ? `${count} time(s) adicionado(s). Confrontos atualizados automaticamente.`
+            : `${count} time(s) adicionado(s) à liga.`,
           'Times adicionados'
         );
       },
@@ -977,6 +1042,9 @@ export class LeagueDetailsComponent implements OnInit {
             this.league = league;
             this.confirmLoading = false;
             this.confirmConfig = null;
+            if (this.showAddTeam) {
+              this.loadAvailableTeams();
+            }
           },
           error: (err) => {
             this.confirmLoading = false;

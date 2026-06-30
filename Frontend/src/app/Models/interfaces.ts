@@ -93,6 +93,7 @@ export interface League {
   pickupBalanceMode?: 'rating' | 'adr' | 'hs_percent' | 'position_mix' | string;
   pickupBalanceModes?: PickupBalanceMode[];
   pickupBalancedAt?: string | null;
+  syncInfo?: { createdMatches: number; assignedTeams: number };
 }
 
 export type PickupBalanceMode = 'rating' | 'adr' | 'hs_percent' | 'position_mix';

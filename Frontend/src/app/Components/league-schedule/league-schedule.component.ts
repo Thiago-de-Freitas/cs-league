@@ -18,6 +18,7 @@ import {
   isWeekAffectedByOverrides,
   isWeekOverrideBlocked,
 } from '../../Utils/week-override.util';
+import { openNativeInputPicker } from '../../Utils/native-input-picker.util';
 
 interface WeekdayOption {
   value: number;
@@ -140,11 +141,7 @@ export class LeagueScheduleComponent implements OnChanges {
     const input = this.weekJumpInput?.nativeElement;
     if (!input) return;
     input.value = this.selectedWeekMonday || currentWeekMonday(this.scheduleTimezone);
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-      return;
-    }
-    input.click();
+    openNativeInputPicker(input);
   }
 
   onWeekDatePicked(event: Event): void {

@@ -145,6 +145,15 @@ export class LeagueService {
     );
   }
 
+  syncGroupMatches(leagueId: string): Observable<League & { syncInfo?: { createdMatches: number; assignedTeams: number } }> {
+    return this.http
+      .post<League & { syncInfo?: { createdMatches: number; assignedTeams: number } }>(
+        `${this.apiUrl}/${leagueId}/groups/sync`,
+        {}
+      )
+      .pipe(this.afterLeagueMutation());
+  }
+
   getStandings(leagueId: string): Observable<unknown[]> {
     return this.http.get<unknown[]>(`${this.apiUrl}/${leagueId}/standings`);
   }

@@ -250,6 +250,138 @@
 
 .admin-form-stacked .multi-select { width: 100%; min-height: 8rem; }
 
+.section-title-split {
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.league-team-count {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--gc-text-secondary);
+}
+
+.league-enrolled-block {
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+}
+
+.league-enrolled-label {
+  margin: 0 0 0.65rem;
+}
+
+.league-enrolled-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.league-enrolled-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-border);
+  border-radius: 999px;
+}
+
+.league-enrolled-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: var(--gc-orange-dim);
+  color: var(--gc-orange);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.league-enrolled-name {
+  font-size: 0.85rem;
+  color: var(--gc-text);
+}
+
+.league-picker-summary {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+}
+
+.league-team-picker-list {
+  max-height: 14rem;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-sm);
+}
+
+.league-team-picker-item {
+  padding: 0;
+  border-bottom: 1px solid var(--gc-border);
+}
+
+.league-team-picker-item:last-child {
+  border-bottom: none;
+}
+
+.league-team-picker-label {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+}
+
+.league-team-picker-label:hover {
+  background: var(--gc-surface-hover);
+}
+
+.league-team-picker-checkbox {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--gc-orange);
+}
+
+.league-team-picker-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  color: var(--gc-text-label);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.league-team-picker-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--gc-text);
+  font-size: 0.9rem;
+}
+
 .admin-input-cap { max-width: 10rem; }
 
 .admin-form-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
