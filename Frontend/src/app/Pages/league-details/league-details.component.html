@@ -45,8 +45,9 @@
       <p *ngIf="!league.teams?.length" class="no-teams-message">Nenhum time inscrito nesta liga ainda.</p>
       <app-league-teams-table
         *ngIf="league.teams?.length"
-        [teams]="league.teams || []"
-        [canManageLeague]="isAdmin && !isArchived && !hasTournamentStarted"
+        [teams]="classificationTeams"
+        [useStandingsOrder]="useStandingsClassification"
+        [canManageLeague]="isAdmin && !isArchived && !hasTournamentStarted && !useStandingsClassification"
         [canRemoveTeams]="isAdmin && !isArchived"
         (teamsReordered)="onTeamsReordered($event)"
         (editTeam)="onEditTeam($event)"

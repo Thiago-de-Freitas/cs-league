@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { participationGuard } from '../middleware/participationGuard';
 import { isAdmin } from '../lib/permissions';
-import { ARCHIVED_LEAGUE_TEAM_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
+import { TEAM_LEAGUE_STATS_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
 import { parseOwnerAsMember } from '../lib/teamCreation';
 import { getAverageAdrBySteamIds } from '../lib/teamMemberStats';
 import {
@@ -50,7 +50,7 @@ async function getTeamWithDetails(teamId: string) {
         },
       },
       leagueTeams: {
-        where: ARCHIVED_LEAGUE_TEAM_WHERE,
+        where: TEAM_LEAGUE_STATS_WHERE,
       },
     },
   });
@@ -132,7 +132,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           },
         },
         leagueTeams: {
-          where: ARCHIVED_LEAGUE_TEAM_WHERE,
+          where: TEAM_LEAGUE_STATS_WHERE,
           select: { wins: true, losses: true, draws: true, points: true, roundsWon: true, roundsLost: true },
         },
       },

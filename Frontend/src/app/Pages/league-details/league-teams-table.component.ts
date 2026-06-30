@@ -31,7 +31,7 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
   </thead>
   <tbody cdkDropList [cdkDropListDisabled]="!canManageLeague" (cdkDropListDropped)="onDrop($event)">
     <tr *ngFor="let team of teams; let i = index" cdkDrag [cdkDragDisabled]="!canManageLeague">
-      <td>{{ team.seed ?? (i + 1) }}</td>
+      <td>{{ useStandingsOrder ? (i + 1) : (team.seed ?? (i + 1)) }}</td>
       <td>
         <img
           *ngIf="teamLogoSrc(team) as logoSrc"
@@ -67,6 +67,7 @@ import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 })
 export class LeagueTeamsTableComponent {
   @Input() teams: Team[] = [];
+  @Input() useStandingsOrder = false;
   @Input() canManageLeague = false;
   @Input() canRemoveTeams = false;
   @Output() teamsReordered = new EventEmitter<Team[]>();

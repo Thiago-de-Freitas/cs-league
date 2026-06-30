@@ -29,6 +29,7 @@ import {
   validateLeagueMapSettings,
   type LeagueSeriesFormat,
 } from '../../Utils/series-map.util';
+import { hasStandingsData, sortTeamsForClassification } from '../../Utils/standings.util';
 import { GcDatetimeLocalFieldComponent } from '../../Components/gc-datetime-local-field/gc-datetime-local-field.component';
 
 interface ConfirmConfig {
@@ -546,6 +547,15 @@ export class LeagueDetailsComponent implements OnInit {
 
   get hasGroupPhaseGenerated(): boolean {
     return !!this.league?.groupPhaseGenerated;
+  }
+
+  get useStandingsClassification(): boolean {
+    const teams = this.league?.teams ?? [];
+    return this.hasGroupPhaseGenerated || hasStandingsData(teams);
+  }
+
+  get classificationTeams(): Team[] {
+    return sortTeamsForClassification(this.league?.teams ?? [], this.useStandingsClassification);
   }
 
   get hasPlayoffBracket(): boolean {

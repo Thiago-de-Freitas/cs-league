@@ -9,10 +9,22 @@ export type LeagueTeamStatRow = {
   roundsLost: number;
 };
 
-/** Somente ligas arquivadas entram no histórico agregado dos times. */
-export const ARCHIVED_LEAGUE_TEAM_WHERE = {
-  league: { status: LeagueStatus.ARCHIVED },
+/** Estatísticas de participações em ligas (inclui resultados manuais e ligas em andamento). */
+export const TEAM_LEAGUE_STATS_WHERE = {
+  league: {
+    status: {
+      in: [
+        LeagueStatus.UPCOMING,
+        LeagueStatus.ONGOING,
+        LeagueStatus.COMPLETED,
+        LeagueStatus.ARCHIVED,
+      ],
+    },
+  },
 } as const;
+
+/** @deprecated Alias legado — use TEAM_LEAGUE_STATS_WHERE */
+export const ARCHIVED_LEAGUE_TEAM_WHERE = TEAM_LEAGUE_STATS_WHERE;
 
 export function sumLeagueTeamStats(rows: LeagueTeamStatRow[]): LeagueTeamStatRow {
   return rows.reduce(

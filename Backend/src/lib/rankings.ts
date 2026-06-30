@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { ARCHIVED_LEAGUE_TEAM_WHERE } from './teamStats';
+import { TEAM_LEAGUE_STATS_WHERE } from './teamStats';
 import { publicUploadUrlForResponse } from './uploadAssets';
 import {
   CAPTAIN_RANKING_FILTER,
@@ -548,31 +548,20 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
   };
 }
 
-export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
-  const grouped = await prisma.leagueTeam.groupBy({
-    by: ['teamId'],
-    where: ARCHIVED_LEAGUE_TEAM_WHERE,
-    _sum: { wins: true, losses: true },
-    _count: { _all: true },
-  });
-
+export function buildTeamRankingEntries(
+  grouped: Array<{ teamId: string; wins: number; losses: number; leagues: number }>,
+  teams: Array<{ id: string; name: string; tag: string; logoUrl: string | null }>,
+  limit: number,
+  logoUrlForResponse: (url: string | null) => string | null = (url) => url
+): TeamRankingEntry[] {
   const ranked = grouped
-    .map((g) => ({
-      teamId: g.teamId,
-      wins: g._sum.wins ?? 0,
-      losses: g._sum.losses ?? 0,
-      leagues: g._count._all,
-    }))
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses)
+    .filter((entry) => entry.wins > 0)
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.leagues - a.leagues)
     .slice(0, limit);
 
   if (ranked.length === 0) return [];
 
-  const teams = await prisma.team.findMany({
-    where: { id: { in: ranked.map((r) => r.teamId) } },
-    select: { id: true, name: true, tag: true, logoUrl: true },
-  });
-  const teamMap = new Map(teams.map((t) => [t.id, t]));
+  const teamMap = new Map(teams.map((team) => [team.id, team]));
 
   return ranked
     .map((entry, index) => {
@@ -583,11 +572,36 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
         teamId: team.id,
         name: team.name,
         tag: team.tag,
-        logoUrl: publicUploadUrlForResponse(team.logoUrl),
+        logoUrl: logoUrlForResponse(team.logoUrl),
         wins: entry.wins,
         losses: entry.losses,
         leagues: entry.leagues,
       };
     })
-    .filter((e): e is TeamRankingEntry => e !== null);
+    .filter((entry): entry is TeamRankingEntry => entry !== null);
+}
+
+export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
+  const grouped = await prisma.leagueTeam.groupBy({
+    by: ['teamId'],
+    where: TEAM_LEAGUE_STATS_WHERE,
+    _sum: { wins: true, losses: true },
+    _count: { _all: true },
+  });
+
+  const ranked = grouped.map((g) => ({
+    teamId: g.teamId,
+    wins: g._sum.wins ?? 0,
+    losses: g._sum.losses ?? 0,
+    leagues: g._count._all,
+  }));
+
+  if (ranked.length === 0) return [];
+
+  const teams = await prisma.team.findMany({
+    where: { id: { in: ranked.map((r) => r.teamId) } },
+    select: { id: true, name: true, tag: true, logoUrl: true },
+  });
+
+  return buildTeamRankingEntries(ranked, teams, limit, publicUploadUrlForResponse);
 }

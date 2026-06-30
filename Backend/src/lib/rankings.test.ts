@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregatePlayerRankingsByLeagueMatches,
+  buildTeamRankingEntries,
   calcRating,
   filterPersonalStatsByPosition,
   filterStatsByPosition,
@@ -170,6 +171,26 @@ describe('aggregatePlayerRankingsByLeagueMatches', () => {
     assert.equal(ranked[0].steamId, 'steam-personal');
     assert.equal(ranked[0].adr, 95);
     assert.equal(ranked[1].steamId, 'steam-league');
+  });
+});
+
+describe('buildTeamRankingEntries', () => {
+  it('inclui apenas times com vitórias registradas', () => {
+    const entries = buildTeamRankingEntries(
+      [
+        { teamId: 't1', wins: 3, losses: 1, leagues: 1 },
+        { teamId: 't2', wins: 0, losses: 2, leagues: 1 },
+      ],
+      [
+        { id: 't1', name: 'Alpha', tag: 'ALP', logoUrl: null },
+        { id: 't2', name: 'Beta', tag: 'BET', logoUrl: null },
+      ],
+      10
+    );
+
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].teamId, 't1');
+    assert.equal(entries[0].wins, 3);
   });
 });
 
