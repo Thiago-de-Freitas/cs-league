@@ -9,7 +9,7 @@ import { tryCompleteLeague } from '../lib/leagueComplete';
 import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
 import type { MatchPlayerStat } from '@prisma/client';
-import { canUserAccessMatch, canUserRegisterMatchResult, canUserEditMatchStats } from '../lib/matchPermissions';
+import { canUserAccessMatch, canUserRegisterMatchResult, canUserEditMatchStats, checkLeagueManagerMatchDataAccess } from '../lib/matchPermissions';
 import {
   calcPlayerAdr,
   parseManualPlayerStats,
@@ -122,6 +122,7 @@ function formatMatchResponse(
   permissions: {
     canRegisterResult: boolean;
     canEditManualStats: boolean;
+    canUploadDemo?: boolean;
     captainTeamIds?: string[];
     canVeto?: boolean;
     canAdminReopenVeto?: boolean;
@@ -245,6 +246,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
     const statsAccess = await canUserEditMatchStats(req.user!.userId, req.user!.role, match.id);
+    const canUploadDemo = checkLeagueManagerMatchDataAccess(req.user!.userId, req.user!.role, match);
     const captainTeamIds =
       req.user!.role === 'ADMIN' || match.league.ownerId === req.user!.userId
         ? [match.team1Id, match.team2Id]
@@ -310,6 +312,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         {
           canRegisterResult: resultAccess.allowed && match.status !== 'COMPLETED',
           canEditManualStats: statsAccess.allowed,
+          canUploadDemo,
           captainTeamIds,
           canVeto: resultAccess.allowed && !vetoDeadlineBlocked,
           canAdminReopenVeto:
@@ -457,6 +460,7 @@ router.put('/:id/manual-stats', authMiddleware, participationGuard, async (req: 
       ? await loadMatchRoster(updated.team1Id, updated.team2Id)
       : undefined;
     const resultAccess = await canUserRegisterMatchResult(req.user!.userId, req.user!.role, match.id);
+    const canUploadDemo = checkLeagueManagerMatchDataAccess(req.user!.userId, req.user!.role, updated);
 
     setAuditContext(req, audit.withParent('match.manual_stats.save', 'Match', match.id, 'League', match.leagueId, {
       metadata: { playerCount: parsedPlayers.players.length, totalRounds },
@@ -468,6 +472,7 @@ router.put('/:id/manual-stats', authMiddleware, participationGuard, async (req: 
         {
           canRegisterResult: resultAccess.allowed && updated.status !== 'COMPLETED',
           canEditManualStats: statsAccess.allowed,
+          canUploadDemo,
         },
         roster
       )

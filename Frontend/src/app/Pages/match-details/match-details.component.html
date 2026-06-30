@@ -31,7 +31,7 @@
       <div class="match-actions">
         <a [routerLink]="['/league-details', match.leagueId]" class="btn btn-secondary btn-small">Voltar à Liga</a>
         <button class="btn btn-secondary btn-small" (click)="openReschedule()" *ngIf="canReschedule">Remarcar</button>
-        <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="match.status !== 'completed' && !match.hasFileDemo && !match.manualDemoId">Enviar Demo</button>
+        <button class="btn btn-primary btn-small" (click)="openUploadModal()" *ngIf="canUploadDemo">Enviar Demo</button>
         <button class="btn btn-secondary btn-small" (click)="openManualStatsForm()" *ngIf="canEditManualStats">
           {{ match.manualDemoId ? 'Editar stats manuais' : 'Inserir stats manuais' }}
         </button>
@@ -398,7 +398,7 @@
     <div *ngIf="!loading && stats.length === 0 && !errorMsg && !isDemoView && !showManualStatsForm" class="not-found-message">
       <p>Nenhuma demo associada. Envie um arquivo .dem ou insira as estatísticas manualmente.</p>
       <div class="empty-stats-actions">
-        <button class="btn btn-primary" (click)="openUploadModal()" *ngIf="match?.status !== 'completed' && !match?.hasFileDemo && !match?.manualDemoId">Enviar Demo</button>
+        <button class="btn btn-primary" (click)="openUploadModal()" *ngIf="canUploadDemo">Enviar Demo</button>
         <button class="btn btn-secondary" (click)="openManualStatsForm()" *ngIf="canEditManualStats">Inserir stats manuais</button>
       </div>
     </div>

@@ -28,6 +28,16 @@ export function checkMatchResultAccess(
   return captainTeamIds.some((tid) => tid === match.team1Id || tid === match.team2Id);
 }
 
+/** Upload de demo e stats manuais de partidas de liga — somente gerente da liga ou admin. */
+export function checkLeagueManagerMatchDataAccess(
+  userId: string,
+  role: string,
+  match: { league: { ownerId: string } }
+): boolean {
+  if (role === 'ADMIN') return true;
+  return match.league.ownerId === userId;
+}
+
 export async function canUserAccessMatch(
   userId: string,
   role: string,
@@ -86,11 +96,13 @@ export async function canUserEditMatchStats(
     return { allowed: false, error: 'Liga arquivada. Não é possível editar estatísticas.' };
   }
 
-  const captainTeamIds = await getCaptainTeamIds(userId, match.team1Id, match.team2Id);
-  const allowed = checkMatchResultAccess(userId, role, match, captainTeamIds);
+  const allowed = checkLeagueManagerMatchDataAccess(userId, role, match);
 
   if (!allowed) {
-    return { allowed: false, error: 'Sem permissão para editar estatísticas desta partida.' };
+    return {
+      allowed: false,
+      error: 'Somente o gerente da liga pode inserir ou editar estatísticas manuais desta partida.',
+    };
   }
 
   return { allowed: true };

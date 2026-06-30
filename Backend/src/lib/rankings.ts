@@ -265,7 +265,7 @@ export type TeamRankingAggregate = {
   wins: number;
   losses: number;
   leagues: number;
-  /** Jogos de liga com demo analisada (não inclui uploads pessoais). */
+  /** Jogos de liga com demo analisada ou stats manuais (não inclui uploads pessoais). */
   matches: number;
   teamAdr: number;
   /** Partidas com demo em fila ou processamento. */
@@ -300,9 +300,21 @@ export type TeamDemoPlayerStat = {
   leagueId: string;
   team1Id: string;
   team2Id: string;
+  teamId?: string | null;
   steamId: string | null;
   adr: number;
 };
+
+export function resolveStatTeamId(
+  stat: Pick<TeamDemoPlayerStat, 'teamId' | 'steamId' | 'team1Id' | 'team2Id'>,
+  memberships: Map<string, TeamMembershipContext>
+): string | null {
+  const explicit = stat.teamId?.trim();
+  if (explicit && (explicit === stat.team1Id || explicit === stat.team2Id)) {
+    return explicit;
+  }
+  return resolvePlayerTeamId(stat.steamId, stat.team1Id, stat.team2Id, memberships);
+}
 
 export function mergeTeamRankingAggregates(
   leagueTeamRows: Array<{ teamId: string; wins: number; losses: number; leagues: number }>,
@@ -384,7 +396,7 @@ export function aggregateTeamRankingsFromLeagueDemos(
 
   const matchTeamAdr = new Map<string, { sum: number; count: number }>();
   for (const stat of playerStats) {
-    const teamId = resolvePlayerTeamId(stat.steamId, stat.team1Id, stat.team2Id, memberships);
+    const teamId = resolveStatTeamId(stat, memberships);
     if (!teamId) continue;
     const key = `${stat.matchId}|${teamId}`;
     const bucket = matchTeamAdr.get(key) ?? { sum: 0, count: 0 };
@@ -793,7 +805,7 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
           },
         },
         stats: {
-          select: { steamId: true, adr: true },
+          select: { teamId: true, steamId: true, adr: true },
         },
       },
       take: 4000,
@@ -823,21 +835,23 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
     leagues: typeof g._count === 'object' ? (g._count._all ?? 0) : 0,
   }));
 
-  const completedMatches: TeamDemoMatchInfo[] = [];
+  const completedMatchMap = new Map<string, TeamDemoMatchInfo>();
   const playerStats: TeamDemoPlayerStat[] = [];
   const teamIds = new Set<string>();
 
   for (const demo of completedDemos) {
     const match = demo.match;
     if (!demo.matchId || !match) continue;
-    completedMatches.push({
-      matchId: match.id,
-      leagueId: match.leagueId,
-      team1Id: match.team1Id,
-      team2Id: match.team2Id,
-      winnerId: match.winnerId,
-      status: match.status,
-    });
+    if (!completedMatchMap.has(match.id)) {
+      completedMatchMap.set(match.id, {
+        matchId: match.id,
+        leagueId: match.leagueId,
+        team1Id: match.team1Id,
+        team2Id: match.team2Id,
+        winnerId: match.winnerId,
+        status: match.status,
+      });
+    }
     teamIds.add(match.team1Id);
     teamIds.add(match.team2Id);
     for (const stat of demo.stats) {
@@ -846,11 +860,14 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
         leagueId: match.leagueId,
         team1Id: match.team1Id,
         team2Id: match.team2Id,
+        teamId: stat.teamId,
         steamId: stat.steamId,
         adr: stat.adr,
       });
     }
   }
+
+  const completedMatches = [...completedMatchMap.values()];
 
   const processingMatches: TeamDemoMatchInfo[] = [];
   for (const demo of processingDemos) {

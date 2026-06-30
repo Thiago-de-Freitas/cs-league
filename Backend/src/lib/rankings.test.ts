@@ -10,6 +10,7 @@ import {
   membershipKey,
   mergeTeamRankingAggregates,
   resolvePlayerTeamId,
+  resolveStatTeamId,
   statRowMatchesPositionFilter,
   type LeaguePlayerStatRow,
   type TeamMembershipContext,
@@ -324,6 +325,62 @@ describe('aggregateTeamRankingsFromLeagueDemos', () => {
     assert.equal(team1?.demosProcessing, 1);
     assert.equal(team2?.matches, 1);
     assert.equal(team2?.teamAdr, 70);
+  });
+
+  it('usa teamId explícito de stats manuais sem depender de steamId', () => {
+    const demoStats = aggregateTeamRankingsFromLeagueDemos(
+      [
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          winnerId: null,
+          status: 'SCHEDULED',
+        },
+      ],
+      [
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          teamId: 't1',
+          steamId: null,
+          adr: 88.5,
+        },
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          teamId: 't2',
+          steamId: null,
+          adr: 72,
+        },
+      ],
+      [],
+      new Map()
+    );
+
+    assert.equal(demoStats.get('t1')?.matches, 1);
+    assert.equal(demoStats.get('t1')?.teamAdr, 88.5);
+    assert.equal(demoStats.get('t2')?.teamAdr, 72);
+  });
+});
+
+describe('resolveStatTeamId', () => {
+  it('prioriza teamId salvo nas stats manuais', () => {
+    const teamId = resolveStatTeamId(
+      {
+        teamId: 't2',
+        steamId: 'steam-a',
+        team1Id: 't1',
+        team2Id: 't2',
+      },
+      new Map([[membershipKey('steam-a', 't1'), { position: 'RIFLER', role: 'MEMBER' }]])
+    );
+    assert.equal(teamId, 't2');
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkMatchViewAccess, checkMatchResultAccess } from './matchPermissions';
+import { checkMatchViewAccess, checkMatchResultAccess, checkLeagueManagerMatchDataAccess } from './matchPermissions';
 
 const match = {
   team1Id: 'team-a',
@@ -37,5 +37,17 @@ describe('checkMatchResultAccess', () => {
 
   it('allows league owner', () => {
     assert.equal(checkMatchResultAccess('owner-1', 'USER', match, []), true);
+  });
+});
+
+describe('checkLeagueManagerMatchDataAccess', () => {
+  it('allows admin and league owner', () => {
+    assert.equal(checkLeagueManagerMatchDataAccess('admin', 'ADMIN', match), true);
+    assert.equal(checkLeagueManagerMatchDataAccess('owner-1', 'USER', match), true);
+  });
+
+  it('denies captain and unrelated user', () => {
+    assert.equal(checkLeagueManagerMatchDataAccess('captain', 'USER', match), false);
+    assert.equal(checkLeagueManagerMatchDataAccess('u1', 'USER', match), false);
   });
 });

@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { checkLeagueManagerMatchDataAccess } from './matchPermissions';
 
 export type PersonalDemoValidation =
   | { valid: true }
@@ -130,32 +131,25 @@ export async function canUserManageMatchDemo(
 ): Promise<{ allowed: boolean; error?: string }> {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    include: { league: { select: { ownerId: true } } },
+    include: { league: { select: { ownerId: true, status: true } } },
   });
 
   if (!match) {
     return { allowed: false, error: 'Partida não encontrada.' };
   }
 
-  if (role === 'ADMIN' || match.league.ownerId === userId) {
-    return { allowed: true };
+  if (match.league.status === 'ARCHIVED') {
+    return { allowed: false, error: 'Liga arquivada. Não é possível enviar demos nesta partida.' };
   }
 
-  const membership = await prisma.teamMember.findFirst({
-    where: {
-      userId,
-      teamId: { in: [match.team1Id, match.team2Id] },
-    },
-  });
-
-  if (membership) {
-    return { allowed: true };
+  if (!checkLeagueManagerMatchDataAccess(userId, role, match)) {
+    return {
+      allowed: false,
+      error: 'Somente o gerente da liga pode enviar ou associar demos nesta partida.',
+    };
   }
 
-  return {
-    allowed: false,
-    error: 'Sem permissão para enviar ou associar demo nesta partida.',
-  };
+  return { allowed: true };
 }
 
 export async function canUserDeleteDemoHighlights(

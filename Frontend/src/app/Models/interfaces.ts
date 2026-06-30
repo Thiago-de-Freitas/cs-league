@@ -204,6 +204,7 @@ export interface Match {
   permissions?: {
     canRegisterResult?: boolean;
     canEditManualStats?: boolean;
+    canUploadDemo?: boolean;
     captainTeamIds?: string[];
     canVeto?: boolean;
     canAdminReopenVeto?: boolean;

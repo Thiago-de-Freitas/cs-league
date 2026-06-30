@@ -353,6 +353,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     return !!this.match?.permissions?.canEditManualStats && !this.match?.hasFileDemo;
   }
 
+  get canUploadDemo(): boolean {
+    return !!this.match?.permissions?.canUploadDemo && this.match?.status !== 'completed' && !this.match?.hasFileDemo && !this.match?.manualDemoId;
+  }
+
   get matchTotalRounds(): number | null {
     if (!this.match) return null;
     const r1 = this.match.team1Rounds;
