@@ -471,6 +471,11 @@ export interface TeamRankingEntry {
   wins: number;
   losses: number;
   leagues: number;
+  /** Jogos de liga com demo analisada. */
+  matches: number;
+  teamAdr: number;
+  /** Partidas com demo em fila ou processamento. */
+  demosProcessing: number;
 }
 
 export interface AdminUserEntry {

@@ -279,7 +279,7 @@
           <div class="ranking-card-header">
             <div class="ranking-card-intro">
               <h3 class="gc-card-title">Top times</h3>
-              <p class="meta ranking-subtitle">Vitórias e derrotas nas ligas (inclui resultados manuais)</p>
+              <p class="meta ranking-subtitle">Vitórias nas ligas e ADR médio em jogos com demo oficial</p>
             </div>
           </div>
 
@@ -293,6 +293,7 @@
                   <th>Time</th>
                   <th>V</th>
                   <th>D</th>
+                  <th>ADR</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,15 +309,22 @@
                         (error)="onTeamRankingLogoError(team.teamId)">
                       <span *ngIf="!teamRankingLogoSrc(team)" class="ranking-team-badge">{{ team.tag }}</span>
                       <strong>{{ team.name }}</strong>
+                      <span *ngIf="team.matches > 0" class="meta ranking-demos">{{ team.matches }} jogo(s)</span>
+                      <span *ngIf="team.demosProcessing > 0" class="badge status-upcoming ranking-demo-processing">
+                        {{ team.demosProcessing }} demo(s) processando
+                      </span>
                     </a>
                   </td>
                   <td><span class="stat-badge stat-badge-wins">{{ team.wins }}</span></td>
                   <td><span class="stat-badge stat-badge-losses">{{ team.losses }}</span></td>
+                  <td class="stat-highlight">{{ team.teamAdr > 0 ? team.teamAdr : '—' }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p *ngIf="!teamRankingsLoading && teamRankings.length === 0" class="meta">Nenhum time com vitórias registradas.</p>
+          <p *ngIf="!teamRankingsLoading && teamRankings.length === 0" class="meta">
+            Nenhum time com vitórias ou demos de partida nas ligas ainda.
+          </p>
         </article>
       </div>
     </section>

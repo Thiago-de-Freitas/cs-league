@@ -2,11 +2,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregatePlayerRankingsByLeagueMatches,
+  aggregateTeamRankingsFromLeagueDemos,
   buildTeamRankingEntries,
   calcRating,
   filterPersonalStatsByPosition,
   filterStatsByPosition,
   membershipKey,
+  mergeTeamRankingAggregates,
   resolvePlayerTeamId,
   statRowMatchesPositionFilter,
   type LeaguePlayerStatRow,
@@ -175,22 +177,180 @@ describe('aggregatePlayerRankingsByLeagueMatches', () => {
 });
 
 describe('buildTeamRankingEntries', () => {
-  it('inclui apenas times com vitórias registradas', () => {
+  const teams = [
+    { id: 't1', name: 'Alpha', tag: 'ALP', logoUrl: null },
+    { id: 't2', name: 'Beta', tag: 'BET', logoUrl: null },
+    { id: 't3', name: 'Gamma', tag: 'GAM', logoUrl: null },
+  ];
+
+  it('inclui times com vitórias registradas', () => {
     const entries = buildTeamRankingEntries(
       [
-        { teamId: 't1', wins: 3, losses: 1, leagues: 1 },
-        { teamId: 't2', wins: 0, losses: 2, leagues: 1 },
+        {
+          teamId: 't1',
+          wins: 3,
+          losses: 1,
+          leagues: 1,
+          matches: 2,
+          teamAdr: 82.5,
+          demosProcessing: 0,
+        },
+        {
+          teamId: 't2',
+          wins: 0,
+          losses: 2,
+          leagues: 1,
+          matches: 0,
+          teamAdr: 0,
+          demosProcessing: 0,
+        },
       ],
-      [
-        { id: 't1', name: 'Alpha', tag: 'ALP', logoUrl: null },
-        { id: 't2', name: 'Beta', tag: 'BET', logoUrl: null },
-      ],
+      teams,
       10
     );
 
     assert.equal(entries.length, 1);
     assert.equal(entries[0].teamId, 't1');
     assert.equal(entries[0].wins, 3);
+    assert.equal(entries[0].matches, 2);
+    assert.equal(entries[0].teamAdr, 82.5);
+  });
+
+  it('inclui times com demos analisadas mesmo sem vitórias', () => {
+    const entries = buildTeamRankingEntries(
+      [
+        {
+          teamId: 't2',
+          wins: 0,
+          losses: 0,
+          leagues: 1,
+          matches: 1,
+          teamAdr: 91.2,
+          demosProcessing: 0,
+        },
+      ],
+      teams,
+      10
+    );
+
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].teamId, 't2');
+    assert.equal(entries[0].matches, 1);
+    assert.equal(entries[0].teamAdr, 91.2);
+  });
+
+  it('inclui times com demo em processamento', () => {
+    const entries = buildTeamRankingEntries(
+      [
+        {
+          teamId: 't3',
+          wins: 0,
+          losses: 0,
+          leagues: 1,
+          matches: 0,
+          teamAdr: 0,
+          demosProcessing: 2,
+        },
+      ],
+      teams,
+      10
+    );
+
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].demosProcessing, 2);
+  });
+});
+
+describe('aggregateTeamRankingsFromLeagueDemos', () => {
+  it('calcula ADR médio por jogo e conta demos em processamento', () => {
+    const demoStats = aggregateTeamRankingsFromLeagueDemos(
+      [
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          winnerId: null,
+          status: 'SCHEDULED',
+        },
+      ],
+      [
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          steamId: 'steam-a',
+          adr: 80,
+        },
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          steamId: 'steam-b',
+          adr: 100,
+        },
+        {
+          matchId: 'm1',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't2',
+          steamId: 'steam-c',
+          adr: 70,
+        },
+      ],
+      [
+        {
+          matchId: 'm2',
+          leagueId: 'l1',
+          team1Id: 't1',
+          team2Id: 't3',
+          winnerId: null,
+          status: 'SCHEDULED',
+        },
+      ],
+      new Map([
+        [membershipKey('steam-a', 't1'), { position: 'RIFLER', role: 'MEMBER' }],
+        [membershipKey('steam-b', 't1'), { position: 'AWP', role: 'MEMBER' }],
+        [membershipKey('steam-c', 't2'), { position: 'IGL', role: 'CAPTAIN' }],
+      ])
+    );
+
+    const team1 = demoStats.get('t1');
+    const team2 = demoStats.get('t2');
+    assert.equal(team1?.matches, 1);
+    assert.equal(team1?.teamAdr, 90);
+    assert.equal(team1?.demosProcessing, 1);
+    assert.equal(team2?.matches, 1);
+    assert.equal(team2?.teamAdr, 70);
+  });
+});
+
+describe('mergeTeamRankingAggregates', () => {
+  it('combina vitórias de liga com estatísticas de demo', () => {
+    const merged = mergeTeamRankingAggregates(
+      [{ teamId: 't1', wins: 2, losses: 1, leagues: 1 }],
+      new Map([
+        [
+          't1',
+          {
+            wins: 0,
+            losses: 0,
+            leagues: 1,
+            matches: 3,
+            teamAdr: 85.4,
+            demosProcessing: 1,
+          },
+        ],
+      ])
+    );
+
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].wins, 2);
+    assert.equal(merged[0].matches, 3);
+    assert.equal(merged[0].teamAdr, 85.4);
+    assert.equal(merged[0].demosProcessing, 1);
   });
 });
 
