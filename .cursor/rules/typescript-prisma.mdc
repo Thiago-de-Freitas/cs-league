@@ -1,0 +1,40 @@
+---
+description: Prisma + Express — tipos, queries e filtros reutilizáveis
+globs: Backend/**/*.ts
+alwaysApply: false
+---
+
+# Backend — Prisma e TypeScript
+
+## Filtros reutilizáveis (`where`)
+
+Sempre tipar com o `*WhereInput` correspondente:
+
+```typescript
+import type { Prisma } from '@prisma/client';
+import { LeagueStatus } from '@prisma/client';
+
+export const TEAM_LEAGUE_STATS_WHERE: Prisma.LeagueTeamWhereInput = {
+  league: {
+    status: {
+      in: [LeagueStatus.UPCOMING, LeagueStatus.ONGOING, LeagueStatus.COMPLETED, LeagueStatus.ARCHIVED],
+    },
+  },
+};
+```
+
+- **Nunca** `as const` em objetos passados a `findMany`, `groupBy`, `updateMany`, etc.
+- Enums Prisma (`LeagueStatus`, `MatchStatus`) em vez de strings soltas.
+
+## `groupBy` / agregações
+
+- `_sum`, `_avg`, `_count` podem ser `undefined` — use `?.` e fallback `?? 0`.
+- Para `_count: { _all: true }`, trate `_count` como objeto: `typeof g._count === 'object' ? (g._count._all ?? 0) : 0`.
+
+## `include` e tipos inferidos
+
+Se um `where` em relação aninhada estiver mal tipado, o retorno de `findUnique` perde `include` no tipo e gera erros em cascata. Corrija o `where` primeiro.
+
+## Transações
+
+Preferir `prisma.$transaction(async (tx) => { ... })` e passar `tx` para helpers que aceitam `Prisma.TransactionClient`.

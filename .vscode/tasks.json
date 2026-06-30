@@ -3,8 +3,28 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Backend: build (tsc)",
+      "type": "npm",
+      "script": "build",
+      "path": "Backend",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Frontend: build",
+      "type": "npm",
+      "script": "build",
+      "path": "Frontend",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
       "type": "npm",
       "script": "start",
+      "path": "Frontend",
       "isBackground": true,
       "problemMatcher": {
         "owner": "typescript",
@@ -23,6 +43,7 @@
     {
       "type": "npm",
       "script": "test",
+      "path": "Frontend",
       "isBackground": true,
       "problemMatcher": {
         "owner": "typescript",

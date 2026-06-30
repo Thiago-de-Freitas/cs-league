@@ -591,9 +591,9 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
 
   const ranked = grouped.map((g) => ({
     teamId: g.teamId,
-    wins: g._sum.wins ?? 0,
-    losses: g._sum.losses ?? 0,
-    leagues: g._count._all,
+    wins: g._sum?.wins ?? 0,
+    losses: g._sum?.losses ?? 0,
+    leagues: typeof g._count === 'object' ? (g._count._all ?? 0) : 0,
   }));
 
   if (ranked.length === 0) return [];

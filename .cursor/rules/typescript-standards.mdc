@@ -1,0 +1,54 @@
+---
+description: Padrões TypeScript do projeto — strict mode, build e tipos seguros
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# TypeScript — padrões obrigatórios
+
+## Compilação antes de concluir
+
+- **Backend**: rode `npm run build` em `Backend/` após alterar código (o Railway usa `tsc` em produção).
+- **Frontend**: rode `npm run build` em `Frontend/` para mudanças relevantes.
+- Não considere a tarefa pronta se o build falhar.
+
+## Strict mode (já ativo nos tsconfig)
+
+- `strict: true` em Backend e Frontend — não desabilitar.
+- Trate `null`/`undefined` explicitamente; use `?.` e `??` em vez de assumir valores.
+- Evite `any`; prefira `unknown` + narrowing ou tipos do domínio.
+
+## Imports e exports
+
+```typescript
+// ✅ Tipos só em import type
+import type { Prisma } from '@prisma/client';
+import { LeagueStatus } from '@prisma/client';
+
+// ❌ Evitar
+import { Prisma } from '@prisma/client'; // se só usar como tipo
+```
+
+## Padrões que quebram o build
+
+```typescript
+// ❌ as const em filtros Prisma (readonly incompatível com WhereInput)
+export const MY_WHERE = { league: { status: { in: [LeagueStatus.ONGOING] } } } as const;
+
+// ✅ Tipo explícito Prisma
+export const MY_WHERE: Prisma.LeagueTeamWhereInput = {
+  league: { status: { in: [LeagueStatus.ONGOING, LeagueStatus.COMPLETED] } },
+};
+
+// ❌ Acesso direto após groupBy
+wins: g._sum.wins
+
+// ✅ Optional chaining
+wins: g._sum?.wins ?? 0,
+leagues: typeof g._count === 'object' ? (g._count._all ?? 0) : 0,
+```
+
+## Testes
+
+- Backend: `src/**/*.test.ts` (excluídos do `tsc` de produção, mas rodar `npm test`).
+- Frontend: `ng test` para specs alterados.

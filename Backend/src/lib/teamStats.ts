@@ -1,4 +1,4 @@
-import { LeagueStatus } from '@prisma/client';
+import { LeagueStatus, type Prisma } from '@prisma/client';
 
 export type LeagueTeamStatRow = {
   wins: number;
@@ -10,7 +10,7 @@ export type LeagueTeamStatRow = {
 };
 
 /** Estatísticas de participações em ligas (inclui resultados manuais e ligas em andamento). */
-export const TEAM_LEAGUE_STATS_WHERE = {
+export const TEAM_LEAGUE_STATS_WHERE: Prisma.LeagueTeamWhereInput = {
   league: {
     status: {
       in: [
@@ -21,7 +21,7 @@ export const TEAM_LEAGUE_STATS_WHERE = {
       ],
     },
   },
-} as const;
+};
 
 /** @deprecated Alias legado — use TEAM_LEAGUE_STATS_WHERE */
 export const ARCHIVED_LEAGUE_TEAM_WHERE = TEAM_LEAGUE_STATS_WHERE;
