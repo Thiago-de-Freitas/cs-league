@@ -37,8 +37,7 @@ import {
   isHighlightGenerationComplete,
   writeHighlightGeneratePending,
 } from '../../Utils/highlight-generate-pending.util';
-import { NativeInputPickerDirective } from '../../Directives/native-input-picker.directive';
-import { openNativeInputPicker } from '../../Utils/native-input-picker.util';
+import { GcDatetimeLocalFieldComponent } from '../../Components/gc-datetime-local-field/gc-datetime-local-field.component';
 
 interface ManualStatDraft {
   key: string;
@@ -57,7 +56,7 @@ interface ManualStatDraft {
 @Component({
   selector: 'app-match-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, DemoUploadModalComponent, DemoStatusLoaderComponent, MatchMapVetoComponent, SeriesMapVetoComponent, NativeInputPickerDirective],
+  imports: [CommonModule, RouterModule, FormsModule, DemoUploadModalComponent, DemoStatusLoaderComponent, MatchMapVetoComponent, SeriesMapVetoComponent, GcDatetimeLocalFieldComponent],
   templateUrl: './match-details.component.html',
   styleUrls: ['./match-details.component.css']
 })
@@ -603,10 +602,6 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
     if (this.rescheduleLoading) return;
     this.showReschedule = false;
     this.rescheduleDateTime = '';
-  }
-
-  openReschedulePicker(input: HTMLInputElement): void {
-    openNativeInputPicker(input);
   }
 
   confirmReschedule(): void {

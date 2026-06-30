@@ -2,6 +2,8 @@
 export function openNativeInputPicker(input: HTMLInputElement | null | undefined): void {
   if (!input || input.disabled) return;
 
+  input.focus({ preventScroll: true });
+
   if (typeof input.showPicker === 'function') {
     try {
       input.showPicker();
@@ -10,7 +12,4 @@ export function openNativeInputPicker(input: HTMLInputElement | null | undefined
       // showPicker pode falhar se não for gesto do usuário ou já estiver aberto
     }
   }
-
-  input.focus();
-  input.click();
 }

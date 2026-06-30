@@ -29,8 +29,7 @@ import {
   validateLeagueMapSettings,
   type LeagueSeriesFormat,
 } from '../../Utils/series-map.util';
-import { NativeInputPickerDirective } from '../../Directives/native-input-picker.directive';
-import { openNativeInputPicker } from '../../Utils/native-input-picker.util';
+import { GcDatetimeLocalFieldComponent } from '../../Components/gc-datetime-local-field/gc-datetime-local-field.component';
 
 interface ConfirmConfig {
   title: string;
@@ -61,7 +60,7 @@ interface ConfirmConfig {
     LeaguePickupManagerComponent,
     ConfirmModalComponent,
     LeagueSeriesMapSettingsComponent,
-    NativeInputPickerDirective,
+    GcDatetimeLocalFieldComponent,
   ],
   templateUrl: './league-details.component.html',
   styleUrls: ['./league-details.component.css'],
@@ -783,10 +782,6 @@ export class LeagueDetailsComponent implements OnInit {
     if (this.rescheduleLoading) return;
     this.rescheduleModalMatch = null;
     this.rescheduleDateTime = '';
-  }
-
-  openReschedulePicker(input: HTMLInputElement): void {
-    openNativeInputPicker(input);
   }
 
   confirmReschedule(): void {

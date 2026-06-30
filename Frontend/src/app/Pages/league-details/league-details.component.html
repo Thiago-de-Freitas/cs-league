@@ -595,26 +595,12 @@
     </div>
     <div class="gc-modal-body">
       <div class="form-group">
-        <label class="form-label" for="reschedule-datetime">Nova data e horário</label>
-        <div class="gc-native-datetime-field">
-          <input
-            #rescheduleDatetimeInput
-            id="reschedule-datetime"
-            type="datetime-local"
-            class="input-field gc-native-datetime-input"
-            [(ngModel)]="rescheduleDateTime"
-            [disabled]="rescheduleLoading"
-            appNativeInputPicker />
-          <button
-            type="button"
-            class="gc-native-datetime-trigger"
-            (click)="openReschedulePicker(rescheduleDatetimeInput)"
-            [disabled]="rescheduleLoading"
-            aria-label="Abrir calendário"
-            title="Abrir calendário">
-            <span class="gc-native-datetime-icon" aria-hidden="true"></span>
-          </button>
-        </div>
+        <label class="form-label" for="reschedule-datetime-date">Nova data e horário</label>
+        <app-gc-datetime-local-field
+          id="reschedule-datetime"
+          [(ngModel)]="rescheduleDateTime"
+          [disabled]="rescheduleLoading">
+        </app-gc-datetime-local-field>
       </div>
       <p class="admin-hint">Apenas este jogo será alterado. A previsão de término da liga será recalculada.</p>
       <div class="gc-modal-footer">
