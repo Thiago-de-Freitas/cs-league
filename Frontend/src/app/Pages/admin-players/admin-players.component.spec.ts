@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { AdminPlayersComponent } from './admin-players.component';
 import { UsersService } from '../../Services/users.service';
 import { AuthService } from '../../Services/auth.service';
+import { RankingsService } from '../../Services/rankings.service';
 import { AdminUserEntry } from '../../Models/interfaces';
 
 describe('AdminPlayersComponent', () => {
@@ -37,7 +38,10 @@ describe('AdminPlayersComponent', () => {
       'banUser',
       'unbanUser',
       'deleteUser',
+      'listUnregisteredPlayerStats',
+      'purgeUnregisteredPlayerStats',
     ]);
+    const rankingsServiceSpy = jasmine.createSpyObj('RankingsService', ['invalidateAll']);
     authServiceSpy = jasmine.createSpyObj('AuthService', ['isSystemAdmin'], {
       currentUser: { id: 'admin-1', role: 'ADMIN' },
     });
@@ -46,6 +50,9 @@ describe('AdminPlayersComponent', () => {
     usersServiceSpy.listUsers.and.returnValue(
       of({ users: [mockUser], page: 1, pageSize: 10, total: 1, totalPages: 1 })
     );
+    usersServiceSpy.listUnregisteredPlayerStats.and.returnValue(
+      of({ groups: [], totalStats: 0 })
+    );
 
     await TestBed.configureTestingModule({
       imports: [AdminPlayersComponent],
@@ -53,6 +60,7 @@ describe('AdminPlayersComponent', () => {
         provideRouter([]),
         { provide: UsersService, useValue: usersServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
+        { provide: RankingsService, useValue: rankingsServiceSpy },
       ],
     }).compileComponents();
 

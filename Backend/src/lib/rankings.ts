@@ -3,6 +3,10 @@ import { prisma } from './prisma';
 import { TEAM_LEAGUE_STATS_WHERE } from './teamStats';
 import { publicUploadUrlForResponse } from './uploadAssets';
 import {
+  hasRegisteredSteamId,
+  loadRegisteredSteamIdSet,
+} from './registeredPlayers';
+import {
   CAPTAIN_RANKING_FILTER,
   getPlayerPositionLabel,
   type PlayerPosition,
@@ -521,6 +525,7 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
   const { leagueId, position, includePersonal = false } = options;
   const page = parsePlayerRankingPage(options.page);
   const pageSize = parsePlayerRankingPageSize(options.pageSize);
+  const registeredSteamIds = await loadRegisteredSteamIdSet();
 
   const stats = await prisma.matchPlayerStat.findMany({
     where: {
@@ -547,6 +552,7 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
 
   const leagueRows: LeaguePlayerStatRow[] = stats
     .filter((stat) => stat.demo.matchId && stat.demo.match)
+    .filter((stat) => hasRegisteredSteamId(stat.steamId, registeredSteamIds))
     .map((stat) => ({
       steamId: stat.steamId,
       playerName: stat.playerName,
@@ -583,7 +589,9 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
       take: 8000,
     });
 
-    personalRows = personalStats.map((stat) => ({
+    personalRows = personalStats
+      .filter((stat) => hasRegisteredSteamId(stat.steamId, registeredSteamIds))
+      .map((stat) => ({
       steamId: stat.steamId,
       playerName: stat.playerName,
       matchId: `personal:${stat.demo.id}`,
@@ -676,6 +684,9 @@ export type PlayerProfileStats = {
 export async function getPlayerProfileBySteamId(steamId: string): Promise<PlayerProfileStats | null> {
   const normalized = steamId.trim();
   if (!normalized) return null;
+
+  const registeredSteamIds = await loadRegisteredSteamIdSet();
+  if (!hasRegisteredSteamId(normalized, registeredSteamIds)) return null;
 
   const stats = await prisma.matchPlayerStat.findMany({
     where: {
@@ -783,7 +794,7 @@ export function buildTeamRankingEntries(
 }
 
 export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
-  const [grouped, completedDemos, processingDemos] = await Promise.all([
+  const [grouped, completedDemos, processingDemos, registeredSteamIds] = await Promise.all([
     prisma.leagueTeam.groupBy({
       by: ['teamId'],
       where: TEAM_LEAGUE_STATS_WHERE,
@@ -826,6 +837,7 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
       },
       take: 1000,
     }),
+    loadRegisteredSteamIdSet(),
   ]);
 
   const leagueTeamRows = grouped.map((g) => ({
@@ -855,6 +867,7 @@ export async function getTeamRankings(limit = 10): Promise<TeamRankingEntry[]> {
     teamIds.add(match.team1Id);
     teamIds.add(match.team2Id);
     for (const stat of demo.stats) {
+      if (!hasRegisteredSteamId(stat.steamId, registeredSteamIds)) continue;
       playerStats.push({
         matchId: match.id,
         leagueId: match.leagueId,

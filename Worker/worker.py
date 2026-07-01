@@ -349,6 +349,38 @@ def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
+def load_registered_steam_ids() -> set[str]:
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT TRIM("steamId")
+                FROM "User"
+                WHERE "steamId" IS NOT NULL AND TRIM("steamId") <> ''
+                """
+            )
+            registered: set[str] = set()
+            for row in cur.fetchall():
+                normalized = _normalize_steam_id(row[0])
+                if normalized:
+                    registered.add(normalized)
+            return registered
+    finally:
+        conn.close()
+
+
+def filter_stats_to_registered_players(stats: list[dict]) -> list[dict]:
+    registered = load_registered_steam_ids()
+    if not registered:
+        return []
+    return [
+        stat
+        for stat in stats
+        if _normalize_steam_id(stat.get("steam_id")) in registered
+    ]
+
+
 def get_demo_meta(demo_id: str) -> dict | None:
     conn = get_db_connection()
     try:
@@ -836,7 +868,13 @@ def process_job(demo_id: str, file_path: str):
             )
             return
 
-        stats = [s for s in stats if str(s.get("steam_id", "")).strip() == uploader_steam]
+        stats = [s for s in stats if _normalize_steam_id(s.get("steam_id")) == uploader_steam]
+    else:
+        before = len(stats)
+        stats = filter_stats_to_registered_players(stats)
+        skipped = before - len(stats)
+        if skipped:
+            print(f"Demo {demo_id}: ignorados {skipped} jogador(es) sem cadastro no sistema")
 
     save_player_stats(demo_id, stats)
     if meta and meta.get("match_id"):

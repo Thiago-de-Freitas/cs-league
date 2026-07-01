@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AdminUserEntry, AdminUsersPage, PublicUserProfile } from '../Models/interfaces';
+import { AdminUserEntry, AdminUsersPage, PurgeUnregisteredStatsResult, PublicUserProfile, UnregisteredPlayerStatsPage } from '../Models/interfaces';
 
 export const ADMIN_USER_PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 export type AdminUserPageSize = (typeof ADMIN_USER_PAGE_SIZE_OPTIONS)[number];
@@ -56,5 +56,17 @@ export class UsersService {
 
   resolveUserIdBySteamId(steamId: string): Observable<{ userId: string }> {
     return this.http.get<{ userId: string }>(`${this.apiUrl}/by-steam/${encodeURIComponent(steamId)}`);
+  }
+
+  listUnregisteredPlayerStats(): Observable<UnregisteredPlayerStatsPage> {
+    return this.http.get<UnregisteredPlayerStatsPage>(`${this.apiUrl}/admin/unregistered-stats`);
+  }
+
+  purgeUnregisteredPlayerStats(groupKey?: string): Observable<PurgeUnregisteredStatsResult> {
+    let params = new HttpParams();
+    if (groupKey?.trim()) {
+      params = params.set('groupKey', groupKey.trim());
+    }
+    return this.http.delete<PurgeUnregisteredStatsResult>(`${this.apiUrl}/admin/unregistered-stats`, { params });
   }
 }

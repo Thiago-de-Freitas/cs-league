@@ -515,6 +515,25 @@ export interface AdminUsersPage {
   totalPages: number;
 }
 
+export interface UnregisteredPlayerStatGroup {
+  groupKey: string;
+  playerName: string;
+  steamId: string | null;
+  statCount: number;
+  demoCount: number;
+  matchCount: number;
+}
+
+export interface UnregisteredPlayerStatsPage {
+  groups: UnregisteredPlayerStatGroup[];
+  totalStats: number;
+}
+
+export interface PurgeUnregisteredStatsResult {
+  deleted: number;
+  groupsAffected: number;
+}
+
 export interface PublicUserTeam {
   id: string;
   name: string;

@@ -156,6 +156,66 @@
         </button>
       </nav>
     </div>
+
+    <div class="gc-card orphan-stats-card">
+      <div class="players-list-header">
+        <div>
+          <h2 class="section-title">Análises sem cadastro</h2>
+          <p class="meta orphan-stats-subtitle">
+            Estatísticas de demos de liga importadas para jogadores que não estão cadastrados no sistema.
+          </p>
+        </div>
+        <div class="orphan-stats-actions">
+          <span class="meta">{{ unregisteredSummary }}</span>
+          <button
+            type="button"
+            class="btn btn-danger btn-small"
+            [disabled]="unregisteredLoading || unregisteredTotalStats === 0"
+            (click)="openOrphanPurgeAll()">
+            Remover todas
+          </button>
+        </div>
+      </div>
+
+      <p *ngIf="unregisteredError" class="form-error">{{ unregisteredError }}</p>
+      <div *ngIf="unregisteredLoading" class="meta">Carregando análises órfãs...</div>
+
+      <div *ngIf="!unregisteredLoading && unregisteredGroups.length > 0" class="table-container">
+        <table class="stats-table orphan-stats-table">
+          <thead>
+            <tr>
+              <th>Jogador na demo</th>
+              <th>Steam ID</th>
+              <th>Registros</th>
+              <th>Demos</th>
+              <th>Partidas</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let group of unregisteredGroups">
+              <td><strong>{{ group.playerName }}</strong></td>
+              <td>{{ group.steamId || '—' }}</td>
+              <td>{{ group.statCount }}</td>
+              <td>{{ group.demoCount }}</td>
+              <td>{{ group.matchCount }}</td>
+              <td class="orphan-row-action">
+                <button
+                  type="button"
+                  class="btn btn-danger btn-small"
+                  (click)="openOrphanPurgeSingle(group)">
+                  Remover
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p *ngIf="!unregisteredLoading && !unregisteredError && unregisteredGroups.length === 0" class="meta">
+        Nenhuma análise órfã encontrada.
+      </p>
+    </div>
   </div>
 </div>
 
@@ -201,4 +261,18 @@
   [loading]="moderationLoading"
   (confirmed)="confirmModeration()"
   (closed)="closeModeration()">
+</app-confirm-modal>
+
+<app-confirm-modal
+  *ngIf="orphanPurgeMode"
+  [title]="orphanPurgeTitle"
+  [message]="orphanPurgeMessage"
+  [highlight]="orphanPurgeHighlight"
+  highlightLabel="Alvo"
+  [hint]="orphanPurgeError"
+  confirmLabel="Remover análises"
+  [danger]="true"
+  [loading]="orphanPurgeLoading"
+  (confirmed)="confirmOrphanPurge()"
+  (closed)="closeOrphanPurge()">
 </app-confirm-modal>

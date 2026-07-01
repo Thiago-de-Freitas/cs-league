@@ -8,12 +8,14 @@ import {
   UsersService,
 } from '../../Services/users.service';
 import { AuthService } from '../../Services/auth.service';
-import { AdminUserEntry } from '../../Models/interfaces';
+import { AdminUserEntry, UnregisteredPlayerStatGroup } from '../../Models/interfaces';
 import { PLAYER_POSITIONS, getPlayerPositionLabel } from '../../Utils/player-positions';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 import { ConfirmModalComponent } from '../../Components/confirm-modal/confirm-modal.component';
+import { RankingsService } from '../../Services/rankings.service';
 
 type ModerationAction = 'deactivate' | 'activate' | 'ban' | 'unban' | 'delete';
+type OrphanPurgeMode = 'all' | 'single';
 
 @Component({
   selector: 'app-admin-players',
@@ -41,6 +43,15 @@ export class AdminPlayersComponent implements OnInit {
   moderationLoading = false;
   moderationError = '';
 
+  unregisteredGroups: UnregisteredPlayerStatGroup[] = [];
+  unregisteredTotalStats = 0;
+  unregisteredLoading = true;
+  unregisteredError = '';
+  orphanPurgeMode: OrphanPurgeMode | null = null;
+  orphanPurgeTarget: UnregisteredPlayerStatGroup | null = null;
+  orphanPurgeLoading = false;
+  orphanPurgeError = '';
+
   readonly pageSizeOptions = ADMIN_USER_PAGE_SIZE_OPTIONS;
   readonly positionOptions = PLAYER_POSITIONS;
   readonly roleOptions = [
@@ -60,6 +71,7 @@ export class AdminPlayersComponent implements OnInit {
   constructor(
     private usersService: UsersService,
     private authService: AuthService,
+    private rankingsService: RankingsService,
     private router: Router
   ) {}
 
@@ -69,6 +81,14 @@ export class AdminPlayersComponent implements OnInit {
       return;
     }
     this.loadUsers();
+    this.loadUnregisteredStats();
+  }
+
+  get unregisteredSummary(): string {
+    if (this.unregisteredLoading) return 'Carregando...';
+    if (this.unregisteredTotalStats === 0) return 'Nenhuma análise órfã';
+    const groups = this.unregisteredGroups.length;
+    return `${this.unregisteredTotalStats} registro(s) em ${groups} jogador(es)`;
   }
 
   get rangeLabel(): string {
@@ -262,5 +282,80 @@ export class AdminPlayersComponent implements OnInit {
       default:
         return '';
     }
+  }
+
+  loadUnregisteredStats(): void {
+    this.unregisteredLoading = true;
+    this.unregisteredError = '';
+    this.usersService.listUnregisteredPlayerStats().subscribe({
+      next: (result) => {
+        this.unregisteredGroups = result.groups;
+        this.unregisteredTotalStats = result.totalStats;
+        this.unregisteredLoading = false;
+      },
+      error: (err) => {
+        this.unregisteredLoading = false;
+        this.unregisteredError = err?.error?.error ?? 'Não foi possível carregar análises órfãs.';
+      },
+    });
+  }
+
+  openOrphanPurgeAll(): void {
+    this.orphanPurgeMode = 'all';
+    this.orphanPurgeTarget = null;
+    this.orphanPurgeError = '';
+  }
+
+  openOrphanPurgeSingle(group: UnregisteredPlayerStatGroup): void {
+    this.orphanPurgeMode = 'single';
+    this.orphanPurgeTarget = group;
+    this.orphanPurgeError = '';
+  }
+
+  closeOrphanPurge(): void {
+    if (this.orphanPurgeLoading) return;
+    this.orphanPurgeMode = null;
+    this.orphanPurgeTarget = null;
+    this.orphanPurgeError = '';
+  }
+
+  confirmOrphanPurge(): void {
+    if (!this.orphanPurgeMode) return;
+
+    this.orphanPurgeLoading = true;
+    this.orphanPurgeError = '';
+    const groupKey = this.orphanPurgeMode === 'single' ? this.orphanPurgeTarget?.groupKey : undefined;
+
+    this.usersService.purgeUnregisteredPlayerStats(groupKey).subscribe({
+      next: () => {
+        this.orphanPurgeLoading = false;
+        this.closeOrphanPurge();
+        this.rankingsService.invalidateAll();
+        this.loadUnregisteredStats();
+      },
+      error: (err) => {
+        this.orphanPurgeLoading = false;
+        this.orphanPurgeError = err?.error?.error ?? 'Não foi possível remover as análises.';
+      },
+    });
+  }
+
+  get orphanPurgeTitle(): string {
+    return this.orphanPurgeMode === 'single' ? 'Remover análise do jogador' : 'Remover todas as análises órfãs';
+  }
+
+  get orphanPurgeMessage(): string {
+    if (this.orphanPurgeMode === 'single' && this.orphanPurgeTarget) {
+      return 'Remove as estatísticas importadas deste jogador que não possui cadastro no sistema.';
+    }
+    return 'Remove todas as estatísticas de demos de liga vinculadas a jogadores sem conta cadastrada.';
+  }
+
+  get orphanPurgeHighlight(): string {
+    if (this.orphanPurgeMode === 'single' && this.orphanPurgeTarget) {
+      const group = this.orphanPurgeTarget;
+      return group.steamId ? `${group.playerName} (${group.steamId})` : group.playerName;
+    }
+    return `${this.unregisteredTotalStats} registro(s)`;
   }
 }

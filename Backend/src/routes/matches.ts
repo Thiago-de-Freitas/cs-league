@@ -8,6 +8,7 @@ import { resolveBracketSize } from '../lib/bracket';
 import { tryCompleteLeague } from '../lib/leagueComplete';
 import { areAllGroupMatchesComplete } from '../lib/groupStage';
 import { aggregateMatchStats } from '../lib/matchStats';
+import { loadRegisteredSteamIdSet, filterStatsByRegisteredSteamIds } from '../lib/registeredPlayers';
 import type { MatchPlayerStat } from '@prisma/client';
 import { canUserAccessMatch, canUserRegisterMatchResult, canUserEditMatchStats, checkLeagueManagerMatchDataAccess } from '../lib/matchPermissions';
 import {
@@ -62,16 +63,19 @@ async function loadMatchRoster(team1Id: string, team2Id: string) {
   };
 }
 
-function formatMatchDemos(demos: Array<{
-  id: string;
-  fileName: string | null;
-  status: string;
-  isPersonal: boolean;
-  isManual: boolean;
-  errorMessage: string | null;
-  stats: MatchPlayerStat[];
-  createdAt: Date;
-}>) {
+function formatMatchDemos(
+  demos: Array<{
+    id: string;
+    fileName: string | null;
+    status: string;
+    isPersonal: boolean;
+    isManual: boolean;
+    errorMessage: string | null;
+    stats: MatchPlayerStat[];
+    createdAt: Date;
+  }>,
+  registeredSteamIds: Set<string>
+) {
   return demos.map((d) => ({
     id: d.id,
     fileName: d.isManual ? 'Stats manuais' : (d.fileName || 'demo.dem'),
@@ -79,7 +83,9 @@ function formatMatchDemos(demos: Array<{
     isPersonal: d.isPersonal,
     isManual: d.isManual,
     errorMessage: d.errorMessage,
-    stats: d.stats,
+    stats: d.isPersonal
+      ? d.stats
+      : filterStatsByRegisteredSteamIds(d.stats, registeredSteamIds),
     createdAt: d.createdAt,
   }));
 }
@@ -127,6 +133,7 @@ function formatMatchResponse(
     canVeto?: boolean;
     canAdminReopenVeto?: boolean;
   },
+  registeredSteamIds: Set<string>,
   roster?: Awaited<ReturnType<typeof loadMatchRoster>>,
   extras?: {
     mapVeto?: unknown;
@@ -165,8 +172,8 @@ function formatMatchResponse(
     team2Rounds: match.team2Rounds,
     scheduledAt: match.scheduledAt,
     playedAt: match.playedAt,
-    demos: formatMatchDemos(demos),
-    aggregatedStats: aggregateMatchStats(demos),
+    demos: formatMatchDemos(demos, registeredSteamIds),
+    aggregatedStats: aggregateMatchStats(demos, registeredSteamIds),
     roster,
     hasFileDemo,
     manualDemoId: manualDemo?.id ?? null,
@@ -305,6 +312,8 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         (seriesData?.series?.vetoStatus === 'ban_phase' || seriesData?.series?.vetoStatus === 'pick_phase')
       : matchVetoDeadline.deadlineExpired;
 
+    const registeredSteamIds = await loadRegisteredSteamIdSet();
+
     res.json(
       formatMatchResponse(
         match,
@@ -319,6 +328,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
             req.user!.role === 'ADMIN' &&
             (isBo3Series ? seriesVetoDeadline : matchVetoDeadline.deadlineExpired),
         },
+        registeredSteamIds,
         roster,
         {
           mapVeto,
@@ -465,6 +475,7 @@ router.put('/:id/manual-stats', authMiddleware, participationGuard, async (req: 
     setAuditContext(req, audit.withParent('match.manual_stats.save', 'Match', match.id, 'League', match.leagueId, {
       metadata: { playerCount: parsedPlayers.players.length, totalRounds },
     }));
+    const registeredSteamIds = await loadRegisteredSteamIdSet();
     res.json(
       formatMatchResponse(
         updated,
@@ -474,6 +485,7 @@ router.put('/:id/manual-stats', authMiddleware, participationGuard, async (req: 
           canEditManualStats: statsAccess.allowed,
           canUploadDemo,
         },
+        registeredSteamIds,
         roster
       )
     );

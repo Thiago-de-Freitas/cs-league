@@ -140,6 +140,32 @@
   font-size: 0.9rem;
 }
 
+.orphan-stats-card {
+  margin-top: 1rem;
+}
+
+.orphan-stats-subtitle {
+  margin: 0.35rem 0 0;
+}
+
+.orphan-stats-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.orphan-stats-table th,
+.orphan-stats-table td {
+  vertical-align: middle;
+}
+
+.orphan-row-action {
+  text-align: right;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .filters-row {
     grid-template-columns: 1fr 1fr;

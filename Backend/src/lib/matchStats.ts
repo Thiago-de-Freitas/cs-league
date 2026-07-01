@@ -1,4 +1,5 @@
 import type { MatchPlayerStat } from '@prisma/client';
+import { hasRegisteredSteamId } from './registeredPlayers';
 
 type DemoWithStats = {
   status: string;
@@ -6,8 +7,11 @@ type DemoWithStats = {
   stats: MatchPlayerStat[];
 };
 
-/** Consolida stats de demos gerais concluídas (demos mais recentes têm prioridade por steamId/nome). */
-export function aggregateMatchStats(demos: DemoWithStats[]) {
+/** Consolida stats de demos gerais concluídas (demos mais recentes têm prioridade por steamId). */
+export function aggregateMatchStats(
+  demos: DemoWithStats[],
+  registeredSteamIds?: Set<string>
+) {
   const byKey = new Map<string, MatchPlayerStat>();
 
   for (const demo of demos) {
@@ -15,9 +19,13 @@ export function aggregateMatchStats(demos: DemoWithStats[]) {
     const status = demo.status.toUpperCase();
     if (status !== 'COMPLETED') continue;
     for (const stat of demo.stats) {
-      const key = (stat.steamId || stat.playerName).toLowerCase();
-      if (!byKey.has(key)) {
-        byKey.set(key, stat);
+      if (registeredSteamIds && !hasRegisteredSteamId(stat.steamId, registeredSteamIds)) {
+        continue;
+      }
+      const steamKey = stat.steamId?.trim().toLowerCase();
+      if (!steamKey) continue;
+      if (!byKey.has(steamKey)) {
+        byKey.set(steamKey, stat);
       }
     }
   }

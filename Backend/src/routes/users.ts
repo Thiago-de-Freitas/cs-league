@@ -202,6 +202,45 @@ router.get('/search', authMiddleware, async (req: AuthRequest, res: Response) =>
   }
 });
 
+router.get('/admin/unregistered-stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const { listUnregisteredPlayerStatGroups } = await import('../lib/unregisteredPlayerStats');
+    const result = await listUnregisteredPlayerStatGroups();
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao listar análises de jogadores não cadastrados' });
+  }
+});
+
+router.delete('/admin/unregistered-stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const groupKey = typeof req.query.groupKey === 'string' ? req.query.groupKey.trim() : '';
+    const { deleteUnregisteredPlayerStats } = await import('../lib/unregisteredPlayerStats');
+    const result = await deleteUnregisteredPlayerStats(groupKey || undefined);
+
+    setAuditContext(
+      req,
+      audit.of('admin.unregistered_stats.purge', 'MatchPlayerStat', 'bulk', {
+        metadata: {
+          groupKey: groupKey || null,
+          deleted: result.deleted,
+          groupsAffected: result.groupsAffected,
+        },
+      })
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao remover análises de jogadores não cadastrados' });
+  }
+});
+
 router.get('/by-steam/:steamId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = await findUserIdBySteamId(req.params.steamId);

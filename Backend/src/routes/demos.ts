@@ -26,6 +26,7 @@ import { audit, setAuditContext } from '../lib/audit';
 import { isHighlightsFeatureEnabled } from '../lib/featureFlags';
 import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
 import { filterHighlightsForPersonalDemo } from '../lib/highlightPayload';
+import { filterStatsByRegisteredSteamIds, loadRegisteredSteamIdSet } from '../lib/registeredPlayers';
 import { getHighlightProgress } from '../lib/highlightProgress';
 import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo } from '../lib/highlightHttp';
 import { serializeHighlight } from '../lib/highlightSerialization';
@@ -429,6 +430,13 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       ? filterHighlightsForPersonalDemo(demo.highlights, demo.uploadedBy.steamId)
       : demo.highlights;
 
+    const registeredSteamIds = demo.isPersonal
+      ? null
+      : await loadRegisteredSteamIdSet();
+    const visibleStats = demo.isPersonal || !registeredSteamIds
+      ? demo.stats
+      : filterStatsByRegisteredSteamIds(demo.stats, registeredSteamIds);
+
     res.json({
       id: demo.id,
       fileName: demo.fileName,
@@ -438,7 +446,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       isPersonal: demo.isPersonal,
       uploadedById: demo.uploadedById,
       match: demo.match,
-      stats: demo.stats,
+      stats: visibleStats,
       highlights: visibleHighlights.map((highlight) =>
         serializeHighlight(highlight, { demoId: demo.id })
       ),
@@ -473,7 +481,13 @@ router.get('/:id/stats', authMiddleware, async (req: AuthRequest, res: Response)
       where: { demoId: req.params.id },
       orderBy: { kills: 'desc' },
     });
-    res.json(stats);
+    const registeredSteamIds = demo.isPersonal
+      ? null
+      : await loadRegisteredSteamIdSet();
+    const visibleStats = demo.isPersonal || !registeredSteamIds
+      ? stats
+      : filterStatsByRegisteredSteamIds(stats, registeredSteamIds);
+    res.json(visibleStats);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
