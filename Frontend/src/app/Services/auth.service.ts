@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, shareReplay, tap } from 'rxjs';
-import { AuthResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
+import { AuthResponse, DeleteAccountResponse, EmailChangePhaseResponse, EmailChangeStatusResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
 import { LeagueService } from './league.service';
 import { RankingsService } from './rankings.service';
 import { TeamService } from './team.service';
@@ -105,6 +105,44 @@ export class AuthService {
     return this.http.delete<User>(`${this.apiUrl}/me/avatar`).pipe(
       tap((user) => this.applyUserUpdate(user))
     );
+  }
+
+  requestEmailChange(newEmail: string, password: string): Observable<EmailChangePhaseResponse> {
+    return this.http.post<EmailChangePhaseResponse>(`${this.apiUrl}/me/change-email/request`, {
+      newEmail,
+      password,
+    });
+  }
+
+  verifyOldEmailForChange(code: string): Observable<EmailChangePhaseResponse> {
+    return this.http.post<EmailChangePhaseResponse>(`${this.apiUrl}/me/change-email/verify-old`, {
+      code,
+    });
+  }
+
+  verifyNewEmailForChange(code: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/me/change-email/verify-new`, {
+      code,
+    }).pipe(tap((res) => this.setSession(res)));
+  }
+
+  getEmailChangeStatus(): Observable<EmailChangeStatusResponse> {
+    return this.http.get<EmailChangeStatusResponse>(`${this.apiUrl}/me/change-email/status`);
+  }
+
+  resendEmailChangeCode(): Observable<EmailChangePhaseResponse> {
+    return this.http.post<EmailChangePhaseResponse>(`${this.apiUrl}/me/change-email/resend`, {});
+  }
+
+  cancelEmailChange(): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${this.apiUrl}/me/change-email/cancel`, {});
+  }
+
+  deleteAccount(password: string, confirmText: string): Observable<DeleteAccountResponse> {
+    return this.http.post<DeleteAccountResponse>(`${this.apiUrl}/me/delete-account`, {
+      password,
+      confirmText,
+    });
   }
 
   private applyUserUpdate(user: User): void {

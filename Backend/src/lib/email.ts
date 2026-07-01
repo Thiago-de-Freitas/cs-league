@@ -324,10 +324,127 @@ export async function sendVerificationEmail(
   displayName: string
 ): Promise<EmailSendResult> {
   const { subject, text, html } = buildVerificationEmailBody(displayName, code);
+  return dispatchEmail(to, subject, text, html, `Verificação para ${to}: código ${code}`);
+}
+
+export type EmailChangeKind = 'old' | 'new';
+
+export function buildEmailChangeCodeBody(
+  displayName: string,
+  code: string,
+  kind: EmailChangeKind,
+  newEmail?: string
+): { subject: string; text: string; html: string } {
+  const formattedCode = formatVerificationCode(code);
+  const safeName = escapeHtml(displayName);
+  const safeCode = escapeHtml(formattedCode);
+  const maskedNew = newEmail ? escapeHtml(newEmail.replace(/(.{2}).+(@.+)/, '$1***$2')) : '';
+
+  if (kind === 'old') {
+    const subject = `${formattedCode} — confirme a troca de e-mail`;
+    const text = [
+      `Olá, ${displayName}!`,
+      '',
+      'Recebemos um pedido para alterar o e-mail da sua conta na Gamers League.',
+      newEmail ? `Novo e-mail solicitado: ${newEmail}` : '',
+      '',
+      'Digite o código abaixo para confirmar que você controla este e-mail:',
+      '',
+      formattedCode,
+      '',
+      'Se você não solicitou esta alteração, ignore este e-mail e altere sua senha.',
+      '',
+      '— Equipe Gamers League',
+    ].filter(Boolean).join('\n');
+
+    const html = buildCodeEmailHtml({
+      title: 'Confirmar troca de e-mail',
+      greeting: safeName,
+      intro: `Alguém solicitou alterar o e-mail da sua conta${maskedNew ? ` para <strong style="color:#f0f0f0;">${maskedNew}</strong>` : ''}. Confirme com o código abaixo:`,
+      code: safeCode,
+      footer: 'Se você não solicitou esta alteração, ignore este e-mail.',
+    });
+
+    return { subject, text, html };
+  }
+
+  const subject = `${formattedCode} — confirme seu novo e-mail`;
+  const text = [
+    `Olá, ${displayName}!`,
+    '',
+    'Quase lá! Digite o código abaixo para confirmar este endereço como novo e-mail da sua conta:',
+    '',
+    formattedCode,
+    '',
+    '— Equipe Gamers League',
+  ].join('\n');
+
+  const html = buildCodeEmailHtml({
+    title: 'Confirmar novo e-mail',
+    greeting: safeName,
+    intro: 'Digite o código abaixo para concluir a troca de e-mail da sua conta:',
+    code: safeCode,
+    footer: 'Se você não solicitou esta alteração, ignore este e-mail.',
+  });
+
+  return { subject, text, html };
+}
+
+export async function sendEmailChangeCode(
+  to: string,
+  code: string,
+  displayName: string,
+  kind: EmailChangeKind,
+  newEmail?: string
+): Promise<EmailSendResult> {
+  const { subject, text, html } = buildEmailChangeCodeBody(displayName, code, kind, newEmail);
+  const logLabel = kind === 'old' ? 'troca (e-mail atual)' : 'troca (novo e-mail)';
+  return dispatchEmail(to, subject, text, html, `${logLabel} para ${to}: código ${code}`);
+}
+
+function buildCodeEmailHtml(opts: {
+  title: string;
+  greeting: string;
+  intro: string;
+  code: string;
+  footer: string;
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;color:#f0f0f0;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0a0a0a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#1a1a1a;border:1px solid #2d2d2d;border-radius:12px;">
+        <tr><td style="padding:28px 32px 12px;border-bottom:1px solid #2d2d2d;">
+          <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#ff5500;">Gamers League</p>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#f0f0f0;text-transform:uppercase;">${opts.title}</h1>
+        </td></tr>
+        <tr><td style="padding:24px 32px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#f0f0f0;">Olá, <strong>${opts.greeting}</strong>!</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#a0a0a0;">${opts.intro}</p>
+          <p style="margin:0;font-size:36px;font-weight:700;letter-spacing:0.28em;color:#ff5500;font-family:monospace;text-align:center;">${opts.code}</p>
+          <p style="margin:24px 0 0;font-size:13px;color:#666666;">${opts.footer}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+async function dispatchEmail(
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+  consoleLog: string
+): Promise<EmailSendResult> {
   const provider = getEmailProvider();
 
   if (provider === 'console') {
-    console.log(`[email] Verificação para ${to}: código ${code}`);
+    console.log(`[email] ${consoleLog}`);
     return { ok: true };
   }
 

@@ -3,11 +3,15 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { promisify } from 'node:util';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { parsePlayerPositionOptional } from '../lib/playerPosition';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { authRateLimiter, emailVerificationRateLimiter } from '../middleware/rateLimit';
+import { authRateLimiter, emailVerificationRateLimiter, sensitiveAccountRateLimiter } from '../middleware/rateLimit';
+import { requireActiveAccount, requireVerifiedAccount, AccountAuthRequest } from '../middleware/accountGuard';
+import { parseEmailInput } from '../lib/emailInput';
+import { parsePasswordInput, MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from '../lib/passwordInput';
 import {
   deleteLegacyUploadFile,
   encodeUploadedImageToDataUrl,
@@ -25,6 +29,15 @@ import {
   maskEmail,
   verifyStoredCode,
 } from '../lib/emailVerification';
+import {
+  cancelEmailChange,
+  getEmailChangeState,
+  resendEmailChangeCode,
+  startEmailChange,
+  verifyNewEmailForChange,
+  verifyOldEmailForChange,
+} from '../lib/emailChange';
+import { deleteUserAndData } from '../lib/deleteUser';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -33,8 +46,10 @@ const comparePassword = promisify(bcrypt.compare);
 const BCRYPT_ROUNDS = 12;
 const MAX_DISPLAY_NAME_LENGTH = 100;
 const MAX_EMAIL_LENGTH = 255;
-const MIN_PASSWORD_LENGTH = 6;
-const MAX_PASSWORD_LENGTH = 128;
+/** Hash fixo para equalizar tempo de resposta no login quando o e-mail não existe. */
+const DUMMY_PASSWORD_HASH = '$2a$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW';
+const CHANGE_EMAIL_START_ERROR = 'Não foi possível iniciar a troca. Verifique a senha e o novo e-mail.';
+const DELETE_ACCOUNT_CONFIRM = 'EXCLUIR CONTA';
 
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
@@ -83,12 +98,14 @@ function sanitizeUser(user: {
 }
 
 function normalizeEmailInput(email: unknown): string | null {
-  if (typeof email !== 'string') return null;
-  const normalized = email.trim().toLowerCase();
-  if (!normalized || normalized.length > MAX_EMAIL_LENGTH || !normalized.includes('@')) {
-    return null;
-  }
-  return normalized;
+  return parseEmailInput(email, MAX_EMAIL_LENGTH);
+}
+
+async function isEmailTaken(email: string, excludeUserId?: string): Promise<boolean> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (!existing) return false;
+  if (excludeUserId && existing.id === excludeUserId) return false;
+  return true;
 }
 
 function normalizeVerificationCode(code: unknown): string | null {
@@ -117,32 +134,27 @@ async function respondPendingVerification(
 router.post('/register', authRateLimiter, async (req, res: Response) => {
   try {
     const { email, password, displayName } = req.body;
-    if (!email || !password || !displayName) {
+    const normalizedEmail = normalizeEmailInput(email);
+    const normalizedPassword = parsePasswordInput(password);
+    if (!normalizedEmail || !normalizedPassword || !displayName) {
       res.status(400).json({ error: 'Email, senha e nome são obrigatórios' });
       return;
     }
-    if (
-      typeof email !== 'string'
-      || typeof password !== 'string'
-      || typeof displayName !== 'string'
-    ) {
+    if (typeof displayName !== 'string') {
       res.status(400).json({ error: 'Dados de cadastro inválidos' });
       return;
     }
     if (
-      email.length > MAX_EMAIL_LENGTH
-      || displayName.length > MAX_DISPLAY_NAME_LENGTH
-      || password.length < MIN_PASSWORD_LENGTH
-      || password.length > MAX_PASSWORD_LENGTH
+      displayName.length > MAX_DISPLAY_NAME_LENGTH
     ) {
       res.status(400).json({ error: 'Email, senha ou nome fora dos limites permitidos' });
       return;
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       if (!existing.emailVerified) {
-        const validPassword = await comparePassword(password, existing.passwordHash);
+        const validPassword = await comparePassword(normalizedPassword, existing.passwordHash);
         if (!validPassword) {
           res.status(409).json({ error: 'Email já cadastrado' });
           return;
@@ -154,10 +166,10 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
       return;
     }
 
-    const passwordHash = await hashPassword(password, BCRYPT_ROUNDS);
+    const passwordHash = await hashPassword(normalizedPassword, BCRYPT_ROUNDS);
     const user = await prisma.user.create({
       data: {
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         passwordHash,
         displayName: displayName.trim(),
         emailVerified: false,
@@ -187,30 +199,19 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
 router.post('/login', authRateLimiter, async (req, res: Response) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email e senha são obrigatórios' });
-      return;
-    }
-    if (typeof email !== 'string' || typeof password !== 'string') {
+    const normalizedEmail = normalizeEmailInput(email);
+    const normalizedPassword = parsePasswordInput(password);
+    if (!normalizedEmail || !normalizedPassword) {
       res.status(400).json({ error: 'Credenciais inválidas' });
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
-    if (!user) {
-      setAuditContext(req, audit.of('auth.login.failed', 'User', null, {
-        metadata: { email: email.trim().toLowerCase() },
-        success: false,
-        errorCode: 'INVALID_CREDENTIALS',
-      }));
-      res.status(401).json({ error: 'Credenciais inválidas' });
-      return;
-    }
-
-    const valid = await comparePassword(password, user.passwordHash);
-    if (!valid) {
-      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
-        metadata: { email: user.email },
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+    const valid = await comparePassword(normalizedPassword, passwordHash);
+    if (!user || !valid) {
+      setAuditContext(req, audit.of('auth.login.failed', 'User', user?.id ?? null, {
+        metadata: { email: normalizedEmail },
         success: false,
         errorCode: 'INVALID_CREDENTIALS',
       }));
@@ -447,5 +448,270 @@ router.delete('/me/avatar', authMiddleware, async (req: AuthRequest, res: Respon
     res.status(500).json({ error: 'Erro ao remover foto de perfil' });
   }
 });
+
+async function verifyAccountPassword(
+  user: { passwordHash: string },
+  password: unknown
+): Promise<boolean> {
+  const parsed = parsePasswordInput(password);
+  if (!parsed) return false;
+  return comparePassword(parsed, user.passwordHash);
+}
+
+router.get(
+  '/me/change-email/status',
+  authMiddleware,
+  requireVerifiedAccount,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const state = await getEmailChangeState(req.user!.userId);
+      if (!state) {
+        res.json({ active: false });
+        return;
+      }
+      res.json({
+        active: true,
+        phase: state.phase,
+        maskedNewEmail: maskEmail(state.newEmail),
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao consultar troca de e-mail' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-email/request',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+
+      const newEmail = normalizeEmailInput(req.body?.newEmail);
+      const password = req.body?.password;
+      if (!newEmail || newEmail === user.email) {
+        res.status(400).json({ error: CHANGE_EMAIL_START_ERROR });
+        return;
+      }
+      if (!(await verifyAccountPassword(user, password))) {
+        res.status(400).json({ error: CHANGE_EMAIL_START_ERROR });
+        return;
+      }
+      if (await isEmailTaken(newEmail)) {
+        res.status(400).json({ error: CHANGE_EMAIL_START_ERROR });
+        return;
+      }
+
+      const started = await startEmailChange(user.id, user.email, newEmail, user.displayName);
+      if (!started.ok) {
+        res.status(started.error.includes('Aguarde') ? 429 : 503).json({ error: started.error });
+        return;
+      }
+
+      setAuditContext(req, audit.of('auth.email.change.request', 'User', user.id, {
+        metadata: { newEmail },
+      }));
+      res.json({
+        phase: 'old',
+        maskedEmail: started.maskedEmail,
+        maskedNewEmail: maskEmail(newEmail),
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao iniciar troca de e-mail' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-email/verify-old',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+      const code = normalizeVerificationCode(req.body?.code);
+      if (!code) {
+        res.status(400).json({ error: 'Código de 6 dígitos é obrigatório.' });
+        return;
+      }
+
+      const result = await verifyOldEmailForChange(user.id, code, user.displayName);
+      if (!result.ok) {
+        const status = result.code === 'locked' ? 429 : 400;
+        res.status(status).json({ error: result.error });
+        return;
+      }
+
+      if (await isEmailTaken(result.newEmail, user.id)) {
+        await cancelEmailChange(user.id);
+        res.status(409).json({ error: 'Este e-mail já está em uso. Inicie a troca novamente.' });
+        return;
+      }
+
+      setAuditContext(req, audit.of('auth.email.change.verify_old', 'User', user.id, {
+        metadata: { newEmail: result.newEmail },
+      }));
+      res.json({
+        phase: 'new',
+        maskedEmail: result.maskedNewEmail,
+        maskedNewEmail: result.maskedNewEmail,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao verificar e-mail atual' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-email/verify-new',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+      const code = normalizeVerificationCode(req.body?.code);
+      if (!code) {
+        res.status(400).json({ error: 'Código de 6 dígitos é obrigatório.' });
+        return;
+      }
+
+      const result = await verifyNewEmailForChange(user.id, code);
+      if (!result.ok) {
+        const status = result.code === 'locked' ? 429 : 400;
+        res.status(status).json({ error: result.error });
+        return;
+      }
+
+      if (await isEmailTaken(result.newEmail, user.id)) {
+        res.status(409).json({ error: 'Este e-mail já está em uso.' });
+        return;
+      }
+
+      let updated;
+      try {
+        updated = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            email: result.newEmail,
+            emailVerified: true,
+            emailVerifiedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          res.status(409).json({ error: 'Este e-mail já está em uso.' });
+          return;
+        }
+        throw err;
+      }
+
+      const token = signToken({ userId: updated.id, email: updated.email, role: updated.role });
+      setAuditContext(req, audit.of('auth.email.change.complete', 'User', updated.id, {
+        before: { email: user.email },
+        after: { email: updated.email },
+      }));
+      res.json({ token, user: sanitizeUser(updated) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao confirmar novo e-mail' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-email/resend',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+
+      const resent = await resendEmailChangeCode(user.id, user.email, user.displayName);
+      if (!resent.ok) {
+        res.status(resent.error.includes('Aguarde') ? 429 : 400).json({ error: resent.error });
+        return;
+      }
+
+      setAuditContext(req, audit.of('auth.email.change.resend', 'User', user.id, {
+        metadata: { phase: resent.phase },
+      }));
+      res.json({
+        phase: resent.phase,
+        maskedEmail: resent.maskedEmail,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao reenviar código' });
+    }
+  }
+);
+
+router.post('/me/change-email/cancel', authMiddleware, requireVerifiedAccount, async (req: AccountAuthRequest, res: Response) => {
+  try {
+    await cancelEmailChange(req.user!.userId);
+    setAuditContext(req, audit.of('auth.email.change.cancel', 'User', req.user!.userId));
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao cancelar troca de e-mail' });
+  }
+});
+
+router.post(
+  '/me/delete-account',
+  authMiddleware,
+  requireActiveAccount,
+  sensitiveAccountRateLimiter,
+  authRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+
+      if (user.role === 'ADMIN') {
+        res.status(400).json({ error: 'Contas de administrador não podem ser excluídas por aqui. Peça a outro administrador.' });
+        return;
+      }
+
+      const password = req.body?.password;
+      const confirmText = typeof req.body?.confirmText === 'string' ? req.body.confirmText.trim() : '';
+      if (confirmText !== DELETE_ACCOUNT_CONFIRM) {
+        res.status(400).json({ error: `Digite ${DELETE_ACCOUNT_CONFIRM} para confirmar a exclusão permanente.` });
+        return;
+      }
+      if (!(await verifyAccountPassword(user, password))) {
+        res.status(400).json({ error: 'Senha incorreta.' });
+        return;
+      }
+
+      await cancelEmailChange(user.id);
+      await deleteUserAndData(user.id);
+
+      setAuditContext(req, audit.of('auth.account.delete', 'User', user.id, {
+        before: {
+          email: user.email,
+          displayName: user.displayName,
+          role: user.role,
+        },
+      }));
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao excluir conta' });
+    }
+  }
+);
 
 export default router;

@@ -64,6 +64,16 @@ export class ProfileComponent implements OnInit, OnDestroy {
   deletingId: string | null = null;
   requeueAllLoading = false;
   demoQueueAvailable = true;
+  emailChangePhase: 'idle' | 'old' | 'new' = 'idle';
+  emailChangeMaskedEmail = '';
+  emailChangeLoading = false;
+  emailChangeResendLoading = false;
+  emailChangeMsg = '';
+  emailChangeError = '';
+  deleteAccountLoading = false;
+  deleteAccountError = '';
+  emailChangeForm: FormGroup;
+  deleteAccountForm: FormGroup;
   private listPollSub?: Subscription;
   private highlightsPollSub?: Subscription;
   private readonly stuckPendingMs = 2 * 60 * 1000;
@@ -80,6 +90,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
       displayName: ['', Validators.required],
       steamId: [''],
       position: [''],
+    });
+    this.emailChangeForm = this.fb.group({
+      newEmail: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6)]],
+      code: ['', [Validators.pattern(/^\d{6}$/)]],
+    });
+    this.deleteAccountForm = this.fb.group({
+      password: ['', [Validators.required, Validators.minLength(6)]],
+      confirmText: ['', Validators.required],
     });
   }
 
@@ -462,6 +481,136 @@ export class ProfileComponent implements OnInit, OnDestroy {
       'Steam em breve',
       { hint: 'A conexão automática com Steam será implementada em uma fase futura.' }
     );
+  }
+
+  startEmailChange(): void {
+    if (this.emailChangeLoading) return;
+    const { newEmail, password } = this.emailChangeForm.value;
+    if (!newEmail?.trim() || !password) {
+      this.emailChangeError = 'Informe o novo e-mail e sua senha atual.';
+      return;
+    }
+
+    this.emailChangeLoading = true;
+    this.emailChangeError = '';
+    this.emailChangeMsg = '';
+    this.authService.requestEmailChange(String(newEmail).trim().toLowerCase(), password).subscribe({
+      next: (res) => {
+        this.emailChangeLoading = false;
+        this.emailChangePhase = res.phase;
+        this.emailChangeMaskedEmail = res.maskedEmail;
+        this.emailChangeForm.patchValue({ password: '', code: '' });
+        this.emailChangeMsg = `Código enviado para ${res.maskedEmail}. Confirme o e-mail atual.`;
+      },
+      error: (err) => {
+        this.emailChangeLoading = false;
+        this.emailChangeError = err.error?.error || 'Não foi possível iniciar a troca de e-mail.';
+      },
+    });
+  }
+
+  submitEmailChangeCode(): void {
+    if (this.emailChangeLoading) return;
+    const code = String(this.emailChangeForm.value.code || '').replace(/\D/g, '');
+    if (code.length !== 6) {
+      this.emailChangeError = 'Informe o código de 6 dígitos.';
+      return;
+    }
+
+    this.emailChangeLoading = true;
+    this.emailChangeError = '';
+    this.emailChangeMsg = '';
+
+    if (this.emailChangePhase === 'old') {
+      this.authService.verifyOldEmailForChange(code).subscribe({
+        next: (res) => {
+          this.emailChangeLoading = false;
+          this.emailChangePhase = res.phase;
+          this.emailChangeMaskedEmail = res.maskedEmail;
+          this.emailChangeForm.patchValue({ code: '' });
+          this.emailChangeMsg = `Código enviado para ${res.maskedEmail}. Confirme o novo e-mail.`;
+        },
+        error: (err) => {
+          this.emailChangeLoading = false;
+          this.emailChangeError = err.error?.error || 'Código inválido.';
+        },
+      });
+      return;
+    }
+
+    this.authService.verifyNewEmailForChange(code).subscribe({
+      next: (userRes) => {
+        this.emailChangeLoading = false;
+        this.email = userRes.user.email;
+        this.resetEmailChangeFlow();
+        this.successMsg = 'E-mail atualizado com sucesso!';
+        this.notify.success('Seu e-mail foi alterado.', 'Conta');
+      },
+      error: (err) => {
+        this.emailChangeLoading = false;
+        this.emailChangeError = err.error?.error || 'Não foi possível confirmar o novo e-mail.';
+      },
+    });
+  }
+
+  resendEmailChangeCode(): void {
+    if (this.emailChangeResendLoading || this.emailChangePhase === 'idle') return;
+    this.emailChangeResendLoading = true;
+    this.emailChangeError = '';
+    this.authService.resendEmailChangeCode().subscribe({
+      next: (res) => {
+        this.emailChangeResendLoading = false;
+        this.emailChangeMaskedEmail = res.maskedEmail;
+        this.emailChangeMsg = `Novo código enviado para ${res.maskedEmail}.`;
+      },
+      error: (err) => {
+        this.emailChangeResendLoading = false;
+        this.emailChangeError = err.error?.error || 'Não foi possível reenviar o código.';
+      },
+    });
+  }
+
+  cancelEmailChange(): void {
+    this.authService.cancelEmailChange().subscribe({
+      next: () => this.resetEmailChangeFlow(),
+      error: () => this.resetEmailChangeFlow(),
+    });
+  }
+
+  resetEmailChangeFlow(): void {
+    this.emailChangePhase = 'idle';
+    this.emailChangeMaskedEmail = '';
+    this.emailChangeMsg = '';
+    this.emailChangeError = '';
+    this.emailChangeForm.patchValue({ newEmail: '', password: '', code: '' });
+  }
+
+  deleteAccount(): void {
+    if (this.deleteAccountLoading || this.role === 'ADMIN') return;
+    const { password, confirmText } = this.deleteAccountForm.value;
+    if (confirmText !== 'EXCLUIR CONTA') {
+      this.deleteAccountError = 'Digite EXCLUIR CONTA para confirmar.';
+      return;
+    }
+    if (!password) {
+      this.deleteAccountError = 'Informe sua senha.';
+      return;
+    }
+
+    this.deleteAccountLoading = true;
+    this.deleteAccountError = '';
+    this.authService.deleteAccount(password, confirmText).subscribe({
+      next: () => {
+        this.deleteAccountLoading = false;
+        this.authService.logout();
+        this.router.navigate(['/login']);
+        this.notify.info('Sua conta foi excluída permanentemente.', 'Conta removida');
+      },
+      error: (err) => {
+        this.deleteAccountLoading = false;
+        this.deleteAccountError = err.error?.error || 'Não foi possível excluir a conta.';
+      },
+    });
   }
 
   openUploadModal(): void {

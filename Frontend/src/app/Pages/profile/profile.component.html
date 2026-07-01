@@ -418,6 +418,97 @@
           <button type="button" class="btn btn-ghost w-full mb-4" (click)="connectSteam()">Conectar Steam (em breve)</button>
           <button type="submit" class="btn btn-primary w-full">Salvar Alterações</button>
         </form>
+
+        <div class="settings-divider"></div>
+
+        <section class="account-security-section" aria-labelledby="email-change-title">
+          <h3 id="email-change-title" class="subsection-title">Trocar e-mail</h3>
+          <p class="form-hint">E-mail atual: <strong>{{ email }}</strong></p>
+          <p class="form-hint">Enviaremos um código para o e-mail atual e outro para o novo endereço.</p>
+
+          <div *ngIf="emailChangeMsg" class="success-message settings-inline-message">{{ emailChangeMsg }}</div>
+          <div *ngIf="emailChangeError" class="error-message settings-inline-message">{{ emailChangeError }}</div>
+
+          <form [formGroup]="emailChangeForm" class="form-group-spacing" (ngSubmit)="emailChangePhase === 'idle' ? startEmailChange() : submitEmailChangeCode()">
+            <div class="form-group" *ngIf="emailChangePhase === 'idle'">
+              <label for="newEmail" class="form-label">Novo e-mail</label>
+              <input type="email" id="newEmail" formControlName="newEmail" class="input-field" autocomplete="email">
+            </div>
+            <div class="form-group" *ngIf="emailChangePhase === 'idle'">
+              <label for="emailChangePassword" class="form-label">Senha atual</label>
+              <input type="password" id="emailChangePassword" formControlName="password" class="input-field" autocomplete="current-password">
+            </div>
+            <div class="form-group" *ngIf="emailChangePhase !== 'idle'">
+              <label for="emailChangeCode" class="form-label">
+                Código enviado para {{ emailChangeMaskedEmail }}
+              </label>
+              <input
+                type="text"
+                id="emailChangeCode"
+                formControlName="code"
+                class="input-field"
+                inputmode="numeric"
+                maxlength="6"
+                placeholder="000000"
+                autocomplete="one-time-code">
+              <p class="form-hint" *ngIf="emailChangePhase === 'old'">Passo 1 de 2 — confirme o e-mail atual.</p>
+              <p class="form-hint" *ngIf="emailChangePhase === 'new'">Passo 2 de 2 — confirme o novo e-mail.</p>
+            </div>
+
+            <div class="settings-actions-row">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="emailChangeLoading">
+                {{ emailChangeLoading ? 'Aguarde...' : (emailChangePhase === 'idle' ? 'Iniciar troca' : 'Confirmar código') }}
+              </button>
+              <button
+                *ngIf="emailChangePhase !== 'idle'"
+                type="button"
+                class="btn btn-secondary"
+                (click)="resendEmailChangeCode()"
+                [disabled]="emailChangeResendLoading">
+                {{ emailChangeResendLoading ? 'Reenviando...' : 'Reenviar código' }}
+              </button>
+              <button
+                *ngIf="emailChangePhase !== 'idle'"
+                type="button"
+                class="btn btn-ghost"
+                (click)="cancelEmailChange()">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <div class="settings-divider"></div>
+
+        <section class="danger-zone-section" aria-labelledby="delete-account-title">
+          <h3 id="delete-account-title" class="subsection-title danger-title">Excluir conta</h3>
+          <p class="form-hint danger-hint">
+            Esta ação é permanente. Suas demos pessoais, destaques e dados de perfil serão removidos.
+            Ligas e times que você criou também serão excluídos.
+          </p>
+          <p *ngIf="role === 'ADMIN'" class="form-hint danger-hint">
+            Contas de administrador não podem ser excluídas por aqui.
+          </p>
+
+          <div *ngIf="deleteAccountError" class="error-message settings-inline-message">{{ deleteAccountError }}</div>
+
+          <form *ngIf="role !== 'ADMIN'" [formGroup]="deleteAccountForm" class="form-group-spacing" (ngSubmit)="deleteAccount()">
+            <div class="form-group">
+              <label for="deletePassword" class="form-label">Senha</label>
+              <input type="password" id="deletePassword" formControlName="password" class="input-field" autocomplete="current-password">
+            </div>
+            <div class="form-group">
+              <label for="deleteConfirm" class="form-label">Digite EXCLUIR CONTA para confirmar</label>
+              <input type="text" id="deleteConfirm" formControlName="confirmText" class="input-field" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-danger w-full" [disabled]="deleteAccountLoading">
+              {{ deleteAccountLoading ? 'Excluindo...' : 'Excluir conta permanentemente' }}
+            </button>
+          </form>
+        </section>
       </section>
     </main>
   </div>

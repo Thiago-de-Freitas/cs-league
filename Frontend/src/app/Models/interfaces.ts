@@ -488,6 +488,22 @@ export interface ResendVerificationResponse {
   email: string;
 }
 
+export interface EmailChangePhaseResponse {
+  phase: 'old' | 'new';
+  maskedEmail: string;
+  maskedNewEmail?: string;
+}
+
+export interface EmailChangeStatusResponse {
+  active: boolean;
+  phase?: 'old' | 'new';
+  maskedNewEmail?: string;
+}
+
+export interface DeleteAccountResponse {
+  success: boolean;
+}
+
 export interface PlayerRankingEntry {
   rank: number;
   playerName: string;
