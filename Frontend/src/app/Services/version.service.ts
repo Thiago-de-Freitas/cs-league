@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
-import { BUILD_INFO, BuildInfo } from '../generated/build-info';
+import { normalizeBuildInfo, type BuildInfo } from '../Models/build-info';
+import { BUILD_INFO } from '../generated/build-info';
 import { APP_NAME } from '../Utils/brand';
 
 export interface AppVersionInfo {
@@ -19,17 +20,17 @@ export class VersionService {
   constructor(private http: HttpClient) {}
 
   getFrontendBuild(): BuildInfo {
-    return BUILD_INFO;
+    return normalizeBuildInfo(BUILD_INFO);
   }
 
   getFrontendLabel(): string {
-    return this.formatLabel(BUILD_INFO);
+    return this.formatLabel(this.getFrontendBuild());
   }
 
   getBackendBuild(): Observable<BuildInfo | null> {
     if (!this.backendCache$) {
-      this.backendCache$ = this.http.get<{ build: BuildInfo }>('/api/health').pipe(
-        map((res) => res.build ?? null),
+      this.backendCache$ = this.http.get<{ build: Partial<BuildInfo> & Pick<BuildInfo, 'component' | 'name' | 'version' | 'commit' | 'commitFull' | 'branch' | 'buildTime' | 'dirty'> }>('/api/health').pipe(
+        map((res) => (res.build ? normalizeBuildInfo(res.build) : null)),
         catchError(() => of(null)),
         shareReplay(1)
       );
@@ -39,28 +40,39 @@ export class VersionService {
 
   getAppVersion(): Observable<AppVersionInfo> {
     return this.getBackendBuild().pipe(
-      map((backend) => ({
-        frontend: BUILD_INFO,
-        frontendLabel: this.formatLabel(BUILD_INFO),
-        backend,
-        backendLabel: backend ? this.formatLabel(backend) : null,
-      }))
+      map((backend) => {
+        const frontend = this.getFrontendBuild();
+        return {
+          frontend,
+          frontendLabel: this.formatLabel(frontend),
+          backend,
+          backendLabel: backend ? this.formatLabel(backend) : null,
+        };
+      })
     );
   }
 
   formatLabel(info: BuildInfo): string {
     const dirty = info.dirty ? '-dirty' : '';
-    return `v${info.version} (${info.commit}${dirty})`;
+    const build = info.commitCount ?? 0;
+    const versionCore = build > 0 ? `v${info.version}+${build}` : `v${info.version}`;
+    return `${versionCore} (${info.commit}${dirty})`;
   }
 
   /** Versão única exibida no rodapé do sistema. */
   getSystemVersionLabel(): string {
-    return `v${BUILD_INFO.version}`;
+    const front = this.getFrontendBuild();
+    const build = front.commitCount ?? 0;
+    return build > 0 ? `v${front.version}+${build}` : `v${front.version}`;
   }
 
   getSystemVersionTooltip(): string {
-    const front = BUILD_INFO;
-    const dirty = front.dirty ? ' (dirty)' : '';
-    return `${APP_NAME} ${front.version} · build ${front.buildTime} · ${front.branch}${dirty}`;
+    const front = this.getFrontendBuild();
+    const dirty = front.dirty ? ' · working tree dirty' : '';
+    const sinceTag = front.versionTag
+      ? `${front.commitsSinceVersion} commit(s) desde ${front.versionTag}`
+      : `${front.commitsSinceVersion ?? front.commitCount ?? 0} commit(s) no repositório`;
+    const subject = front.commitSubject ? `\n${front.commitSubject}` : '';
+    return `${APP_NAME} ${this.getSystemVersionLabel()} · ${sinceTag} · ${front.commit} · ${front.branch}${dirty}${subject}`;
   }
 }

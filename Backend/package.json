@@ -1,11 +1,11 @@
 {
   "name": "gamers-league-api",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "version:generate": "node scripts/generate-version.mjs",
     "prebuild": "npm run version:generate",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "predev": "npm run version:generate",
     "prestart": "npm run build",
     "pretest": "npm run version:generate",

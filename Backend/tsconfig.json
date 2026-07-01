@@ -11,8 +11,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "moduleResolution": "node",
+    "typeRoots": ["./node_modules/@types"],
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "dist"]
 }

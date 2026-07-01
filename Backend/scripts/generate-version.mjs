@@ -137,22 +137,54 @@ function resolveGitMeta() {
   };
 }
 
+function resolveVersionCounts(version) {
+  const commitCount = Number(runGit('rev-list --count HEAD')) || 0;
+  const commitSubject = (runGit('log -1 --format=%s') || '').slice(0, 80);
+
+  const exactTag = `v${version}`;
+  let versionTag = '';
+  let commitsSinceVersion = commitCount;
+
+  if (runGit(`rev-list -n 1 ${exactTag}`)) {
+    versionTag = exactTag;
+    commitsSinceVersion = Number(runGit(`rev-list --count ${exactTag}..HEAD`)) || 0;
+  } else {
+    const latestTag = runGit('describe --tags --abbrev=0 --match v*');
+    if (latestTag) {
+      versionTag = latestTag;
+      commitsSinceVersion = Number(runGit(`rev-list --count ${latestTag}..HEAD`)) || 0;
+    }
+  }
+
+  return { commitCount, commitsSinceVersion, versionTag, commitSubject };
+}
+
 function makeBuildInfo(component, pkg) {
   const git = resolveGitMeta();
+  const version = pkg.version ?? '0.0.0';
+  const counts = resolveVersionCounts(version);
   return {
     component,
     name: pkg.name,
-    version: pkg.version ?? '0.0.0',
+    version,
     commit: git.commit,
     commitFull: git.commitFull,
     branch: git.branch,
     buildTime: git.buildTime,
     dirty: git.dirty,
+    commitCount: counts.commitCount,
+    commitsSinceVersion: counts.commitsSinceVersion,
+    versionTag: counts.versionTag || null,
+    commitSubject: counts.commitSubject || null,
   };
 }
 
-function toTsExport(info) {
-  return `/** Gerado automaticamente — não editar. */\nexport const BUILD_INFO = ${JSON.stringify(info, null, 2)} as const;\n\nexport type BuildInfo = typeof BUILD_INFO;\n`;
+function toTsExport(info, component) {
+  const payload = JSON.stringify(info, null, 2);
+  if (component === 'frontend') {
+    return `/** Gerado automaticamente — não editar. */\nimport { normalizeBuildInfo, type BuildInfo } from '../Models/build-info';\n\nexport const BUILD_INFO: BuildInfo = normalizeBuildInfo(${payload});\n`;
+  }
+  return `/** Gerado automaticamente — não editar. */\nimport type { BuildInfo } from '../lib/buildInfo';\n\nexport const BUILD_INFO: BuildInfo = ${payload};\n`;
 }
 
 function writeFileEnsuringDir(filePath, contents) {
@@ -169,11 +201,11 @@ if (targets.length === 0) {
 
 for (const target of targets) {
   const info = makeBuildInfo(target.component, target.pkg);
-  writeFileEnsuringDir(target.tsOut, toTsExport(info));
+  writeFileEnsuringDir(target.tsOut, toTsExport(info, target.component));
   if (target.jsonOut) {
     writeFileEnsuringDir(target.jsonOut, `${JSON.stringify(info, null, 2)}\n`);
   }
   console.log(
-    `[version] ${target.component} ${info.version} (${info.commit}${info.dirty ? '-dirty' : ''})`
+    `[version] ${target.component} v${info.version}+${info.commitCount} (${info.commit}${info.dirty ? '-dirty' : ''})`
   );
 }

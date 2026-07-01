@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "noEmit": true,
+    "typeRoots": ["./Backend/node_modules/@types"],
+    "types": ["node"]
+  },
+  "include": ["Backend/src/**/*.test.ts", "Backend/src/global.d.ts"],
+  "exclude": ["node_modules", "dist", "Frontend"]
+}
