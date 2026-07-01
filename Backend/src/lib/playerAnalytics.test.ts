@@ -47,7 +47,31 @@ describe('playerAnalytics', () => {
     assert.ok(insights.some((item) => item.id === 'aim'));
     assert.ok(insights.some((item) => item.id === 'he-usage'));
     assert.ok(insights.some((item) => item.id === 'trade-fragging'));
-    assert.ok(insights.some((item) => item.id === 'ct-map'));
+    assert.ok(insights.some((item) => item.id === 'positioning'));
+  });
+
+  it('buildPerformanceInsights gera dicas contextualizadas com as estatísticas', () => {
+    const weakStat = {
+      ...baseStat,
+      hsPercent: 28,
+      kills: 12,
+      deaths: 18,
+      kast: 58,
+      analytics: {
+        ...baseStat.analytics,
+        utility: { heDamage: 28, molotovDamage: 10, flashAssists: 0 },
+        combat: { tradeKills: 1, tradedDeaths: 9, openingKills: 1, openingDeaths: 6 },
+      },
+    };
+    const skills = computeSkillRatings(weakStat);
+    const insights = buildPerformanceInsights(weakStat, skills, weakStat.analytics);
+
+    const tips = insights.map((item) => item.tip).join(' ');
+
+    assert.ok(tips.includes('28%') || tips.includes('HS%') || tips.includes('K/D'));
+    assert.ok(/HE|dmg\/round/i.test(tips));
+    assert.ok(/trade/i.test(tips));
+    assert.ok(insights.every((item) => item.tip.length > 20));
   });
 
   it('buildPersonalPerformanceAnalytics agrega demos concluídas', () => {

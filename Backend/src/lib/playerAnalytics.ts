@@ -216,6 +216,147 @@ function buildInsight(
   };
 }
 
+function pickWeakestTip(candidates: { rating: number; tip: string }[]): string {
+  return [...candidates].sort((a, b) => a.rating - b.rating)[0]?.tip ?? '';
+}
+
+function buildAimTip(stat: StatInput, skills: SkillRatings): string {
+  const rounds = estimateRounds(stat);
+  const analytics = parseAnalytics(stat.analytics);
+  const combat = analytics?.combat;
+  const kd = stat.deaths > 0 ? stat.kills / stat.deaths : stat.kills;
+  const openingKillRate = (combat?.openingKills ?? 0) / rounds;
+  const gap = SKILL_GOAL.aim - skills.aim;
+
+  const hsRating = ratingFromStat(stat.hsPercent, 42, 12);
+  const kdRating = ratingFromStat(kd, 1.0, 0.35);
+  const openRating = ratingFromStat(openingKillRate, 0.12, 0.06);
+
+  if (skills.aim >= SKILL_GOAL.aim + 15) {
+    return `Mira forte (${skills.aim}/100) com HS% em ${round0(stat.hsPercent)}% e K/D ${round2(kd).toFixed(2)}. Mantenha o pré-aim e converta openings (${combat?.openingKills ?? 0} em ${rounds} rounds).`;
+  }
+
+  if (skills.aim >= SKILL_GOAL.aim) {
+    return `Você está na meta (${skills.aim}). Para subir mais, busque HS% acima de ${round0(stat.hsPercent)}% e ${round2(openingKillRate * 100).toFixed(0)}% de openings por round.`;
+  }
+
+  const statLine = `HS% ${round0(stat.hsPercent)}, K/D ${round2(kd).toFixed(2)}, ${combat?.openingKills ?? 0} openings em ${rounds} rounds.`;
+  const focus = pickWeakestTip([
+    {
+      rating: hsRating,
+      tip: `HS% em ${round0(stat.hsPercent)}% (meta ~42%) puxa sua mira para ${skills.aim}. Treine altura de mira e bursts curtos antes de commitar o duelo.`,
+    },
+    {
+      rating: kdRating,
+      tip: `K/D de ${round2(kd).toFixed(2)} limita seu rating de mira (${skills.aim}). Evite duelos isolados e prefira picks com utilitário ou vantagem numérica.`,
+    },
+    {
+      rating: openRating,
+      tip: `Poucos openings (${combat?.openingKills ?? 0} em ${rounds} rounds). Entre em dupla com o entry ou jogue segunda entrada para ganhar o primeiro abate com flash.`,
+    },
+  ]);
+
+  return gap >= 20
+    ? `${focus} Referência: ${statLine} Você está ${gap} pontos abaixo da meta 50.`
+    : `${focus} Referência: ${statLine}`;
+}
+
+function buildHeUsageTip(stat: StatInput, analytics: PlayerAnalyticsRaw | null, heRating: number): string {
+  const rounds = estimateRounds(stat);
+  const utility = analytics?.utility;
+  const hePerRound = (utility?.heDamage ?? 0) / rounds;
+  const molotovPerRound = (utility?.molotovDamage ?? 0) / rounds;
+  const gap = 50 - heRating;
+
+  if (heRating >= 65) {
+    return `Bom uso de HE: ${round2(hePerRound).toFixed(1)} de dano/round. Continue quebrando stacks e punindo reposicionamentos com ${round0(utility?.heDamage ?? 0)} de dano total.`;
+  }
+
+  if (hePerRound < 1) {
+    return `Quase nenhum dano de HE (${round0(utility?.heDamage ?? 0)} em ${rounds} rounds). Compre HE todo round útil e use antes do contato em executes e retakes.`;
+  }
+
+  if (molotovPerRound < 1.5 && hePerRound < 4) {
+    return `HE com ${round2(hePerRound).toFixed(1)} dmg/round e molotov baixo (${round2(molotovPerRound).toFixed(1)}). Combine molotov para forçar saída e HE para finalizar o dano.`;
+  }
+
+  const base = `HE em ${round2(hePerRound).toFixed(1)} dmg/round (meta ~6,5). Aprenda 1–2 lineups por mapa e use em timings fixos de execute ou quando o time inimigo stackar o bombsite.`;
+  return gap >= 25 ? `${base} Faltam ~${gap} pontos para a meta — utilitário é seu maior ganho rápido.` : base;
+}
+
+function buildTradeFraggingTip(stat: StatInput, analytics: PlayerAnalyticsRaw | null, tradeRating: number): string {
+  const combat = analytics?.combat;
+  const tradeKillRate = (combat?.tradeKills ?? 0) / Math.max(stat.kills, 1);
+  const tradedDeathRate = (combat?.tradedDeaths ?? 0) / Math.max(stat.deaths, 1);
+  const gap = 50 - tradeRating;
+
+  if (tradeRating >= 65) {
+    return `Trade fragger consistente: ${round0(tradeKillRate * 100)}% dos abates são trades (${combat?.tradeKills ?? 0}/${stat.kills}). Continue jogando colado ao entry.`;
+  }
+
+  if (tradeKillRate < 0.08 && stat.kills >= 10) {
+    return `Só ${round0(tradeKillRate * 100)}% dos seus ${stat.kills} abates são trades (meta ~18%). Fique a 1–2 passos do entry e atire assim que o duelo começar.`;
+  }
+
+  if (tradedDeathRate > 0.45) {
+    return `${round0(tradedDeathRate * 100)}% das suas mortes não viram trade (${combat?.tradedDeaths ?? 0}/${stat.deaths}). Peça flash ou entre no bombsite só com cobertura do time.`;
+  }
+
+  const base = `${combat?.tradeKills ?? 0} trade kills em ${stat.kills} abates (${round0(tradeKillRate * 100)}%). Jogue o mesmo ângulo do companheiro morto em até 1,5s para converter o frag.`;
+  return gap >= 30 ? `${base} Com rating ${tradeRating}, trades são a skill que mais sobe seu impacto no round.` : base;
+}
+
+function buildCtMapTip(
+  map: string,
+  ctSide: AnalyticsSideStats,
+  ctSkill: number
+): string {
+  const mapName = formatMapName(map);
+  const kd = ctSide.deaths > 0 ? ctSide.kills / ctSide.deaths : ctSide.kills;
+  const adr = ctSide.damage / ctSide.rounds;
+
+  if (ctSkill >= 65) {
+    return `CT forte em ${mapName}: K/D ${round2(kd).toFixed(2)} e ${round0(adr)} ADR em ${ctSide.rounds} rounds. Replique essa leitura de ângulos nos outros mapas.`;
+  }
+
+  if (adr < 65) {
+    return `No CT em ${mapName}, ADR de ${round0(adr)} está baixo. Segure posições com utilitário e evite peek duplo sem flash nos retakes.`;
+  }
+
+  if (kd < 0.9) {
+    return `CT em ${mapName} com K/D ${round2(kd).toFixed(2)} em ${ctSide.rounds} rounds. Jogue mais retake em grupo e use HE/molotov antes de commitar o bombsite.`;
+  }
+
+  return `CT em ${mapName} (${ctSkill}/100): foque utilitários de retake, ângulos off-angle e não troque isolado no meio do mapa.`;
+}
+
+function buildPositioningTip(stat: StatInput, skills: SkillRatings): string {
+  const rounds = estimateRounds(stat);
+  const analytics = parseAnalytics(stat.analytics);
+  const combat = analytics?.combat;
+  const openingDeathRate = (combat?.openingDeaths ?? 0) / rounds;
+  const tradedDeathRate = (combat?.tradedDeaths ?? 0) / Math.max(stat.deaths, 1);
+
+  if (skills.positioning >= SKILL_GOAL.positioning + 10) {
+    return `Posicionamento sólido (${skills.positioning}) com KAST ${round0(stat.kast)}%. Continue jogando para o trade e evitando mortes de opening.`;
+  }
+
+  return pickWeakestTip([
+    {
+      rating: ratingFromStat(stat.kast, 72, 10),
+      tip: `KAST em ${round0(stat.kast)}% (meta ~72%) mostra que você morre sem impacto no round. Jogue posições com saída e peça utilitário antes de avançar.`,
+    },
+    {
+      rating: ratingFromStat(1 - openingDeathRate, 0.88, 0.08),
+      tip: `${combat?.openingDeaths ?? 0} opening deaths em ${rounds} rounds. Evite ser o primeiro contato sem flash e deixe o entry abrir espaço.`,
+    },
+    {
+      rating: ratingFromStat(1 - tradedDeathRate, 0.82, 0.1),
+      tip: `${round0(tradedDeathRate * 100)}% das mortes sem trade. Reposicione após o primeiro abate inimigo em vez de segurar o mesmo ângulo.`,
+    },
+  ]);
+}
+
 export function buildPerformanceInsights(
   stat: StatInput,
   skills: SkillRatings,
@@ -232,8 +373,7 @@ export function buildPerformanceInsights(
       'Mira (Aim)',
       skills.aim,
       SKILL_GOAL.aim,
-      tierLabel(tierFromRating(skills.aim, SKILL_GOAL.aim))
-        + '. Priorize crosshair placement e duelos com vantagem numérica.'
+      buildAimTip(stat, skills)
     )
   );
 
@@ -244,7 +384,7 @@ export function buildPerformanceInsights(
       'Uso de HE',
       heRating,
       50,
-      'Cause dano consistente com HE em stacks e posições previsíveis do adversário.'
+      buildHeUsageTip(stat, analytics, heRating)
     )
   );
 
@@ -259,7 +399,17 @@ export function buildPerformanceInsights(
       'Trade Fragging',
       tradeRating,
       50,
-      'Jogue próximo aos entry fraggers para converter abates e punir overpeeks.'
+      buildTradeFraggingTip(stat, analytics, tradeRating)
+    )
+  );
+
+  insights.push(
+    buildInsight(
+      'positioning',
+      'Posicionamento',
+      skills.positioning,
+      SKILL_GOAL.positioning,
+      buildPositioningTip(stat, skills)
     )
   );
 
@@ -274,12 +424,14 @@ export function buildPerformanceInsights(
         `CT em ${formatMapName(map)}`,
         ctSkill,
         55,
-        `Seu desempenho no CT em ${formatMapName(map)} — foque utilitários de retake e ângulos seguros.`
+        buildCtMapTip(map, ctSide, ctSkill)
       )
     );
   }
 
-  return insights.slice(0, 4);
+  return insights
+    .sort((a, b) => (a.goal - a.rating) - (b.goal - b.rating))
+    .slice(0, 4);
 }
 
 export function findTopMapInsight(
