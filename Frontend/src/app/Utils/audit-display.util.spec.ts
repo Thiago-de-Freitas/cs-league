@@ -1,4 +1,10 @@
-import { formatAuditActor } from './audit-display.util';
+import {
+  formatAuditActor,
+  formatAuditAction,
+  hasAuditDetails,
+  buildAuditDetailsPayload,
+  formatAuditJson,
+} from './audit-display.util';
 import { AuditEvent } from '../Models/interfaces';
 
 describe('formatAuditActor', () => {
@@ -40,5 +46,39 @@ describe('formatAuditActor', () => {
       success: true,
     };
     expect(formatAuditActor(event)).toBe('admin@test.com');
+  });
+});
+
+describe('audit details helpers', () => {
+  const baseEvent: AuditEvent = {
+    id: 'e1',
+    occurredAt: '2025-06-01T12:00:00Z',
+    action: 'league.create',
+    entityType: 'League',
+    entityId: 'l1',
+    actorType: 'user',
+    success: true,
+  };
+
+  it('formatAuditAction retorna rótulo amigável', () => {
+    expect(formatAuditAction('league.create')).toBe('Liga criada');
+  });
+
+  it('hasAuditDetails detecta payload extra', () => {
+    expect(hasAuditDetails(baseEvent)).toBeFalse();
+    expect(hasAuditDetails({ ...baseEvent, after: { name: 'Test' } })).toBeTrue();
+  });
+
+  it('buildAuditDetailsPayload agrupa campos relevantes', () => {
+    const payload = buildAuditDetailsPayload({
+      ...baseEvent,
+      parentType: 'League',
+      parentId: 'parent-1',
+      after: { name: 'Nova liga' },
+      metadata: { source: 'admin' },
+    });
+    expect(payload.after).toEqual({ name: 'Nova liga' });
+    expect(payload.parent).toEqual({ type: 'League', id: 'parent-1' });
+    expect(formatAuditJson(payload)).toContain('Nova liga');
   });
 });

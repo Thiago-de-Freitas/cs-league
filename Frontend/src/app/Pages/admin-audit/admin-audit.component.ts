@@ -9,7 +9,7 @@ import {
 } from '../../Services/audit.service';
 import { AuthService } from '../../Services/auth.service';
 import { AuditEvent } from '../../Models/interfaces';
-import { formatAuditActor } from '../../Utils/audit-display.util';
+import { formatAuditActor, formatAuditAction, hasAuditDetails, buildAuditDetailsPayload, formatAuditJson } from '../../Utils/audit-display.util';
 
 @Component({
   selector: 'app-admin-audit',
@@ -30,6 +30,7 @@ export class AdminAuditComponent implements OnInit {
   totalPages = 1;
 
   readonly pageSizeOptions = AUDIT_PAGE_SIZE_OPTIONS;
+  expandedIds = new Set<string>();
 
   constructor(
     private auditService: AuditService,
@@ -95,11 +96,31 @@ export class AdminAuditComponent implements OnInit {
   }
 
   formatAction(action: string): string {
-    return action.replace(/\./g, ' · ');
+    return formatAuditAction(action);
   }
 
   formatActor(event: AuditEvent): string {
     return formatAuditActor(event);
+  }
+
+  hasDetails(event: AuditEvent): boolean {
+    return hasAuditDetails(event);
+  }
+
+  toggleDetails(eventId: string): void {
+    if (this.expandedIds.has(eventId)) {
+      this.expandedIds.delete(eventId);
+    } else {
+      this.expandedIds.add(eventId);
+    }
+  }
+
+  isExpanded(eventId: string): boolean {
+    return this.expandedIds.has(eventId);
+  }
+
+  formatDetails(event: AuditEvent): string {
+    return formatAuditJson(buildAuditDetailsPayload(event));
   }
 
   formatDate(value: string): string {

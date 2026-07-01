@@ -96,7 +96,31 @@ describe('AdminAuditComponent', () => {
     );
   });
 
-  it('formatAction substitui pontos por separador', () => {
-    expect(component.formatAction('league.create')).toBe('league · create');
+  it('formatAction usa rótulo amigável quando disponível', () => {
+    expect(component.formatAction('league.create')).toBe('Liga criada');
+    expect(component.formatAction('custom.action')).toBe('custom · action');
+  });
+
+  it('expande e oculta detalhes do evento', () => {
+    const event = {
+      id: 'e1',
+      occurredAt: '2025-06-01T12:00:00Z',
+      action: 'league.create',
+      entityType: 'League',
+      entityId: 'l1',
+      actorType: 'user',
+      success: true,
+      after: { name: 'Liga Teste' },
+    } as const;
+
+    expect(component.hasDetails(event)).toBeTrue();
+    expect(component.isExpanded('e1')).toBeFalse();
+
+    component.toggleDetails('e1');
+    expect(component.isExpanded('e1')).toBeTrue();
+    expect(component.formatDetails(event)).toContain('Liga Teste');
+
+    component.toggleDetails('e1');
+    expect(component.isExpanded('e1')).toBeFalse();
   });
 });

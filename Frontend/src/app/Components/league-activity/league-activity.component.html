@@ -15,7 +15,11 @@
           <span>{{ formatDate(event.occurredAt) }}</span>
           <span *ngIf="event.entityType">{{ event.entityType }}<span *ngIf="event.entityId"> · {{ event.entityId }}</span></span>
         </div>
-        <button type="button" class="btn btn-secondary btn-small activity-details-btn" (click)="toggleDetails(event.id)">
+        <button
+          *ngIf="hasDetails(event)"
+          type="button"
+          class="btn btn-secondary btn-small activity-details-btn"
+          (click)="toggleDetails(event.id)">
           {{ isExpanded(event.id) ? 'Ocultar detalhes' : 'Ver detalhes' }}
         </button>
         <pre class="activity-json" *ngIf="isExpanded(event.id)">{{ formatJson({ before: event.before, after: event.after, metadata: event.metadata, correlationId: event.correlationId }) }}</pre>

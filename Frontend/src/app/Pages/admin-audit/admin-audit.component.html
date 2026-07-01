@@ -41,17 +41,27 @@
 
       <ul class="gc-list" *ngIf="!loading && events.length > 0">
         <li *ngFor="let event of events" class="gc-list-item audit-row" [class.is-failure]="!event.success">
-          <div>
-            <strong>{{ formatAction(event.action) }}</strong>
+          <div class="audit-main">
+            <div class="audit-head">
+              <strong class="audit-action">{{ formatAction(event.action) }}</strong>
+              <span class="badge" [class.badge-gray]="event.success" [class.badge-red]="!event.success">
+                {{ event.success ? 'OK' : 'Falha' }}
+              </span>
+            </div>
             <div class="meta audit-meta">
               <span>{{ formatActor(event) }}</span>
               <span>{{ formatDate(event.occurredAt) }}</span>
               <span>{{ event.entityType }}<span *ngIf="event.entityId"> · {{ event.entityId }}</span></span>
             </div>
+            <button
+              *ngIf="hasDetails(event)"
+              type="button"
+              class="btn btn-secondary btn-small audit-details-btn"
+              (click)="toggleDetails(event.id)">
+              {{ isExpanded(event.id) ? 'Ocultar detalhes' : 'Ver detalhes' }}
+            </button>
+            <pre class="audit-json" *ngIf="isExpanded(event.id)">{{ formatDetails(event) }}</pre>
           </div>
-          <span class="badge" [class.badge-gray]="event.success" [class.badge-red]="!event.success">
-            {{ event.success ? 'OK' : 'Falha' }}
-          </span>
         </li>
       </ul>
 

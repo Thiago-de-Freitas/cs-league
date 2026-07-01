@@ -4,7 +4,48 @@ import { provideRouter } from '@angular/router';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { UserProfileComponent } from './user-profile.component';
 import { UsersService } from '../../Services/users.service';
-import { PublicUserProfile } from '../../Models/interfaces';
+import { PublicUserProfile, PersonalStatsSummary, PersonalDemoStat } from '../../Models/interfaces';
+
+function mockPersonalSummary(overrides: Partial<PersonalStatsSummary> = {}): PersonalStatsSummary {
+  return {
+    demosTotal: 1,
+    demosCompleted: 1,
+    kills: 20,
+    deaths: 10,
+    assists: 5,
+    damage: 1700,
+    headshotKills: 8,
+    kdDiff: 10,
+    avgKills: 20,
+    kd: 2,
+    kda: 2.5,
+    adr: 85,
+    hsPercent: 50,
+    kast: 75,
+    rating: 1.2,
+    ...overrides,
+  };
+}
+
+function mockPersonalDemo(overrides: Partial<PersonalDemoStat> = {}): PersonalDemoStat {
+  return {
+    demoId: 'd1',
+    fileName: 'match.dem',
+    status: 'completed',
+    createdAt: '2025-06-01T12:00:00Z',
+    kills: 20,
+    deaths: 15,
+    assists: 3,
+    damage: 1200,
+    kd: 1.33,
+    kda: 1.53,
+    adr: 85,
+    hsPercent: 45,
+    kast: 72,
+    headshotKills: 6,
+    ...overrides,
+  };
+}
 
 describe('UserProfileComponent', () => {
   let component: UserProfileComponent;
@@ -68,31 +109,17 @@ describe('UserProfileComponent', () => {
       of({
         ...mockProfile,
         personalStats: {
-          summary: {
+          summary: mockPersonalSummary({
             demosTotal: 2,
             demosCompleted: 2,
             kills: 40,
             deaths: 30,
             kd: 1.33,
-            adr: 85,
-            hsPercent: 45,
-            kast: 72,
+            kda: 1.5,
+            kdDiff: 10,
             rating: 1.1,
-          },
-          demos: [
-            {
-              demoId: 'd1',
-              fileName: 'match.dem',
-              status: 'completed',
-              createdAt: '2025-06-01T12:00:00Z',
-              kills: 20,
-              deaths: 15,
-              kd: 1.33,
-              adr: 85,
-              hsPercent: 45,
-              kast: 72,
-            },
-          ],
+          }),
+          demos: [mockPersonalDemo()],
         },
       })
     );
@@ -113,17 +140,7 @@ describe('UserProfileComponent', () => {
       of({
         ...mockProfile,
         personalStats: {
-          summary: {
-            demosTotal: 1,
-            demosCompleted: 1,
-            kills: 20,
-            deaths: 10,
-            kd: 2,
-            adr: 85,
-            hsPercent: 50,
-            kast: 75,
-            rating: 1.2,
-          },
+          summary: mockPersonalSummary(),
           demos: [],
         },
       })
@@ -132,6 +149,7 @@ describe('UserProfileComponent', () => {
     expect(component.kdGaugePercent()).toBe(100);
     expect(component.ratingGaugePercent()).toBe(60);
     expect(component.kastGaugePercent()).toBe(75);
+    expect(component.kdaGaugePercent()).toBe(83);
   });
 
   it('shortFileName encurta nomes longos de demo', () => {
