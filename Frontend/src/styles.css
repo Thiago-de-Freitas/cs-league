@@ -1303,6 +1303,12 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
 }
 
 /* ===== Profile: stats e gauges ===== */
+.profile-page .stats-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .profile-page .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1329,6 +1335,10 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
 
 .profile-page .stat-card-gauge { align-items: center; text-align: center; }
 .profile-page .stat-card-wide { grid-column: 1 / -1; }
+
+.profile-page .stats-history-card {
+  width: 100%;
+}
 
 .profile-page .stat-card-meta {
   font-size: 0.8rem;

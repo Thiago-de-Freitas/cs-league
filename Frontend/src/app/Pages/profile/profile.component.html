@@ -59,7 +59,8 @@
           <button type="button" class="btn btn-primary mt-4" (click)="openUploadModal()">Enviar primeira demo</button>
         </div>
 
-        <div *ngIf="!statsLoading && hasStats && summary" class="stats-grid">
+        <div *ngIf="!statsLoading && hasStats && summary" class="stats-dashboard">
+          <div class="stats-grid">
           <div class="stat-card stat-card-gauge">
             <span class="stat-card-label">K/D</span>
             <div class="gauge" [style.--pct]="kdGaugePercent() + '%'">
@@ -149,8 +150,11 @@
               <li><span>HS</span><strong>{{ summary.headshotKills }}</strong></li>
             </ul>
           </div>
+          </div>
 
-          <div class="stat-card stat-card-wide">
+          <app-profile-analytics [analytics]="performanceAnalytics"></app-profile-analytics>
+
+          <div class="stat-card stat-card-wide stats-history-card">
             <span class="stat-card-label">Histórico por demo</span>
             <div class="table-container">
               <table class="stats-table profile-history-table">
@@ -190,8 +194,6 @@
               </table>
             </div>
           </div>
-
-          <app-profile-analytics [analytics]="performanceAnalytics"></app-profile-analytics>
         </div>
       </section>
 

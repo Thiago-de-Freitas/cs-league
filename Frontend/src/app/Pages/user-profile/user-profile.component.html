@@ -137,6 +137,7 @@
             {{ summary.demosCompleted }} demo(s) pessoal(is) analisada(s) fora de ligas
           </p>
 
+          <div class="stats-dashboard">
           <div class="stats-grid">
             <div class="stat-card stat-card-gauge">
               <span class="stat-card-label">K/D</span>
@@ -227,8 +228,11 @@
                 <li><span>HS</span><strong>{{ summary.headshotKills }}</strong></li>
               </ul>
             </div>
+          </div>
 
-            <div class="stat-card stat-card-wide">
+          <app-profile-analytics [analytics]="performanceAnalytics"></app-profile-analytics>
+
+          <div class="stat-card stat-card-wide stats-history-card">
               <span class="stat-card-label">Histórico por demo</span>
               <div class="table-container">
                 <table class="stats-table profile-history-table">
@@ -264,8 +268,6 @@
               </div>
             </div>
           </div>
-
-          <app-profile-analytics [analytics]="performanceAnalytics"></app-profile-analytics>
         </section>
 
         <section class="gc-card user-profile-section" *ngIf="!hasPersonalStats">
