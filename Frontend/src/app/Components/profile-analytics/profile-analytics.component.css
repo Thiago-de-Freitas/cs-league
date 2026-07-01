@@ -49,10 +49,15 @@
   font-weight: 700;
 }
 
-.insight-tier-subpar { color: var(--gc-red); }
-.insight-tier-average { color: var(--gc-text-secondary); }
-.insight-tier-good { color: var(--gc-green); }
-.insight-tier-excellent { color: var(--gc-orange); }
+.insight-tier-subpar { color: var(--gc-rank-silver); }
+.insight-tier-average { color: var(--gc-rank-mg); }
+.insight-tier-good { color: var(--gc-rank-legendary); }
+.insight-tier-excellent { color: var(--gc-rank-gold-nova); }
+
+.skill-tier-subpar { color: var(--gc-rank-silver); }
+.skill-tier-average { color: var(--gc-rank-mg); }
+.skill-tier-good { color: var(--gc-rank-legendary); }
+.skill-tier-excellent { color: var(--gc-rank-gold-nova); }
 
 .insight-scores {
   display: flex;
@@ -88,13 +93,16 @@
   padding: 1rem;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .radar-header {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  width: 100%;
 }
 
 .radar-header h3 {
@@ -102,15 +110,24 @@
   text-transform: uppercase;
   color: var(--gc-orange);
   margin: 0;
-  flex: 1;
+  width: 100%;
+}
+
+.radar-legend-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  width: 100%;
 }
 
 .radar-legend {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--gc-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  white-space: nowrap;
 }
 
 .legend-you,
@@ -126,8 +143,80 @@
 
 .radar-chart {
   width: 100%;
-  max-width: 220px;
+  max-width: 200px;
   margin: 0 auto;
+  overflow: visible;
+}
+
+.radar-label {
+  font-size: 5.5px;
+  fill: var(--gc-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.radar-label-side {
+  font-size: 5px;
+}
+
+.radar-values {
+  list-style: none;
+  padding: 0;
+  margin: 0.85rem 0 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.radar-values li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--gc-text-secondary);
+}
+
+.radar-values strong {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+.radar-rank-legend {
+  list-style: none;
+  padding: 0.75rem 0 0;
+  margin: 0.75rem 0 0;
+  border-top: 1px solid var(--gc-border);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.radar-rank-legend li {
+  display: grid;
+  grid-template-columns: 10px 2.8rem 1fr;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.65rem;
+  color: var(--gc-text-muted);
+}
+
+.rank-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.rank-swatch.skill-tier-subpar { background: var(--gc-rank-silver); }
+.rank-swatch.skill-tier-average { background: var(--gc-rank-mg); }
+.rank-swatch.skill-tier-good { background: var(--gc-rank-legendary); }
+.rank-swatch.skill-tier-excellent { background: var(--gc-rank-gold-nova); }
+
+.rank-range {
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-name {
+  color: var(--gc-text-secondary);
 }
 
 .radar-grid {
@@ -158,31 +247,6 @@
 .radar-goal {
   stroke: var(--gc-text-muted);
   fill: var(--gc-text-muted);
-}
-
-.radar-label {
-  font-size: 4px;
-  fill: var(--gc-text-secondary);
-  text-transform: uppercase;
-}
-
-.radar-values {
-  list-style: none;
-  padding: 0;
-  margin: 0.75rem 0 0;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.radar-values li {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: var(--gc-text-secondary);
-}
-
-.radar-values strong {
-  color: var(--gc-text);
 }
 
 .analytics-form {

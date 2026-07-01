@@ -11,7 +11,7 @@
       <div class="insight-scores">
         <div class="insight-score">
           <span class="insight-score-label">Seu rating</span>
-          <strong class="insight-score-value">{{ insight.rating }}</strong>
+          <strong class="insight-score-value" [ngClass]="skillValueClass(insight.rating)">{{ insight.rating }}</strong>
         </div>
         <div class="insight-score insight-score-goal">
           <span class="insight-score-label">Meta</span>
@@ -24,25 +24,43 @@
     <article class="radar-card gc-card">
       <header class="radar-header">
         <h3>Performance</h3>
-        <span class="radar-legend"><span class="legend-you"></span> Você</span>
-        <span class="radar-legend"><span class="legend-goal"></span> Meta</span>
+        <div class="radar-legend-group">
+          <span class="radar-legend"><span class="legend-you"></span> Você</span>
+          <span class="radar-legend"><span class="legend-goal"></span> Meta (50)</span>
+        </div>
       </header>
       <svg class="radar-chart" viewBox="0 0 100 100" aria-label="Gráfico radar de habilidades">
-        <polygon class="radar-grid" points="50,12 88,69 12,69"></polygon>
-        <polygon class="radar-grid radar-grid-inner" points="50,24 76,63 24,63"></polygon>
-        <line x1="50" y1="50" x2="50" y2="12" class="radar-axis"></line>
-        <line x1="50" y1="50" x2="88" y2="69" class="radar-axis"></line>
-        <line x1="50" y1="50" x2="12" y2="69" class="radar-axis"></line>
+        <polygon class="radar-grid" points="50,14 84,67 16,67"></polygon>
+        <polygon class="radar-grid radar-grid-inner" points="50,26 74,61 26,61"></polygon>
+        <line x1="50" y1="50" x2="50" y2="14" class="radar-axis"></line>
+        <line x1="50" y1="50" x2="84" y2="67" class="radar-axis"></line>
+        <line x1="50" y1="50" x2="16" y2="67" class="radar-axis"></line>
         <polygon class="radar-polygon radar-goal" [attr.points]="radarPolygon('goal')"></polygon>
         <polygon class="radar-polygon radar-you" [attr.points]="radarPolygon('you')"></polygon>
-        <text x="50" y="8" class="radar-label">Mira</text>
-        <text x="92" y="72" class="radar-label">Posicionamento</text>
-        <text x="2" y="72" class="radar-label">Utilitários</text>
+        <text x="50" y="10" class="radar-label" text-anchor="middle">Mira</text>
+        <text x="86" y="70" class="radar-label radar-label-side" text-anchor="start">Pos.</text>
+        <text x="14" y="70" class="radar-label radar-label-side" text-anchor="end">Util.</text>
       </svg>
       <ul class="radar-values">
-        <li><span>Mira</span><strong>{{ data.skills.aim }}</strong></li>
-        <li><span>Posicionamento</span><strong>{{ data.skills.positioning }}</strong></li>
-        <li><span>Utilitários</span><strong>{{ data.skills.utility }}</strong></li>
+        <li>
+          <span>Mira</span>
+          <strong [ngClass]="skillValueClass(data.skills.aim)">{{ data.skills.aim }}</strong>
+        </li>
+        <li>
+          <span>Posicionamento</span>
+          <strong [ngClass]="skillValueClass(data.skills.positioning)">{{ data.skills.positioning }}</strong>
+        </li>
+        <li>
+          <span>Utilitários</span>
+          <strong [ngClass]="skillValueClass(data.skills.utility)">{{ data.skills.utility }}</strong>
+        </li>
+      </ul>
+      <ul class="radar-rank-legend" aria-label="Faixas de rating inspiradas nas cores de rank do CS2">
+        <li *ngFor="let band of skillRatingTiers">
+          <span class="rank-swatch" [ngClass]="band.cssClass"></span>
+          <span class="rank-range">{{ band.min }}–{{ band.max }}</span>
+          <span class="rank-name">{{ band.rankLabel }}</span>
+        </li>
       </ul>
     </article>
   </div>

@@ -1,6 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { PersonalPerformanceAnalytics } from '../../Models/interfaces';
+import {
+  SKILL_RATING_TIERS,
+  skillRatingTierInfo,
+} from '../../Utils/skill-rating-tiers.util';
 
 @Component({
   selector: 'app-profile-analytics',
@@ -11,6 +15,8 @@ import { PersonalPerformanceAnalytics } from '../../Models/interfaces';
 })
 export class ProfileAnalyticsSectionComponent {
   @Input() analytics: PersonalPerformanceAnalytics | null = null;
+
+  readonly skillRatingTiers = SKILL_RATING_TIERS;
 
   formTab: 'rating' | 'winrate' = 'rating';
 
@@ -38,6 +44,14 @@ export class ProfileAnalyticsSectionComponent {
       default:
         return 'Abaixo da média';
     }
+  }
+
+  skillValueClass(rating: number): string {
+    return skillRatingTierInfo(rating).cssClass;
+  }
+
+  skillRankLabel(rating: number): string {
+    return skillRatingTierInfo(rating).rankLabel;
   }
 
   performanceGaugePercent(): number {

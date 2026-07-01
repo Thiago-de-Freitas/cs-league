@@ -40,11 +40,11 @@
     <div class="section-card">
       <h2 class="section-title section-title-split">
         <span>Classificação</span>
-        <span class="league-team-count meta">{{ league.teams?.length || 0 }} time(s) na liga</span>
+        <span class="league-team-count meta">{{ league.teams.length || 0 }} time(s) na liga</span>
       </h2>
-      <p *ngIf="!league.teams?.length" class="no-teams-message">Nenhum time inscrito nesta liga ainda.</p>
+      <p *ngIf="!league.teams.length" class="no-teams-message">Nenhum time inscrito nesta liga ainda.</p>
       <app-league-teams-table
-        *ngIf="league.teams?.length"
+        *ngIf="league.teams.length"
         [teams]="classificationTeams"
         [useStandingsOrder]="useStandingsClassification"
         [canManageLeague]="isAdmin && !isArchived && !hasTournamentStarted && !useStandingsClassification"
@@ -322,7 +322,7 @@
         <h3 class="admin-panel-title">Adicionar times</h3>
         <p class="admin-panel-desc">Selecione um ou mais times para incluir na liga.</p>
 
-        <div *ngIf="league.teams?.length" class="league-enrolled-block">
+        <div *ngIf="league.teams.length" class="league-enrolled-block">
           <h4 class="form-label league-enrolled-label">Times na liga</h4>
           <ul class="league-enrolled-list">
             <li *ngFor="let t of league.teams" class="league-enrolled-chip">
