@@ -53,8 +53,21 @@ function getEmailFrom(): string | null {
   return from || null;
 }
 
+function normalizeApiKey(value: string | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  // Aspas ao colar no Railway / .env são erro comum
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 async function sendViaResend(to: string, subject: string, text: string, html: string): Promise<EmailSendResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = normalizeApiKey(process.env.RESEND_API_KEY);
   const from = getEmailFrom();
   if (!apiKey) {
     return { ok: false, error: 'RESEND_API_KEY não configurada.' };
