@@ -1371,6 +1371,19 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
   color: var(--gc-text);
 }
 
+.profile-page .gauge-mini {
+  width: 72px;
+  height: 72px;
+}
+
+.profile-page .gauge-mini .gauge-inner {
+  flex-direction: column;
+}
+
+.profile-page .gauge-mini .gauge-value {
+  font-size: 0.85rem;
+}
+
 .profile-page .stat-card-matches { justify-content: space-between; }
 
 .profile-page .match-dots {

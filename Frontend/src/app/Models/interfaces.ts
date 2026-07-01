@@ -412,6 +412,43 @@ export interface PersonalDemoStat {
 export interface PersonalStatsOverview {
   summary: PersonalStatsSummary;
   demos: PersonalDemoStat[];
+  analytics: PersonalPerformanceAnalytics | null;
+}
+
+export type PerformanceInsightTier = 'subpar' | 'average' | 'good' | 'excellent';
+
+export interface PerformanceInsight {
+  id: string;
+  title: string;
+  rating: number;
+  goal: number;
+  tier: PerformanceInsightTier;
+  tip: string;
+}
+
+export interface SkillRatings {
+  aim: number;
+  positioning: number;
+  utility: number;
+}
+
+export interface RecentFormPoint {
+  demoId: string;
+  fileName: string;
+  createdAt: string;
+  performanceRating: number;
+  winRateProxy: number;
+}
+
+export interface PersonalPerformanceAnalytics {
+  skills: SkillRatings;
+  skillsGoal: SkillRatings;
+  performanceRating: number;
+  performanceLabel: string;
+  sideRatings: { t: number; ct: number };
+  insights: PerformanceInsight[];
+  recentForm: RecentFormPoint[];
+  topMap: { name: string; side: 'ct' | 't'; rating: number; goal: number } | null;
 }
 
 export interface PersonalDemoValidation {

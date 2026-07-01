@@ -3,12 +3,13 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { UsersService } from '../../Services/users.service';
 import { PersonalStatsOverview, PublicUserProfile } from '../../Models/interfaces';
+import { ProfileAnalyticsSectionComponent } from '../../Components/profile-analytics/profile-analytics.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 
 @Component({
   selector: 'app-user-profile',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, ProfileAnalyticsSectionComponent],
   templateUrl: './user-profile.component.html',
   styleUrls: ['../profile/profile.component.css', './user-profile.component.css'],
 })
@@ -103,6 +104,10 @@ export class UserProfileComponent implements OnInit {
 
   get hasPersonalStats(): boolean {
     return (this.personalSummary?.demosCompleted ?? 0) > 0;
+  }
+
+  get performanceAnalytics() {
+    return this.personalStats?.analytics ?? null;
   }
 
   gaugePercent(value: number, max: number): number {

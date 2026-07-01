@@ -17,6 +17,7 @@ import psycopg2
 import redis
 from demoparser2 import DemoParser
 from highlight_extraction import extract_highlights, _normalize_steam_id
+from player_analytics import extract_player_analytics
 from highlight_progress import set_highlight_progress
 from highlight_renderer import HIGHLIGHT_RENDER_QUEUE, process_highlight_render_job
 
@@ -661,8 +662,8 @@ def save_player_stats(demo_id: str, stats: list[dict]):
                 cur.execute(
                     """
                     INSERT INTO "MatchPlayerStat"
-                    (id, "demoId", "steamId", "playerName", kills, deaths, assists, damage, adr, "hsPercent", kast)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (id, "demoId", "steamId", "playerName", kills, deaths, assists, damage, adr, "hsPercent", kast, analytics)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                     """,
                     (
                         str(uuid.uuid4()),
@@ -676,6 +677,7 @@ def save_player_stats(demo_id: str, stats: list[dict]):
                         s["adr"],
                         s["hs_percent"],
                         s["kast"],
+                        json.dumps(s.get("analytics")) if s.get("analytics") else None,
                     ),
                 )
         conn.commit()
@@ -766,6 +768,9 @@ def parse_demo(file_path: str) -> list[dict]:
         for steam_id in all_players - victims:
             player_data[steam_id]["kast_rounds"].add(round_num)
 
+    map_name = extract_map_name(file_path)
+    analytics_by_player = extract_player_analytics(parser, map_name)
+
     results = []
     for steam_id, data in player_data.items():
         kills = data["kills"]
@@ -785,6 +790,7 @@ def parse_demo(file_path: str) -> list[dict]:
             "adr": adr,
             "hs_percent": hs_percent,
             "kast": kast,
+            "analytics": analytics_by_player.get(steam_id),
         })
 
     if not results:

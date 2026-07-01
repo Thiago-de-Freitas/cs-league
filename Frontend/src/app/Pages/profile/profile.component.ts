@@ -18,6 +18,7 @@ import {
 } from '../../Utils/highlight-display.util';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
+import { ProfileAnalyticsSectionComponent } from '../../Components/profile-analytics/profile-analytics.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 import { PLAYER_POSITIONS, getPlayerPositionLabel, normalizePlayerPositionForForm } from '../../Utils/player-positions';
 
@@ -26,7 +27,7 @@ type ProfileTab = 'stats' | 'demos' | 'highlights' | 'settings';
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, DemoUploadModalComponent, DemoStatusLoaderComponent, ProfileAnalyticsSectionComponent],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']
 })
@@ -221,6 +222,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   get hasStats(): boolean {
     return (this.summary?.demosCompleted || 0) > 0;
+  }
+
+  get performanceAnalytics() {
+    return this.statsOverview?.analytics ?? null;
   }
 
   get hasPendingDemos(): boolean {

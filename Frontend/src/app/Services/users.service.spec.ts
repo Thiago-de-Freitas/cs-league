@@ -65,6 +65,7 @@ describe('UsersService', () => {
       personalStats: {
         summary: { demosTotal: 1, demosCompleted: 1, kills: 10, deaths: 5, kd: 2, adr: 80, hsPercent: 40, kast: 70, rating: 1 },
         demos: [],
+        analytics: null,
       },
       isSelf: false,
     });

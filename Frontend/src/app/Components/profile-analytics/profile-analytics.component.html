@@ -1,0 +1,95 @@
+<section class="analytics-section" *ngIf="analytics as data">
+  <h2 class="section-title analytics-title">Análise de Performance</h2>
+  <p class="analytics-subtitle">Métricas inspiradas em dashboards competitivos — comparadas com metas da base de jogadores.</p>
+
+  <div class="analytics-insights">
+    <article class="insight-card gc-card" *ngFor="let insight of data.insights">
+      <header class="insight-header">
+        <h3>{{ insight.title }}</h3>
+        <span class="insight-tier" [ngClass]="tierClass(insight.tier)">{{ tierLabel(insight.tier) }}</span>
+      </header>
+      <div class="insight-scores">
+        <div class="insight-score">
+          <span class="insight-score-label">Seu rating</span>
+          <strong class="insight-score-value">{{ insight.rating }}</strong>
+        </div>
+        <div class="insight-score insight-score-goal">
+          <span class="insight-score-label">Meta</span>
+          <strong>{{ insight.goal }}</strong>
+        </div>
+      </div>
+      <p class="insight-tip">{{ insight.tip }}</p>
+    </article>
+
+    <article class="radar-card gc-card">
+      <header class="radar-header">
+        <h3>Performance</h3>
+        <span class="radar-legend"><span class="legend-you"></span> Você</span>
+        <span class="radar-legend"><span class="legend-goal"></span> Meta</span>
+      </header>
+      <svg class="radar-chart" viewBox="0 0 100 100" aria-label="Gráfico radar de habilidades">
+        <polygon class="radar-grid" points="50,12 88,69 12,69"></polygon>
+        <polygon class="radar-grid radar-grid-inner" points="50,24 76,63 24,63"></polygon>
+        <line x1="50" y1="50" x2="50" y2="12" class="radar-axis"></line>
+        <line x1="50" y1="50" x2="88" y2="69" class="radar-axis"></line>
+        <line x1="50" y1="50" x2="12" y2="69" class="radar-axis"></line>
+        <polygon class="radar-polygon radar-goal" [attr.points]="radarPolygon('goal')"></polygon>
+        <polygon class="radar-polygon radar-you" [attr.points]="radarPolygon('you')"></polygon>
+        <text x="50" y="8" class="radar-label">Mira</text>
+        <text x="92" y="72" class="radar-label">Posicionamento</text>
+        <text x="2" y="72" class="radar-label">Utilitários</text>
+      </svg>
+      <ul class="radar-values">
+        <li><span>Mira</span><strong>{{ data.skills.aim }}</strong></li>
+        <li><span>Posicionamento</span><strong>{{ data.skills.positioning }}</strong></li>
+        <li><span>Utilitários</span><strong>{{ data.skills.utility }}</strong></li>
+      </ul>
+    </article>
+  </div>
+
+  <div class="analytics-form gc-card">
+    <header class="form-header">
+      <h3>Forma recente</h3>
+      <div class="form-tabs">
+        <button type="button" class="form-tab" [class.active]="formTab === 'rating'" (click)="setFormTab('rating')">Rating</button>
+        <button type="button" class="form-tab" [class.active]="formTab === 'winrate'" (click)="setFormTab('winrate')">Impacto</button>
+      </div>
+    </header>
+
+    <div class="form-body">
+      <div class="form-gauges">
+        <div class="form-gauge-main">
+          <span class="form-gauge-label">Rating de impacto</span>
+          <div class="gauge gauge-orange" [style.--pct]="performanceGaugePercent() + '%'">
+            <div class="gauge-inner">
+              <span class="gauge-value">{{ formatRating(data.performanceRating) }}</span>
+              <span class="gauge-sub">{{ data.performanceLabel }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-gauge-side">
+          <span class="form-gauge-label">T-Side</span>
+          <div class="gauge gauge-mini" [style.--pct]="sideGaugePercent(data.sideRatings.t) + '%'">
+            <div class="gauge-inner"><span class="gauge-value">{{ formatRating(data.sideRatings.t) }}</span></div>
+          </div>
+        </div>
+        <div class="form-gauge-side">
+          <span class="form-gauge-label">CT-Side</span>
+          <div class="gauge gauge-mini gauge-blue" [style.--pct]="sideGaugePercent(data.sideRatings.ct) + '%'">
+            <div class="gauge-inner"><span class="gauge-value">{{ formatRating(data.sideRatings.ct) }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-chart-wrap">
+        <svg class="form-chart" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
+          <polyline class="form-chart-grid" points="0,30 100,30"></polyline>
+          <polygon class="form-chart-area" [attr.points]="chartAreaPoints()"></polygon>
+          <polyline class="form-chart-line" [attr.points]="chartPoints()"></polyline>
+        </svg>
+        <p class="form-chart-caption" *ngIf="data.recentForm.length === 0">Sem histórico suficiente.</p>
+        <p class="form-chart-caption" *ngIf="data.recentForm.length > 0">Últimas {{ data.recentForm.length }} demos analisadas</p>
+      </div>
+    </div>
+  </div>
+</section>

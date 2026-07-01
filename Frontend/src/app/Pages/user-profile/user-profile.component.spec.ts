@@ -120,6 +120,7 @@ describe('UserProfileComponent', () => {
             rating: 1.1,
           }),
           demos: [mockPersonalDemo()],
+          analytics: null,
         },
       })
     );
@@ -142,6 +143,7 @@ describe('UserProfileComponent', () => {
         personalStats: {
           summary: mockPersonalSummary(),
           demos: [],
+          analytics: null,
         },
       })
     );

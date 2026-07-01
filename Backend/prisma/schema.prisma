@@ -374,6 +374,7 @@ model MatchPlayerStat {
   adr        Float   @default(0)
   hsPercent  Float   @default(0)
   kast       Float   @default(0)
+  analytics  Json?
 
   demo Demo @relation(fields: [demoId], references: [id], onDelete: Cascade)
 }

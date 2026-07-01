@@ -28,6 +28,7 @@ const emptyOverview: PersonalStatsOverview = {
     rating: 0,
   },
   demos: [],
+  analytics: null,
 };
 
 describe('ProfileComponent', () => {

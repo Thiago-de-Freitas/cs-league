@@ -1,6 +1,10 @@
 import type { MatchPlayerStat } from '@prisma/client';
 import { prisma } from './prisma';
 import { calcRating } from './rankings';
+import {
+  buildPersonalPerformanceAnalytics,
+  type PersonalPerformanceAnalytics,
+} from './playerAnalytics';
 
 type DemoWithStats = {
   id: string;
@@ -44,6 +48,8 @@ export type PersonalStatsSummary = {
   kast: number;
   rating: number;
 };
+
+export type { PersonalPerformanceAnalytics };
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
@@ -132,6 +138,25 @@ export function buildPersonalStatsOverview(demos: DemoWithStats[]) {
   const hsPercent = analyzed > 0 ? hsSum / analyzed : 0;
   const kast = analyzed > 0 ? kastSum / analyzed : 0;
 
+  const analyticsDemos: Array<{
+    demoId: string;
+    fileName: string;
+    createdAt: Date;
+    stat: MatchPlayerStat;
+  }> = [];
+
+  for (const demo of demos) {
+    if (demo.status.toUpperCase() !== 'COMPLETED' || demo.stats.length === 0) continue;
+    analyticsDemos.push({
+      demoId: demo.id,
+      fileName: demo.fileName ?? 'demo.dem',
+      createdAt: demo.createdAt,
+      stat: demo.stats[0],
+    });
+  }
+
+  const analytics = buildPersonalPerformanceAnalytics(analyticsDemos);
+
   const summary: PersonalStatsSummary = {
     demosTotal: demos.length,
     demosCompleted: demos.filter((d) => d.status.toUpperCase() === 'COMPLETED').length,
@@ -150,12 +175,13 @@ export function buildPersonalStatsOverview(demos: DemoWithStats[]) {
     rating: analyzed > 0 ? calcRating(kd, adr, kast, hsPercent) : 0,
   };
 
-  return { summary, demos: perDemo };
+  return { summary, demos: perDemo, analytics };
 }
 
 export type SerializedPersonalStatsOverview = {
   summary: PersonalStatsSummary;
   demos: Array<Omit<PersonalDemoStat, 'createdAt'> & { createdAt: string }>;
+  analytics: PersonalPerformanceAnalytics | null;
 };
 
 export function serializePublicPersonalStatsOverview(
@@ -173,6 +199,7 @@ export function serializePublicPersonalStatsOverview(
         ...demo,
         createdAt: demo.createdAt.toISOString(),
       })),
+    analytics: overview.analytics,
   };
 }
 
