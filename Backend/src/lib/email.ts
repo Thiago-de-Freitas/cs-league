@@ -16,26 +16,157 @@ function getEmailProvider(): EmailProvider {
   return parseEmailProvider(process.env.EMAIL_PROVIDER);
 }
 
-function buildVerificationEmailBody(displayName: string, code: string): { subject: string; text: string; html: string } {
-  const subject = 'Seu código de verificação — Gamers League';
-  const text = [
+function formatVerificationCode(code: string): string {
+  const digits = code.replace(/\D/g, '');
+  if (digits.length !== 6) return digits;
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
+function getVerifyEmailPageUrl(): string | null {
+  const corsOrigin = process.env.CORS_ORIGIN?.trim();
+  if (!corsOrigin || corsOrigin.includes('${{')) return null;
+
+  const origin = corsOrigin.split(',')[0]?.trim().replace(/\/+$/, '');
+  if (!origin) return null;
+
+  try {
+    return new URL('/verify-email', origin).href;
+  } catch {
+    return null;
+  }
+}
+
+export function buildVerificationEmailBody(displayName: string, code: string): { subject: string; text: string; html: string } {
+  const safeName = escapeHtml(displayName);
+  const formattedCode = formatVerificationCode(code);
+  const safeCode = escapeHtml(formattedCode);
+  const verifyUrl = getVerifyEmailPageUrl();
+
+  const subject = `${formattedCode} — confirme seu e-mail na Gamers League`;
+
+  const textLines = [
     `Olá, ${displayName}!`,
     '',
-    `Use o código abaixo para confirmar seu e-mail na Gamers League:`,
+    'Bem-vindo à Gamers League — quase lá.',
+    'Digite o código abaixo na tela de verificação para ativar sua conta:',
     '',
-    code,
+    formattedCode,
     '',
-    'O código expira em 10 minutos.',
-    'Se você não criou esta conta, ignore esta mensagem.',
-  ].join('\n');
+    '• O código expira em 10 minutos.',
+    '• Você tem até 5 tentativas antes de precisar solicitar um novo código.',
+    '• Não compartilhe este código com ninguém.',
+  ];
+
+  if (verifyUrl) {
+    textLines.push('', `Acesse: ${verifyUrl}`);
+  }
+
+  textLines.push('', 'Se você não criou esta conta, ignore este e-mail.', '', '— Equipe Gamers League');
+  const text = textLines.join('\n');
+
+  const verifyButton = verifyUrl
+    ? `
+      <tr>
+        <td style="padding:0 32px 28px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="border-radius:6px;background-color:#ff5500;">
+                <a href="${escapeHtml(verifyUrl)}" target="_blank" rel="noopener noreferrer"
+                  style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;text-decoration:none;">
+                  Confirmar e-mail
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`
+  : '';
 
   const html = `
-    <p>Olá, <strong>${escapeHtml(displayName)}</strong>!</p>
-    <p>Use o código abaixo para confirmar seu e-mail na <strong>Gamers League</strong>:</p>
-    <p style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:24px 0;">${escapeHtml(code)}</p>
-    <p style="color:#666;">O código expira em 10 minutos.</p>
-    <p style="color:#666;">Se você não criou esta conta, ignore esta mensagem.</p>
-  `.trim();
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificação de e-mail — Gamers League</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;color:#f0f0f0;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0a0a0a;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#1a1a1a;border:1px solid #2d2d2d;border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 32px 12px;border-bottom:1px solid #2d2d2d;">
+              <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#ff5500;">
+                Gamers League
+              </p>
+              <h1 style="margin:10px 0 0;font-size:22px;line-height:1.3;font-weight:700;color:#f0f0f0;text-transform:uppercase;letter-spacing:0.04em;">
+                Confirme seu e-mail
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 8px;">
+              <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#f0f0f0;">
+                Olá, <strong style="color:#ffffff;">${safeName}</strong>!
+              </p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#a0a0a0;">
+                Bem-vindo à plataforma. Use o código abaixo para ativar sua conta e entrar nas ligas.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#111111;border:1px solid #2d2d2d;border-radius:10px;">
+                <tr>
+                  <td align="center" style="padding:24px 16px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#a0a0a0;">
+                      Seu código
+                    </p>
+                    <p style="margin:0;font-size:36px;line-height:1;font-weight:700;letter-spacing:0.28em;color:#ff5500;font-family:'Courier New',Courier,monospace;">
+                      ${safeCode}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${verifyButton}
+          <tr>
+            <td style="padding:0 32px 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#111111;border-radius:8px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#a0a0a0;">
+                      • Expira em <strong style="color:#f0f0f0;">10 minutos</strong>
+                    </p>
+                    <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#a0a0a0;">
+                      • Até <strong style="color:#f0f0f0;">5 tentativas</strong> antes de solicitar um novo código
+                    </p>
+                    <p style="margin:0;font-size:13px;line-height:1.5;color:#a0a0a0;">
+                      • Não compartilhe este código com ninguém
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 28px;">
+              <p style="margin:0;font-size:13px;line-height:1.6;color:#666666;">
+                Se você não criou esta conta, pode ignorar este e-mail com segurança.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;background-color:#111111;border-top:1px solid #2d2d2d;">
+              <p style="margin:0;font-size:12px;line-height:1.5;color:#666666;text-align:center;">
+                © Gamers League — ligas, partidas e rankings de CS
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
 
   return { subject, text, html };
 }

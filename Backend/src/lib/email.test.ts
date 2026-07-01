@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSmtpTransportOptions, parseEmailProvider } from './email';
+import { buildSmtpTransportOptions, buildVerificationEmailBody, parseEmailProvider } from './email';
 
 describe('parseEmailProvider', () => {
   it('aceita console, resend, smtp e nodemailer', () => {
@@ -69,5 +69,32 @@ describe('buildSmtpTransportOptions', () => {
         else process.env[key] = value;
       }
     }
+  });
+});
+
+describe('buildVerificationEmailBody', () => {
+  it('monta assunto, texto e HTML com código formatado', () => {
+    const originalCors = process.env.CORS_ORIGIN;
+    try {
+      process.env.CORS_ORIGIN = 'https://app.gamersleague.test';
+      const body = buildVerificationEmailBody('João', '498501');
+
+      assert.match(body.subject, /498 501/);
+      assert.match(body.text, /Olá, João!/);
+      assert.match(body.text, /498 501/);
+      assert.match(body.html, /498 501/);
+      assert.match(body.html, /Confirmar e-mail/);
+      assert.match(body.html, /https:\/\/app\.gamersleague\.test\/verify-email/);
+      assert.doesNotMatch(body.html, /<script/i);
+    } finally {
+      if (originalCors === undefined) delete process.env.CORS_ORIGIN;
+      else process.env.CORS_ORIGIN = originalCors;
+    }
+  });
+
+  it('escapa HTML no nome do usuário', () => {
+    const body = buildVerificationEmailBody('<script>alert(1)</script>', '123456');
+    assert.doesNotMatch(body.html, /<script>alert/);
+    assert.match(body.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   });
 });
