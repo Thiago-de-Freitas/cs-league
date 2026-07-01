@@ -1,8 +1,7 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { DemoService } from './demo.service';
-import { ApiConfigService } from './api-config.service';
 
 describe('DemoService', () => {
   let service: DemoService;
@@ -14,7 +13,6 @@ describe('DemoService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         DemoService,
-        ApiConfigService,
       ],
     });
     service = TestBed.inject(DemoService);
@@ -33,17 +31,37 @@ describe('DemoService', () => {
     req.flush({ valid: true });
   });
 
-  it('uploadDemoWithProgress posts multipart to configured upload URL', () => {
-    const file = new File(['demo'], 'match.dem', { type: 'application/octet-stream' });
+  it('uploadDemoWithProgress uses chunked upload via same-origin API', fakeAsync(() => {
+    const file = new File(['demo-content'], 'match.dem', { type: 'application/octet-stream' });
+    const events: number[] = [];
 
-    service.uploadDemoWithProgress(file, { isPersonal: true }).subscribe();
+    service.uploadDemoWithProgress(file, { isPersonal: true }).subscribe((event) => {
+      if (event.phase === 'uploading') {
+        events.push(event.progress);
+      }
+    });
 
-    httpMock.expectOne('/runtime-config.json').flush({ apiBaseUrl: '' });
-    const upload = httpMock.expectOne((req) => req.url.endsWith('/api/demos/upload'));
-    expect(upload.request.method).toBe('POST');
-    expect(upload.request.body instanceof FormData).toBeTrue();
-    upload.flush({ id: 'd1', fileName: 'match.dem', status: 'pending' });
-  });
+    const config = httpMock.expectOne('/api/health/config');
+    config.flush({ demoUploadChunkBytes: 4 * 1024 * 1024 });
+    tick();
+
+    const session = httpMock.expectOne('/api/demos/upload/sessions');
+    expect(session.request.method).toBe('POST');
+    session.flush({ uploadId: 'up-1', chunkBytes: 4 * 1024 * 1024, totalChunks: 1 });
+    tick();
+
+    const chunk = httpMock.expectOne('/api/demos/upload/sessions/up-1/chunks/0');
+    expect(chunk.request.method).toBe('PUT');
+    chunk.flush({ ok: true, index: 0, received: file.size });
+    tick();
+
+    const complete = httpMock.expectOne('/api/demos/upload/sessions/up-1/complete');
+    expect(complete.request.method).toBe('POST');
+    complete.flush({ id: 'd1', fileName: 'match.dem', status: 'pending' });
+    tick();
+
+    expect(events.length).toBeGreaterThan(0);
+  }));
 
   it('listPersonalHighlights calls GET endpoint', () => {
     service.listPersonalHighlights().subscribe((result) => {

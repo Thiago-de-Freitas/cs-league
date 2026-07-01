@@ -14,8 +14,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 const rawApiUrl = (process.env.API_URL || '').trim();
 const API_URL = (rawApiUrl || 'http://localhost:3000').replace(/\/+$/, '');
 const distPath = path.join(__dirname, 'dist/gamers-league/browser');
-const PROXY_TIMEOUT_MS = 120_000;
-const SERVER_TIMEOUT_MS = 120_000;
+const PROXY_TIMEOUT_MS = 300_000;
+const SERVER_TIMEOUT_MS = 300_000;
 
 if (!fs.existsSync(path.join(distPath, 'index.html'))) {
   console.error(`[front] Build não encontrado em ${distPath}. Rode npm run build antes.`);
@@ -47,7 +47,7 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'gamers-league-front' });
 });
 
-// Config em runtime — browser usa URL direta da API para uploads grandes
+// Config em runtime — browser usa proxy same-origin para uploads em blocos
 app.get('/runtime-config.json', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ apiBaseUrl: API_URL });

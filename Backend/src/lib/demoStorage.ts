@@ -1,3 +1,4 @@
+import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { isPathInsideBase } from './pathSafe';
@@ -53,4 +54,34 @@ export function displayDemoFileName(
 ): string {
   if (isManual) return 'Stats manuais';
   return fileName?.trim() || 'demo.dem';
+}
+
+/** Diretório local rápido para receber o stream do upload antes de mover para o volume. */
+export function getDemoUploadTempPath(): string {
+  const base = path.join(os.tmpdir(), 'cs-league-demo-uploads');
+  if (!fs.existsSync(base)) {
+    fs.mkdirSync(base, { recursive: true });
+  }
+  return base;
+}
+
+/** Move demo do diretório temporário para o storage persistente (volume /data). */
+export function moveDemoFileToStorage(tempPath: string): string {
+  const resolvedTemp = path.resolve(tempPath);
+  const fileName = path.basename(resolvedTemp);
+  const finalPath = path.join(getDemoStoragePath(), fileName);
+
+  try {
+    fs.renameSync(resolvedTemp, finalPath);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EXDEV') {
+      fs.copyFileSync(resolvedTemp, finalPath);
+      fs.unlinkSync(resolvedTemp);
+    } else {
+      throw err;
+    }
+  }
+
+  return finalPath;
 }

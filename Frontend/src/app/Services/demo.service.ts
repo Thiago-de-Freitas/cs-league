@@ -1,8 +1,7 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
-import { Observable, interval, switchMap, takeWhile, startWith, filter, map } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, defer, from, map, switchMap, filter, interval, takeWhile, startWith } from 'rxjs';
 import { Demo, MatchPlayerStat, PersonalDemoValidation, PersonalHighlightsResponse, PersonalStatsOverview, HighlightProgress } from '../Models/interfaces';
-import { ApiConfigService } from './api-config.service';
 
 export interface DemoUploadProgress {
   phase: 'uploading' | 'done';
@@ -10,21 +9,27 @@ export interface DemoUploadProgress {
   demo?: Demo;
 }
 
+export interface DemoUploadSession {
+  uploadId: string;
+  chunkBytes: number;
+  totalChunks: number;
+}
+
 export interface DemoHealthConfig {
   redis?: { queueAvailable?: boolean };
   redisErrors?: string[];
   warnings?: string[];
   demoMaxUploadMb?: number;
+  demoUploadChunkBytes?: number;
 }
+
+const DEFAULT_CHUNK_BYTES = 4 * 1024 * 1024;
 
 @Injectable({ providedIn: 'root' })
 export class DemoService {
   private apiUrl = '/api/demos';
 
-  constructor(
-    private http: HttpClient,
-    private apiConfig: ApiConfigService
-  ) {}
+  constructor(private http: HttpClient) {}
 
   getDemoHealthConfig(): Observable<DemoHealthConfig> {
     return this.http.get<DemoHealthConfig>('/api/health/config');
@@ -41,34 +46,54 @@ export class DemoService {
     file: File,
     options?: { matchId?: string; isPersonal?: boolean }
   ): Observable<DemoUploadProgress> {
-    const formData = new FormData();
-    formData.append('demo', file);
-    if (options?.matchId) {
-      formData.append('matchId', options.matchId);
-    }
-    if (options?.isPersonal) {
-      formData.append('isPersonal', 'true');
-    }
-    return this.apiConfig.getDemoUploadUrl().pipe(
-      switchMap((uploadUrl) =>
-        this.http.post<Demo>(uploadUrl, formData, {
-          reportProgress: true,
-          observe: 'events',
-        })
-      ),
-      map((event: HttpEvent<Demo>) => {
-        if (event.type === HttpEventType.UploadProgress) {
-          const total = event.total ?? file.size;
-          const progress = total > 0 ? Math.round((100 * event.loaded) / total) : 0;
-          return { phase: 'uploading' as const, progress };
-        }
-        if (event.type === HttpEventType.Response) {
-          return { phase: 'done' as const, progress: 100, demo: event.body ?? undefined };
-        }
-        return { phase: 'uploading' as const, progress: 0 };
-      }),
-      filter((e) => e.phase === 'uploading' || e.demo != null)
+    return this.getDemoHealthConfig().pipe(
+      switchMap((config) => {
+        const chunkBytes = config.demoUploadChunkBytes && config.demoUploadChunkBytes > 0
+          ? config.demoUploadChunkBytes
+          : DEFAULT_CHUNK_BYTES;
+        return defer(() => from(this.runChunkedUpload(file, options, chunkBytes)));
+      })
     );
+  }
+
+  private async *runChunkedUpload(
+    file: File,
+    options: { matchId?: string; isPersonal?: boolean } | undefined,
+    chunkBytes: number
+  ): AsyncGenerator<DemoUploadProgress> {
+    const totalChunks = Math.max(1, Math.ceil(file.size / chunkBytes));
+    const session = await new Promise<DemoUploadSession>((resolve, reject) => {
+      this.http.post<DemoUploadSession>(`${this.apiUrl}/upload/sessions`, {
+        fileName: file.name,
+        fileSize: file.size,
+        totalChunks,
+        isPersonal: options?.isPersonal ?? false,
+        ...(options?.matchId ? { matchId: options.matchId } : {}),
+      }).subscribe({ next: resolve, error: reject });
+    });
+
+    yield { phase: 'uploading', progress: 0 };
+
+    for (let index = 0; index < totalChunks; index++) {
+      const start = index * chunkBytes;
+      const end = Math.min(start + chunkBytes, file.size);
+      const chunk = file.slice(start, end);
+      await new Promise<void>((resolve, reject) => {
+        this.http.put<{ ok: boolean }>(
+          `${this.apiUrl}/upload/sessions/${session.uploadId}/chunks/${index}`,
+          chunk,
+          { headers: { 'Content-Type': 'application/octet-stream' } }
+        ).subscribe({ next: () => resolve(), error: reject });
+      });
+      const progress = Math.min(95, Math.round(((index + 1) / totalChunks) * 95));
+      yield { phase: 'uploading', progress };
+    }
+
+    const demo = await new Promise<Demo>((resolve, reject) => {
+      this.http.post<Demo>(`${this.apiUrl}/upload/sessions/${session.uploadId}/complete`, {})
+        .subscribe({ next: resolve, error: reject });
+    });
+    yield { phase: 'done', progress: 100, demo };
   }
 
   validatePersonalDemo(): Observable<PersonalDemoValidation> {

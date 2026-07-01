@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import express from 'express';
 import { Prisma } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
@@ -15,7 +16,13 @@ import {
   canUserDeleteDemoHighlights,
 } from '../lib/demoValidation';
 import { buildPersonalStatsOverview } from '../lib/personalStats';
-import { getDemoStoragePath, resolveDemoFilePath, tryResolveDemoFilePath } from '../lib/demoStorage';
+import {
+  getDemoStoragePath,
+  getDemoUploadTempPath,
+  moveDemoFileToStorage,
+  resolveDemoFilePath,
+  tryResolveDemoFilePath,
+} from '../lib/demoStorage';
 import { sanitizeFileExtension } from '../lib/pathSafe';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { participationGuard } from '../middleware/participationGuard';
@@ -32,6 +39,16 @@ import { buildHighlightsListResponse, sendHighlightClipSpec, sendHighlightVideo 
 import { serializeHighlight } from '../lib/highlightSerialization';
 import { getDemoMaxUploadBytes } from '../lib/demoUploadLimits';
 import {
+  assembleDemoUploadSession,
+  createDemoUploadSession,
+  destroyDemoUploadSession,
+  getChunkPath,
+  getDemoUploadChunkBytes,
+  loadDemoUploadSession,
+  markChunkReceived,
+  validateChunkedUploadParams,
+} from '../lib/demoChunkedUpload';
+import {
   deleteAllDemoHighlights,
   deleteAllPersonalHighlightsForUser,
   deleteDemoHighlightById,
@@ -39,8 +56,6 @@ import {
 
 const router = Router();
 router.use(auditResponseMiddleware);
-
-const storagePath = getDemoStoragePath();
 
 const DEMO_FILE_MISSING_ERROR =
   'Arquivo .dem não encontrado no servidor. Provavelmente o volume /data não estava montado no upload — exclua esta demo e envie novamente após configurar o volume persistente na API e no worker.';
@@ -53,7 +68,7 @@ async function markDemoFileMissing(demoId: string): Promise<void> {
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, storagePath),
+  destination: (_req, _file, cb) => cb(null, getDemoUploadTempPath()),
   filename: (_req, file, cb) => {
     const ext = sanitizeFileExtension(file.originalname, ['.dem']);
     if (!ext) {
@@ -78,6 +93,160 @@ const upload = multer({
 
 function parseIsPersonal(value: unknown): boolean {
   return value === true || value === 'true' || value === '1';
+}
+
+async function validateDemoUploadRequest(
+  userId: string,
+  role: string,
+  fileName: string,
+  isPersonal: boolean,
+  matchId?: string
+): Promise<{ valid: true } | { valid: false; error: string; code?: string; status: number }> {
+  const duplicateCheck = await validateDuplicateDemoUpload(userId, fileName);
+  if (!duplicateCheck.valid) {
+    return { valid: false, error: duplicateCheck.error, code: duplicateCheck.code, status: 400 };
+  }
+
+  if (isPersonal) {
+    const validation = await validatePersonalDemoUpload(userId, role);
+    if (!validation.valid) {
+      return { valid: false, error: validation.error, code: validation.code, status: 400 };
+    }
+    return { valid: true };
+  }
+
+  if (!matchId) {
+    return { valid: false, error: 'Selecione uma partida para enviar a demo.', code: 'MATCH_REQUIRED', status: 400 };
+  }
+  const permission = await canUserManageMatchDemo(userId, role, matchId);
+  if (!permission.allowed) {
+    return { valid: false, error: permission.error ?? 'Sem permissão para enviar demo nesta partida.', status: 403 };
+  }
+  const validation = await validateGeneralDemoUpload(matchId);
+  if (!validation.valid) {
+    return { valid: false, error: validation.error, code: validation.code, status: 400 };
+  }
+  return { valid: true };
+}
+
+async function persistDemoFromTempPath(
+  req: AuthRequest,
+  tempPath: string,
+  fileName: string,
+  isPersonal: boolean,
+  matchId?: string
+): Promise<{ demo: Awaited<ReturnType<typeof prisma.demo.create>>; storedDemoPath: string }> {
+  let storedDemoPath: string | null = null;
+  try {
+    storedDemoPath = moveDemoFileToStorage(tempPath);
+  } catch (moveErr) {
+    fs.unlink(tempPath, () => {});
+    console.error('[demo upload] falha ao mover arquivo para storage:', moveErr);
+    throw Object.assign(new Error('DEMO_STORAGE_WRITE_FAILED'), { code: 'DEMO_STORAGE_WRITE_FAILED' });
+  }
+
+  try {
+    const demo = await prisma.$transaction(async (tx) => {
+      if (!isPersonal && matchId) {
+        const existing = await tx.demo.findFirst({
+          where: {
+            matchId,
+            isPersonal: false,
+            status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
+          },
+          select: { id: true, isManual: true },
+        });
+        if (existing) {
+          const error = existing.isManual
+            ? 'Já existem estatísticas manuais para esta partida. Edite-as em vez de enviar uma demo.'
+            : 'Já existe uma demo geral associada a esta partida.';
+          throw new Error(error);
+        }
+      }
+
+      return tx.demo.create({
+        data: {
+          uploadedById: req.user!.userId,
+          filePath: resolveDemoFilePath(storedDemoPath!),
+          fileName,
+          status: 'PENDING',
+          isPersonal,
+          ...(matchId && !isPersonal && { matchId }),
+        },
+      });
+    });
+
+    try {
+      const demoFilePath = demo.filePath;
+      if (!demoFilePath) {
+        throw new Error('Demo criada sem arquivo');
+      }
+      await enqueueDemoJob(demo.id, demoFilePath);
+    } catch (enqueueErr) {
+      await prisma.demo.delete({ where: { id: demo.id } }).catch(() => {});
+      fs.unlink(storedDemoPath, () => {});
+      throw enqueueErr;
+    }
+
+    setAuditContext(req, demo.matchId
+      ? audit.withParent('match.demo.link', 'Demo', demo.id, 'Match', demo.matchId, {
+          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
+        })
+      : audit.of('demo.upload', 'Demo', demo.id, {
+          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
+        }));
+
+    return { demo, storedDemoPath };
+  } catch (err) {
+    if (storedDemoPath) {
+      fs.unlink(storedDemoPath, () => {});
+    }
+    throw err;
+  }
+}
+
+function sendDemoUploadError(res: Response, err: unknown): void {
+  const message = err instanceof Error ? err.message : '';
+  if (
+    message.includes('estatísticas manuais') ||
+    message.includes('demo geral associada')
+  ) {
+    res.status(400).json({ error: message, code: 'MATCH_HAS_DEMO' });
+    return;
+  }
+  if (message === 'DEMO_STORAGE_WRITE_FAILED') {
+    res.status(500).json({
+      error: 'Não foi possível salvar a demo no servidor. Verifique o volume /data na API.',
+      code: 'DEMO_STORAGE_WRITE_FAILED',
+    });
+    return;
+  }
+  if (message.includes('Fila Redis indisponível') || message.includes('Redis')) {
+    res.status(503).json({
+      error: 'Fila de processamento de demos indisponível. Verifique REDIS_URL na API (plugin Redis, não o Worker).',
+      code: 'DEMO_QUEUE_UNAVAILABLE',
+    });
+    return;
+  }
+  res.status(500).json({ error: 'Erro ao fazer upload da demo' });
+}
+
+function serializeCreatedDemo(demo: {
+  id: string;
+  fileName: string | null;
+  status: string;
+  matchId: string | null;
+  isPersonal: boolean;
+  createdAt: Date;
+}) {
+  return {
+    id: demo.id,
+    fileName: demo.fileName ?? 'demo.dem',
+    status: demo.status.toLowerCase(),
+    matchId: demo.matchId,
+    isPersonal: demo.isPersonal,
+    createdAt: demo.createdAt,
+  };
 }
 
 router.get('/validate-personal', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -271,6 +440,133 @@ router.post('/personal/requeue-pending', authMiddleware, participationGuard, req
   }
 });
 
+router.post('/upload/sessions', authMiddleware, participationGuard, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+  try {
+    const fileName = String(req.body?.fileName ?? '').trim();
+    const fileSize = Number(req.body?.fileSize);
+    const totalChunks = Number(req.body?.totalChunks);
+    const isPersonal = parseIsPersonal(req.body?.isPersonal);
+    const matchId = isPersonal ? undefined : (req.body?.matchId ? String(req.body.matchId) : undefined);
+
+    const paramsCheck = validateChunkedUploadParams(fileName, fileSize, totalChunks);
+    if (!paramsCheck.valid) {
+      res.status(400).json({ error: paramsCheck.error, code: 'INVALID_CHUNKED_UPLOAD' });
+      return;
+    }
+    if (fileSize > getDemoMaxUploadBytes()) {
+      res.status(413).json({ error: 'Arquivo muito grande para upload em blocos.', code: 'DEMO_FILE_TOO_LARGE' });
+      return;
+    }
+
+    const validation = await validateDemoUploadRequest(req.user!.userId, req.user!.role, fileName, isPersonal, matchId);
+    if (!validation.valid) {
+      res.status(validation.status).json({ error: validation.error, code: validation.code });
+      return;
+    }
+
+    const session = createDemoUploadSession({
+      userId: req.user!.userId,
+      fileName,
+      fileSize,
+      totalChunks,
+      isPersonal,
+      matchId,
+    });
+
+    res.status(201).json({
+      uploadId: session.uploadId,
+      chunkBytes: getDemoUploadChunkBytes(),
+      totalChunks: session.totalChunks,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao iniciar upload da demo' });
+  }
+});
+
+router.put(
+  '/upload/sessions/:uploadId/chunks/:index',
+  authMiddleware,
+  participationGuard,
+  requireDemoQueue,
+  express.raw({ type: 'application/octet-stream', limit: getDemoUploadChunkBytes() + 64 * 1024 }),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const uploadId = req.params.uploadId;
+      const index = Number.parseInt(req.params.index, 10);
+      const meta = loadDemoUploadSession(uploadId, req.user!.userId);
+      if (!meta) {
+        res.status(404).json({ error: 'Sessão de upload não encontrada ou expirada', code: 'UPLOAD_SESSION_NOT_FOUND' });
+        return;
+      }
+      if (!Number.isInteger(index) || index < 0 || index >= meta.totalChunks) {
+        res.status(400).json({ error: 'Índice de bloco inválido', code: 'INVALID_CHUNK_INDEX' });
+        return;
+      }
+
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) {
+        res.status(400).json({ error: 'Corpo do bloco vazio', code: 'EMPTY_CHUNK' });
+        return;
+      }
+
+      const chunkBytes = getDemoUploadChunkBytes();
+      const isLast = index === meta.totalChunks - 1;
+      const maxSize = isLast ? meta.fileSize - index * chunkBytes : chunkBytes;
+      if (body.length > maxSize) {
+        res.status(400).json({ error: 'Bloco maior que o esperado', code: 'CHUNK_TOO_LARGE' });
+        return;
+      }
+
+      const chunkPath = getChunkPath(uploadId, index);
+      fs.mkdirSync(path.dirname(chunkPath), { recursive: true });
+      fs.writeFileSync(chunkPath, body);
+      markChunkReceived(uploadId, req.user!.userId, index);
+
+      res.json({ ok: true, index, received: body.length });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao receber bloco da demo' });
+    }
+  }
+);
+
+router.post('/upload/sessions/:uploadId/complete', authMiddleware, participationGuard, requireDemoQueue, async (req: AuthRequest, res: Response) => {
+  const uploadId = req.params.uploadId;
+  let assembledPath: string | null = null;
+  try {
+    const meta = loadDemoUploadSession(uploadId, req.user!.userId);
+    if (!meta) {
+      res.status(404).json({ error: 'Sessão de upload não encontrada ou expirada', code: 'UPLOAD_SESSION_NOT_FOUND' });
+      return;
+    }
+
+    assembledPath = await assembleDemoUploadSession(uploadId, req.user!.userId);
+    const { demo } = await persistDemoFromTempPath(
+      req,
+      assembledPath,
+      meta.fileName,
+      meta.isPersonal,
+      meta.matchId
+    );
+    assembledPath = null;
+    destroyDemoUploadSession(uploadId);
+
+    res.status(201).json(serializeCreatedDemo(demo));
+  } catch (err) {
+    console.error(err);
+    if (assembledPath) {
+      fs.unlink(assembledPath, () => {});
+    }
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('Upload incompleto') || message.includes('Bloco') || message.includes('Tamanho do arquivo')) {
+      res.status(400).json({ error: message, code: 'INCOMPLETE_CHUNKED_UPLOAD' });
+      return;
+    }
+    sendDemoUploadError(res, err);
+  }
+});
+
 router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upload.single('demo'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
@@ -283,118 +579,21 @@ router.post('/upload', authMiddleware, participationGuard, requireDemoQueue, upl
     const matchId = isPersonal ? undefined : (req.body.matchId ? String(req.body.matchId) : undefined);
     const fileName = uploadedFile.originalname;
 
-    const duplicateCheck = await validateDuplicateDemoUpload(req.user!.userId, fileName);
-    if (!duplicateCheck.valid) {
+    const validation = await validateDemoUploadRequest(req.user!.userId, req.user!.role, fileName, isPersonal, matchId);
+    if (!validation.valid) {
       fs.unlink(uploadedFile.path, () => {});
-      res.status(400).json({ error: duplicateCheck.error, code: duplicateCheck.code });
+      res.status(validation.status).json({ error: validation.error, code: validation.code });
       return;
     }
 
-    if (isPersonal) {
-      const validation = await validatePersonalDemoUpload(req.user!.userId, req.user!.role);
-      if (!validation.valid) {
-        fs.unlink(uploadedFile.path, () => {});
-        res.status(400).json({ error: validation.error, code: validation.code });
-        return;
-      }
-    } else {
-      if (!matchId) {
-        fs.unlink(uploadedFile.path, () => {});
-        res.status(400).json({ error: 'Selecione uma partida para enviar a demo.', code: 'MATCH_REQUIRED' });
-        return;
-      }
-      const permission = await canUserManageMatchDemo(req.user!.userId, req.user!.role, matchId);
-      if (!permission.allowed) {
-        fs.unlink(uploadedFile.path, () => {});
-        res.status(403).json({ error: permission.error });
-        return;
-      }
-      const validation = await validateGeneralDemoUpload(matchId);
-      if (!validation.valid) {
-        fs.unlink(uploadedFile.path, () => {});
-        res.status(400).json({ error: validation.error, code: validation.code });
-        return;
-      }
-    }
-
-    const demo = await prisma.$transaction(async (tx) => {
-      if (!isPersonal && matchId) {
-        const existing = await tx.demo.findFirst({
-          where: {
-            matchId,
-            isPersonal: false,
-            status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
-          },
-          select: { id: true, isManual: true },
-        });
-        if (existing) {
-          const error = existing.isManual
-            ? 'Já existem estatísticas manuais para esta partida. Edite-as em vez de enviar uma demo.'
-            : 'Já existe uma demo geral associada a esta partida.';
-          throw new Error(error);
-        }
-      }
-
-      return tx.demo.create({
-        data: {
-          uploadedById: req.user!.userId,
-          filePath: resolveDemoFilePath(uploadedFile.path),
-          fileName: uploadedFile.originalname,
-          status: 'PENDING',
-          isPersonal,
-          ...(matchId && !isPersonal && { matchId }),
-        },
-      });
-    });
-
-    try {
-      const demoFilePath = demo.filePath;
-      if (!demoFilePath) {
-        throw new Error('Demo criada sem arquivo');
-      }
-      await enqueueDemoJob(demo.id, demoFilePath);
-    } catch (enqueueErr) {
-      await prisma.demo.delete({ where: { id: demo.id } }).catch(() => {});
-      fs.unlink(uploadedFile.path, () => {});
-      throw enqueueErr;
-    }
-
-    setAuditContext(req, demo.matchId
-      ? audit.withParent('match.demo.link', 'Demo', demo.id, 'Match', demo.matchId, {
-          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
-        })
-      : audit.of('demo.upload', 'Demo', demo.id, {
-          after: { fileName: demo.fileName, isPersonal: demo.isPersonal },
-        }));
-    res.status(201).json({
-      id: demo.id,
-      fileName: demo.fileName,
-      status: demo.status.toLowerCase(),
-      matchId: demo.matchId,
-      isPersonal: demo.isPersonal,
-      createdAt: demo.createdAt,
-    });
+    const { demo } = await persistDemoFromTempPath(req, uploadedFile.path, fileName, isPersonal, matchId);
+    res.status(201).json(serializeCreatedDemo(demo));
   } catch (err) {
     console.error(err);
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
-    const message = err instanceof Error ? err.message : '';
-    if (
-      message.includes('estatísticas manuais') ||
-      message.includes('demo geral associada')
-    ) {
-      res.status(400).json({ error: message, code: 'MATCH_HAS_DEMO' });
-      return;
-    }
-    if (message.includes('Fila Redis indisponível') || message.includes('Redis')) {
-      res.status(503).json({
-        error: 'Fila de processamento de demos indisponível. Verifique REDIS_URL na API (plugin Redis, não o Worker).',
-        code: 'DEMO_QUEUE_UNAVAILABLE',
-      });
-      return;
-    }
-    res.status(500).json({ error: 'Erro ao fazer upload da demo' });
+    sendDemoUploadError(res, err);
   }
 });
 
@@ -731,7 +930,7 @@ router.post('/:id/reprocess', authMiddleware, participationGuard, requireDemoQue
       res.status(400).json({
         error: DEMO_FILE_MISSING_ERROR,
         code: 'DEMO_FILE_NOT_FOUND',
-        storagePath,
+        storagePath: getDemoStoragePath(),
       });
       return;
     }

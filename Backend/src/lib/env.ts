@@ -1,4 +1,5 @@
 import { getDemoMaxUploadMb } from './demoUploadLimits';
+import { getDemoUploadChunkBytes } from './demoChunkedUpload';
 
 function isUnresolvedRailwayRef(value: string): boolean {
   return value.includes('${{') || value.includes('{{');
@@ -129,6 +130,7 @@ export function getEnvConfigStatus() {
     redisErrors: getRedisEnvErrors(),
     warnings: getRedisWarnings(),
     demoMaxUploadMb: getDemoMaxUploadMb(),
+    demoUploadChunkBytes: getDemoUploadChunkBytes(),
     highlightClipsPath: {
       set: (process.env.HIGHLIGHT_CLIPS_PATH?.trim() ?? '').length > 0,
       value: process.env.HIGHLIGHT_CLIPS_PATH?.trim() || null,
