@@ -199,8 +199,32 @@
               </div>
               <div class="metric-bar"><div class="metric-bar-fill metric-bar-orange" [style.width.%]="adrGaugePercent()"></div></div>
               <ul class="metric-details">
-                <li><span>Demos</span><strong>{{ summary.demosCompleted }}</strong></li>
-                <li><span>K/D</span><strong>{{ summary.kd }}</strong></li>
+                <li><span>Média K</span><strong>{{ summary.avgKills }}</strong></li>
+                <li><span>Dano</span><strong>{{ formatDamage(summary.damage) }}</strong></li>
+              </ul>
+            </div>
+
+            <div class="stat-card stat-card-gauge">
+              <span class="stat-card-label">KDA</span>
+              <div class="gauge gauge-green" [style.--pct]="kdaGaugePercent() + '%'">
+                <div class="gauge-inner">
+                  <span class="gauge-value">{{ summary.kda }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stat-card stat-card-metric">
+              <span class="stat-card-label">Impacto</span>
+              <div class="metric-head">
+                <span class="metric-icon">+</span>
+                <span class="metric-value" [class.stat-positive]="summary.kdDiff > 0" [class.stat-negative]="summary.kdDiff < 0">
+                  {{ formatKdDiff(summary.kdDiff) }}
+                </span>
+              </div>
+              <div class="metric-bar"><div class="metric-bar-fill" [style.width.%]="impactGaugePercent()"></div></div>
+              <ul class="metric-details">
+                <li><span>Assists</span><strong>{{ summary.assists }}</strong></li>
+                <li><span>HS</span><strong>{{ summary.headshotKills }}</strong></li>
               </ul>
             </div>
 
@@ -214,7 +238,9 @@
                       <th>Data</th>
                       <th>K</th>
                       <th>D</th>
+                      <th>A</th>
                       <th>K/D</th>
+                      <th>KDA</th>
                       <th>ADR</th>
                       <th>HS%</th>
                       <th>KAST</th>
@@ -226,7 +252,9 @@
                       <td>{{ formatDate(d.createdAt) }}</td>
                       <td>{{ d.kills }}</td>
                       <td>{{ d.deaths }}</td>
+                      <td>{{ d.assists }}</td>
                       <td class="stat-highlight">{{ d.kd }}</td>
+                      <td>{{ d.kda }}</td>
                       <td>{{ d.adr }}</td>
                       <td>{{ d.hsPercent }}%</td>
                       <td>{{ d.kast }}%</td>

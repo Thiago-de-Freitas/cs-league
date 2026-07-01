@@ -379,7 +379,13 @@ export interface PersonalStatsSummary {
   demosCompleted: number;
   kills: number;
   deaths: number;
+  assists: number;
+  damage: number;
+  headshotKills: number;
+  kdDiff: number;
+  avgKills: number;
   kd: number;
+  kda: number;
   adr: number;
   hsPercent: number;
   kast: number;
@@ -393,10 +399,14 @@ export interface PersonalDemoStat {
   createdAt: string;
   kills: number;
   deaths: number;
+  assists: number;
+  damage: number;
   kd: number;
+  kda: number;
   adr: number;
   hsPercent: number;
   kast: number;
+  headshotKills: number;
 }
 
 export interface PersonalStatsOverview {

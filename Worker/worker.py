@@ -661,8 +661,8 @@ def save_player_stats(demo_id: str, stats: list[dict]):
                 cur.execute(
                     """
                     INSERT INTO "MatchPlayerStat"
-                    (id, "demoId", "steamId", "playerName", kills, deaths, adr, "hsPercent", kast)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (id, "demoId", "steamId", "playerName", kills, deaths, assists, damage, adr, "hsPercent", kast)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         str(uuid.uuid4()),
@@ -671,6 +671,8 @@ def save_player_stats(demo_id: str, stats: list[dict]):
                         s["player_name"],
                         s["kills"],
                         s["deaths"],
+                        s.get("assists", 0),
+                        s.get("damage", 0),
                         s["adr"],
                         s["hs_percent"],
                         s["kast"],
@@ -715,6 +717,7 @@ def parse_demo(file_path: str) -> list[dict]:
                 "player_name": name,
                 "kills": 0,
                 "deaths": 0,
+                "assists": 0,
                 "total_damage": 0,
                 "headshot_kills": 0,
                 "kast_rounds": set(),
@@ -737,9 +740,12 @@ def parse_demo(file_path: str) -> list[dict]:
                 if round_num > 0:
                     player_data[attacker]["kast_rounds"].add(round_num)
 
-            if assister and assister != "0" and round_num > 0:
+            if assister and assister != "0":
                 ensure_player(assister)
-                player_data[assister]["kast_rounds"].add(round_num)
+                if assister != attacker:
+                    player_data[assister]["assists"] += 1
+                if round_num > 0:
+                    player_data[assister]["kast_rounds"].add(round_num)
 
             if victim and victim != "0":
                 ensure_player(victim, victim_name)
@@ -774,6 +780,8 @@ def parse_demo(file_path: str) -> list[dict]:
             "player_name": data["player_name"],
             "kills": kills,
             "deaths": deaths,
+            "assists": data["assists"],
+            "damage": data["total_damage"],
             "adr": adr,
             "hs_percent": hs_percent,
             "kast": kast,
@@ -793,6 +801,8 @@ def parse_demo(file_path: str) -> list[dict]:
                             "player_name": str(row.get("name", "Unknown")),
                             "kills": 0,
                             "deaths": 0,
+                            "assists": 0,
+                            "damage": 0,
                             "adr": 0.0,
                             "hs_percent": 0.0,
                             "kast": 0.0,

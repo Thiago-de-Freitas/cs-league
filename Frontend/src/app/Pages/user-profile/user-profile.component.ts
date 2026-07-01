@@ -129,6 +129,27 @@ export class UserProfileComponent implements OnInit {
     return this.gaugePercent(this.personalSummary?.adr || 0, 120);
   }
 
+  kdaGaugePercent(): number {
+    return this.gaugePercent(this.personalSummary?.kda || 0, 3);
+  }
+
+  impactGaugePercent(): number {
+    const diff = this.personalSummary?.kdDiff || 0;
+    return this.gaugePercent(Math.abs(diff), 30);
+  }
+
+  formatKdDiff(value: number): string {
+    if (value > 0) return `+${value}`;
+    return String(value);
+  }
+
+  formatDamage(value: number): string {
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}k`;
+    }
+    return String(value);
+  }
+
   shortFileName(fileName: string): string {
     if (fileName.length <= 28) return fileName;
     return `${fileName.slice(0, 12)}…${fileName.slice(-12)}`;

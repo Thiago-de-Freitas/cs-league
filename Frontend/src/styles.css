@@ -1349,6 +1349,8 @@ input[type="datetime-local"]::-moz-calendar-picker-indicator {
   position: relative;
 }
 
+.profile-page .stat-positive { color: var(--gc-green); }
+.profile-page .stat-negative { color: var(--gc-red); }
 .profile-page .gauge-green { background: conic-gradient(var(--gc-green) var(--pct), var(--gc-border) 0); }
 .profile-page .gauge-blue { background: conic-gradient(var(--gc-text-secondary) var(--pct), var(--gc-border) 0); }
 

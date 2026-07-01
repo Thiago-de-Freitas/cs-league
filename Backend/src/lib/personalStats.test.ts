@@ -14,6 +14,8 @@ describe('personalStats', () => {
           {
             kills: 20,
             deaths: 10,
+            assists: 5,
+            damage: 2400,
             adr: 80,
             hsPercent: 40,
             kast: 70,
@@ -33,6 +35,11 @@ describe('personalStats', () => {
     assert.equal(overview.summary.demosCompleted, 1);
     assert.equal(overview.summary.kills, 20);
     assert.equal(overview.summary.deaths, 10);
+    assert.equal(overview.summary.assists, 5);
+    assert.equal(overview.summary.damage, 2400);
+    assert.equal(overview.summary.headshotKills, 8);
+    assert.equal(overview.summary.kda, 2.5);
+    assert.equal(overview.summary.kdDiff, 10);
     assert.equal(overview.demos.length, 2);
     assert.equal(overview.demos[0].status, 'completed');
     assert.equal(overview.demos[1].status, 'pending');

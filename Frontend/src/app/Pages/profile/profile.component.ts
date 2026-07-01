@@ -307,6 +307,27 @@ export class ProfileComponent implements OnInit, OnDestroy {
     return this.gaugePercent(this.summary?.kast || 0, 100);
   }
 
+  kdaGaugePercent(): number {
+    return this.gaugePercent(this.summary?.kda || 0, 3);
+  }
+
+  impactGaugePercent(): number {
+    const diff = this.summary?.kdDiff || 0;
+    return this.gaugePercent(Math.abs(diff), 30);
+  }
+
+  formatKdDiff(value: number): string {
+    if (value > 0) return `+${value}`;
+    return String(value);
+  }
+
+  formatDamage(value: number): string {
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}k`;
+    }
+    return String(value);
+  }
+
   hsGaugePercent(): number {
     return this.gaugePercent(this.summary?.hsPercent || 0, 100);
   }
