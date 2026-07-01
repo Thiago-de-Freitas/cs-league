@@ -68,6 +68,8 @@ describe('playerAnalytics', () => {
 
     assert.ok(analytics);
     assert.equal(analytics.recentForm.length, 2);
+    assert.ok(analytics.recentForm[0].skills.aim >= 0);
+    assert.ok(analytics.recentForm[1].skills.positioning >= 0);
     assert.ok(analytics.insights.length >= 3);
     assert.equal(analytics.skillsGoal.aim, 50);
   });

@@ -268,100 +268,178 @@
   margin: 0;
 }
 
-.form-tabs {
+.form-charts {
   display: flex;
-  gap: 0.35rem;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
 }
 
-.form-tab {
-  border: 1px solid var(--gc-border);
+.form-charts-row {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.form-charts-row-primary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-charts-row-skills {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.65rem 0.75rem 0.7rem;
   background: var(--gc-bg-secondary);
-  color: var(--gc-text-secondary);
-  font-size: 0.75rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
 }
 
-.form-tab.active {
-  border-color: var(--gc-orange);
-  color: var(--gc-orange);
+.form-chart-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.form-chart-card-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gc-text-muted);
+}
+
+.form-chart-card-value {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--gc-text);
+}
+
+.form-chart-tone-orange {
+  --chart-color: var(--gc-orange);
+}
+
+.form-chart-tone-green {
+  --chart-color: var(--gc-green);
+}
+
+.form-chart-tone-gold {
+  --chart-color: var(--gc-rank-gold-nova);
+}
+
+.form-chart-tone-legendary {
+  --chart-color: var(--gc-rank-legendary);
+}
+
+.form-chart-tone-mg {
+  --chart-color: var(--gc-rank-mg);
 }
 
 .form-body {
-  display: grid;
-  grid-template-columns: 280px 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
-  align-items: center;
 }
 
 .form-gauges {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 0.75rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  background: var(--gc-bg-secondary);
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-:host .form-gauge-main .gauge-inner {
+.form-gauge-cell {
+  display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.45rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 1.15rem 1rem;
+  min-width: 0;
+}
+
+.form-gauge-cell + .form-gauge-cell {
+  border-left: 1px solid var(--gc-border);
+}
+
+:host .gauge {
+  --pct: 0%;
+  --gauge-color: var(--gc-orange);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: conic-gradient(var(--gauge-color) var(--pct), var(--gc-border) 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+:host .gauge-inner {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  background: var(--gc-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:host .gauge-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--gc-text);
+}
+
+:host .form-gauge-cell-main .gauge {
+  width: 112px;
+  height: 112px;
+}
+
+:host .form-gauge-cell-main .gauge-inner {
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem;
   text-align: center;
   line-height: 1.1;
 }
 
-:host .form-gauge-main .gauge-value {
-  font-size: 1.2rem;
+:host .form-gauge-cell-main .gauge-value {
+  font-size: 1.25rem;
   line-height: 1;
 }
 
-.form-gauge-main {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
+:host .form-gauge-cell:not(.form-gauge-cell-main) .gauge-value {
+  font-size: 0.9rem;
 }
 
-.form-gauge-main .gauge {
-  width: 118px;
-  height: 118px;
+.gauge-orange,
+.gauge-t {
+  --gauge-color: var(--gc-orange);
 }
 
-.form-gauge-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
-}
-
-.form-gauge-side .gauge-mini {
-  width: 72px;
-  height: 72px;
-}
-
-.form-gauge-side .gauge-inner {
-  flex-direction: column;
-  padding: 0.25rem;
+.gauge-ct {
+  --gauge-color: var(--gc-rank-mg);
 }
 
 .form-gauge-label {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--gc-text-muted);
-  margin-bottom: 0.35rem;
-}
-
-.gauge-orange {
-  --gauge-color: var(--gc-orange);
-}
-
-.gauge-mini {
-  --gauge-size: 72px;
-}
-
-.gauge-mini .gauge-value {
-  font-size: 0.85rem;
+  margin: 0;
+  text-align: center;
 }
 
 .gauge-sub {
@@ -373,40 +451,68 @@
   white-space: nowrap;
 }
 
-.form-chart-wrap {
-  min-height: 120px;
-}
-
 .form-chart {
+  display: block;
   width: 100%;
-  height: 120px;
+  height: 72px;
   background: var(--gc-bg-secondary);
   border: 1px solid var(--gc-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
-.form-chart-grid {
-  fill: none;
-  stroke: var(--gc-border);
-  stroke-width: 0.4;
-  stroke-dasharray: 2 2;
+.form-chart-card-featured .form-chart {
+  height: 96px;
+}
+
+.form-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  text-align: center;
+}
+
+.form-chart-empty span {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--gc-text-muted);
 }
 
 .form-chart-area {
-  fill: color-mix(in srgb, var(--gc-orange) 25%, transparent);
   stroke: none;
 }
 
 .form-chart-line {
   fill: none;
-  stroke: var(--gc-orange);
-  stroke-width: 1.2;
+  stroke: var(--chart-color, var(--gc-orange));
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .form-chart-caption {
   font-size: 0.75rem;
   color: var(--gc-text-muted);
-  margin: 0.35rem 0 0;
+  margin: 0.15rem 0 0;
+}
+
+.form-chart-caption-wide {
+  margin-top: 0.1rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .form-charts-row-skills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-charts-row-skills .form-chart-card:last-child {
+    grid-column: 1 / -1;
+    max-width: calc(50% - 0.425rem);
+    justify-self: center;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -415,12 +521,30 @@
   }
 }
 
-@media (max-width: 768px) {
-  .analytics-insights {
+@media (max-width: 640px) {
+  .form-gauges {
     grid-template-columns: 1fr;
   }
 
-  .form-body {
+  .form-gauge-cell + .form-gauge-cell {
+    border-left: none;
+    border-top: 1px solid var(--gc-border);
+  }
+
+  .form-charts-row-primary,
+  .form-charts-row-skills {
+    grid-template-columns: 1fr;
+  }
+
+  .form-charts-row-skills .form-chart-card:last-child {
+    grid-column: auto;
+    max-width: none;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-insights {
     grid-template-columns: 1fr;
   }
 }

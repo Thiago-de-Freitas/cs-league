@@ -1,10 +1,31 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { PersonalPerformanceAnalytics } from '../../Models/interfaces';
+import { PersonalPerformanceAnalytics, RecentFormPoint } from '../../Models/interfaces';
+import {
+  buildSmoothAreaPath,
+  buildSmoothLinePath,
+  GROWTH_CHART_VIEW,
+  GrowthChartCoord,
+  mapValueToChartY,
+} from '../../Utils/growth-chart.util';
 import {
   SKILL_RATING_TIERS,
   skillRatingTierInfo,
 } from '../../Utils/skill-rating-tiers.util';
+
+type GrowthChartId = 'rating' | 'impact' | 'aim' | 'positioning' | 'utility';
+
+interface GrowthChartConfig {
+  id: GrowthChartId;
+  label: string;
+  colorClass: string;
+  min: number;
+  max: number;
+  baseline: number;
+  featured?: boolean;
+  formatValue: (value: number) => string;
+  pickValue: (point: RecentFormPoint) => number;
+}
 
 @Component({
   selector: 'app-profile-analytics',
@@ -17,8 +38,65 @@ export class ProfileAnalyticsSectionComponent {
   @Input() analytics: PersonalPerformanceAnalytics | null = null;
 
   readonly skillRatingTiers = SKILL_RATING_TIERS;
+  readonly chartViewHeight = GROWTH_CHART_VIEW.height;
 
-  formTab: 'rating' | 'winrate' = 'rating';
+  readonly primaryGrowthCharts: GrowthChartConfig[] = [
+    {
+      id: 'rating',
+      label: 'Rating',
+      colorClass: 'form-chart-tone-orange',
+      min: -4,
+      max: 3,
+      baseline: 0,
+      featured: true,
+      formatValue: (value) => this.formatRating(value),
+      pickValue: (point) => point.performanceRating,
+    },
+    {
+      id: 'impact',
+      label: 'Impacto',
+      colorClass: 'form-chart-tone-green',
+      min: 0,
+      max: 100,
+      baseline: 50,
+      featured: true,
+      formatValue: (value) => `${Math.round(value)}%`,
+      pickValue: (point) => point.winRateProxy,
+    },
+  ];
+
+  readonly skillGrowthCharts: GrowthChartConfig[] = [
+    {
+      id: 'aim',
+      label: 'Mira',
+      colorClass: 'form-chart-tone-gold',
+      min: 0,
+      max: 100,
+      baseline: 50,
+      formatValue: (value) => `${Math.round(value)}`,
+      pickValue: (point) => point.skills?.aim ?? 50,
+    },
+    {
+      id: 'positioning',
+      label: 'Posicionamento',
+      colorClass: 'form-chart-tone-legendary',
+      min: 0,
+      max: 100,
+      baseline: 50,
+      formatValue: (value) => `${Math.round(value)}`,
+      pickValue: (point) => point.skills?.positioning ?? 50,
+    },
+    {
+      id: 'utility',
+      label: 'Utilitários',
+      colorClass: 'form-chart-tone-mg',
+      min: 0,
+      max: 100,
+      baseline: 50,
+      formatValue: (value) => `${Math.round(value)}`,
+      pickValue: (point) => point.skills?.utility ?? 50,
+    },
+  ];
 
   tierClass(tier: string): string {
     switch (tier) {
@@ -86,38 +164,53 @@ export class ProfileAnalyticsSectionComponent {
       .join(' ');
   }
 
-  setFormTab(tab: 'rating' | 'winrate'): void {
-    this.formTab = tab;
+  chartCoords(chart: GrowthChartConfig): GrowthChartCoord[] {
+    const form = this.analytics?.recentForm ?? [];
+    if (form.length < 2) return [];
+
+    const values = form.map((point) => chart.pickValue(point));
+    const { width, padX } = GROWTH_CHART_VIEW;
+    const step = (width - padX * 2) / (values.length - 1);
+
+    return values.map((value, index) => ({
+      x: padX + index * step,
+      y: mapValueToChartY(value, chart.min, chart.max),
+    }));
   }
 
-  chartPoints(): string {
+  hasEnoughDemosForTrend(): boolean {
+    return (this.analytics?.recentForm?.length ?? 0) >= 2;
+  }
+
+  chartGradientId(chart: GrowthChartConfig): string {
+    return `growth-grad-${chart.id}`;
+  }
+
+  chartAreaFill(chart: GrowthChartConfig): string {
+    return `url(#${this.chartGradientId(chart)})`;
+  }
+
+  chartSmoothLinePath(chart: GrowthChartConfig): string {
+    return buildSmoothLinePath(this.chartCoords(chart));
+  }
+
+  chartSmoothAreaPath(chart: GrowthChartConfig): string {
+    return buildSmoothAreaPath(this.chartCoords(chart), GROWTH_CHART_VIEW.height);
+  }
+
+  latestChartValue(chart: GrowthChartConfig): string | null {
+    const points = this.analytics?.recentForm ?? [];
+    if (points.length === 0) return null;
+    const latest = points[points.length - 1];
+    return chart.formatValue(chart.pickValue(latest));
+  }
+
+  latestChartValueClass(chart: GrowthChartConfig): string {
+    if (chart.id === 'rating' || chart.id === 'impact') return '';
     const points = this.analytics?.recentForm ?? [];
     if (points.length === 0) return '';
-    const values = points.map((p) => (this.formTab === 'rating' ? p.performanceRating : (p.winRateProxy - 50) / 12.5));
-    const min = -4;
-    const max = 3;
-    const width = 100;
-    const height = 60;
-    const step = points.length > 1 ? width / (points.length - 1) : 0;
-
-    return values
-      .map((value, index) => {
-        const x = points.length > 1 ? index * step : width / 2;
-        const clamped = Math.max(min, Math.min(max, value));
-        const y = height - ((clamped - min) / (max - min)) * height;
-        return `${x},${y}`;
-      })
-      .join(' ');
-  }
-
-  chartAreaPoints(): string {
-    const line = this.chartPoints();
-    if (!line) return '';
-    const points = this.analytics?.recentForm ?? [];
-    const width = 100;
-    const height = 60;
-    const lastX = points.length > 1 ? width : width / 2;
-    return `0,${height} ${line} ${lastX},${height}`;
+    const latest = points[points.length - 1];
+    return this.skillValueClass(chart.pickValue(latest));
   }
 
   formatRating(value: number): string {

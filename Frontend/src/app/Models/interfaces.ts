@@ -438,6 +438,7 @@ export interface RecentFormPoint {
   createdAt: string;
   performanceRating: number;
   winRateProxy: number;
+  skills: SkillRatings;
 }
 
 export interface PersonalPerformanceAnalytics {

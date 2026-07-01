@@ -68,15 +68,11 @@
   <div class="analytics-form gc-card">
     <header class="form-header">
       <h3>Forma recente</h3>
-      <div class="form-tabs">
-        <button type="button" class="form-tab" [class.active]="formTab === 'rating'" (click)="setFormTab('rating')">Rating</button>
-        <button type="button" class="form-tab" [class.active]="formTab === 'winrate'" (click)="setFormTab('winrate')">Impacto</button>
-      </div>
     </header>
 
     <div class="form-body">
       <div class="form-gauges">
-        <div class="form-gauge-main">
+        <div class="form-gauge-cell form-gauge-cell-main">
           <span class="form-gauge-label">Rating de impacto</span>
           <div class="gauge gauge-orange" [style.--pct]="performanceGaugePercent() + '%'">
             <div class="gauge-inner">
@@ -85,28 +81,96 @@
             </div>
           </div>
         </div>
-        <div class="form-gauge-side">
+        <div class="form-gauge-cell">
           <span class="form-gauge-label">T-Side</span>
-          <div class="gauge gauge-mini" [style.--pct]="sideGaugePercent(data.sideRatings.t) + '%'">
+          <div class="gauge gauge-t" [style.--pct]="sideGaugePercent(data.sideRatings.t) + '%'">
             <div class="gauge-inner"><span class="gauge-value">{{ formatRating(data.sideRatings.t) }}</span></div>
           </div>
         </div>
-        <div class="form-gauge-side">
+        <div class="form-gauge-cell">
           <span class="form-gauge-label">CT-Side</span>
-          <div class="gauge gauge-mini gauge-blue" [style.--pct]="sideGaugePercent(data.sideRatings.ct) + '%'">
+          <div class="gauge gauge-ct" [style.--pct]="sideGaugePercent(data.sideRatings.ct) + '%'">
             <div class="gauge-inner"><span class="gauge-value">{{ formatRating(data.sideRatings.ct) }}</span></div>
           </div>
         </div>
       </div>
 
-      <div class="form-chart-wrap">
-        <svg class="form-chart" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
-          <polyline class="form-chart-grid" points="0,30 100,30"></polyline>
-          <polygon class="form-chart-area" [attr.points]="chartAreaPoints()"></polygon>
-          <polyline class="form-chart-line" [attr.points]="chartPoints()"></polyline>
-        </svg>
-        <p class="form-chart-caption" *ngIf="data.recentForm.length === 0">Sem histórico suficiente.</p>
-        <p class="form-chart-caption" *ngIf="data.recentForm.length > 0">Últimas {{ data.recentForm.length }} demos analisadas</p>
+      <div class="form-charts">
+        <ng-template #growthChartSvg let-chart>
+          <div class="form-chart form-chart-empty" *ngIf="!hasEnoughDemosForTrend()" role="img" [attr.aria-label]="'Tendência de ' + chart.label + ' indisponível'">
+            <span>Tendência disponível a partir de 2 demos</span>
+          </div>
+          <svg
+            *ngIf="hasEnoughDemosForTrend()"
+            class="form-chart"
+            viewBox="0 0 100 50"
+            preserveAspectRatio="none"
+            [attr.aria-label]="'Evolução de ' + chart.label"
+          >
+            <defs>
+              <linearGradient
+                [attr.id]="chartGradientId(chart)"
+                gradientUnits="userSpaceOnUse"
+                x1="0"
+                y1="0"
+                x2="0"
+                [attr.y2]="chartViewHeight"
+              >
+                <stop offset="0%" stop-color="var(--chart-color)" stop-opacity="0.55" />
+                <stop offset="70%" stop-color="var(--chart-color)" stop-opacity="0.14" />
+                <stop offset="100%" stop-color="var(--chart-color)" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              class="form-chart-area"
+              [attr.d]="chartSmoothAreaPath(chart)"
+              [attr.fill]="chartAreaFill(chart)"
+            />
+            <path
+              class="form-chart-line"
+              [attr.d]="chartSmoothLinePath(chart)"
+            />
+          </svg>
+        </ng-template>
+
+        <div class="form-charts-row form-charts-row-primary">
+          <article
+            class="form-chart-card form-chart-card-featured"
+            *ngFor="let chart of primaryGrowthCharts"
+            [ngClass]="chart.colorClass"
+          >
+            <header class="form-chart-card-header">
+              <span class="form-chart-card-label">{{ chart.label }}</span>
+              <strong
+                class="form-chart-card-value"
+                *ngIf="latestChartValue(chart) as latest"
+                [ngClass]="latestChartValueClass(chart)"
+              >{{ latest }}</strong>
+            </header>
+            <ng-container *ngTemplateOutlet="growthChartSvg; context: { $implicit: chart }"></ng-container>
+          </article>
+        </div>
+
+        <div class="form-charts-row form-charts-row-skills">
+          <article class="form-chart-card" *ngFor="let chart of skillGrowthCharts" [ngClass]="chart.colorClass">
+            <header class="form-chart-card-header">
+              <span class="form-chart-card-label">{{ chart.label }}</span>
+              <strong
+                class="form-chart-card-value"
+                *ngIf="latestChartValue(chart) as latest"
+                [ngClass]="latestChartValueClass(chart)"
+              >{{ latest }}</strong>
+            </header>
+            <ng-container *ngTemplateOutlet="growthChartSvg; context: { $implicit: chart }"></ng-container>
+          </article>
+        </div>
+
+        <p class="form-chart-caption form-chart-caption-wide" *ngIf="data.recentForm.length === 1">
+          1 demo analisada — o valor atual aparece acima; envie mais demos para ver a curva de evolução
+        </p>
+        <p class="form-chart-caption form-chart-caption-wide" *ngIf="data.recentForm.length > 1">
+          Últimas {{ data.recentForm.length }} demos — evolução da esquerda (mais antiga) para a direita (mais recente)
+        </p>
       </div>
     </div>
   </div>

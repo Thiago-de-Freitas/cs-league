@@ -50,6 +50,7 @@ export type RecentFormPoint = {
   createdAt: string;
   performanceRating: number;
   winRateProxy: number;
+  skills: SkillRatings;
 };
 
 export type PersonalPerformanceAnalytics = {
@@ -384,6 +385,7 @@ export function buildPersonalPerformanceAnalytics(
         createdAt: demo.createdAt.toISOString(),
         performanceRating: computePerformanceRating(demo.stat),
         winRateProxy,
+        skills: computeSkillRatings(demo.stat),
       };
     });
 
