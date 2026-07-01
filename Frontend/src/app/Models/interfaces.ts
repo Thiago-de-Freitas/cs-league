@@ -9,6 +9,8 @@ export interface User {
   isActive?: boolean;
   bannedUntil?: string | null;
   isBanned?: boolean;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string | null;
   createdAt?: string;
 }
 
@@ -426,6 +428,16 @@ export interface MatchPlayerStat {
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+export interface PendingVerificationResponse {
+  needsVerification: true;
+  email: string;
+}
+
+export interface ResendVerificationResponse {
+  message: string;
+  email: string;
 }
 
 export interface PlayerRankingEntry {

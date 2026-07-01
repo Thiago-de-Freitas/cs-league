@@ -1,0 +1,49 @@
+<div class="form-container auth-page">
+  <div class="form-wrapper">
+    <div class="auth-logo">
+      <span class="auth-logo-icon">{{ brand.icon }}</span>
+      <span class="auth-logo-text">{{ brand.primary }} {{ brand.secondary }}</span>
+    </div>
+    <h2 class="form-header">Confirmar e-mail</h2>
+    <p class="form-subtitle">
+      Enviamos um código de 6 dígitos para <strong>{{ maskedEmail }}</strong>.
+    </p>
+
+    <form class="form-group-spacing" [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="verification-code" class="form-label">Código de verificação</label>
+        <input
+          id="verification-code"
+          name="code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          class="input-field verification-code-input"
+          placeholder="000000"
+          formControlName="code"
+          (input)="onCodeInput($event)"
+          [disabled]="loading">
+        <div *ngIf="form.get('code')?.invalid && form.get('code')?.touched" class="error-message">
+          Informe os 6 dígitos do código.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Verificando...' : 'Confirmar e-mail' }}
+        </button>
+      </div>
+
+      <div *ngIf="errorMsg" class="error-message text-center mt-2">{{ errorMsg }}</div>
+      <div *ngIf="successMsg" class="success-message text-center mt-2">{{ successMsg }}</div>
+    </form>
+
+    <div class="verify-email-actions text-center text-small mt-4">
+      <button type="button" class="btn btn-secondary btn-small" [disabled]="resendLoading" (click)="resendCode()">
+        {{ resendLoading ? 'Reenviando...' : 'Reenviar código' }}
+      </button>
+      <a routerLink="/login" class="text-link verify-email-login-link">Voltar ao login</a>
+    </div>
+  </div>
+</div>

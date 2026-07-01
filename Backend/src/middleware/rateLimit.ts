@@ -34,3 +34,9 @@ export const authRateLimiter = createRateLimiter({
   max: 20,
   message: 'Muitas tentativas. Tente novamente em alguns minutos.',
 });
+
+export const emailVerificationRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Muitas tentativas de verificação. Tente novamente em alguns minutos.',
+});

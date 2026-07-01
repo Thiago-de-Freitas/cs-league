@@ -58,6 +58,16 @@ export class LoginComponent implements OnInit {
       },
       error: (err) => {
         this.loading = false;
+        if (err.status === 403 && err.error?.code === 'EMAIL_NOT_VERIFIED') {
+          const email = this.loginForm.value.email?.trim().toLowerCase();
+          this.router.navigate(['/verify-email'], {
+            queryParams: {
+              email,
+              masked: err.error?.email || email,
+            },
+          });
+          return;
+        }
         if (err.status === 401) this.authService.logout();
         this.loginError = err.error?.error || 'Erro ao fazer login.';
       }

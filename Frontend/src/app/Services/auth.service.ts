@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, shareReplay, tap } from 'rxjs';
-import { AuthResponse, User } from '../Models/interfaces';
+import { AuthResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
 import { LeagueService } from './league.service';
 import { RankingsService } from './rankings.service';
 import { TeamService } from './team.service';
@@ -40,10 +40,22 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
-  register(email: string, password: string, displayName: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, { email, password, displayName }).pipe(
+  register(email: string, password: string, displayName: string): Observable<PendingVerificationResponse> {
+    return this.http.post<PendingVerificationResponse>(`${this.apiUrl}/register`, {
+      email,
+      password,
+      displayName,
+    });
+  }
+
+  verifyEmail(email: string, code: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email`, { email, code }).pipe(
       tap((res) => this.setSession(res))
     );
+  }
+
+  resendVerification(email: string): Observable<ResendVerificationResponse> {
+    return this.http.post<ResendVerificationResponse>(`${this.apiUrl}/resend-verification`, { email });
   }
 
   login(email: string, password: string): Observable<AuthResponse> {

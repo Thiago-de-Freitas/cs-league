@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { parsePlayerPositionOptional } from '../lib/playerPosition';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { authRateLimiter } from '../middleware/rateLimit';
+import { authRateLimiter, emailVerificationRateLimiter } from '../middleware/rateLimit';
 import {
   deleteLegacyUploadFile,
   encodeUploadedImageToDataUrl,
@@ -20,6 +20,11 @@ import {
   DEACTIVATED_ACCOUNT_MESSAGE,
   isParticipationBanned,
 } from '../lib/userModeration';
+import {
+  issueVerificationCode,
+  maskEmail,
+  verifyStoredCode,
+} from '../lib/emailVerification';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -55,6 +60,8 @@ function sanitizeUser(user: {
   role: string;
   isActive: boolean;
   bannedUntil: Date | null;
+  emailVerified: boolean;
+  emailVerifiedAt: Date | null;
   createdAt: Date;
 }) {
   const moderation = { isActive: user.isActive, bannedUntil: user.bannedUntil };
@@ -69,8 +76,42 @@ function sanitizeUser(user: {
     isActive: user.isActive,
     bannedUntil: user.bannedUntil?.toISOString() ?? null,
     isBanned: isParticipationBanned(moderation),
+    emailVerified: user.emailVerified,
+    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     createdAt: user.createdAt,
   };
+}
+
+function normalizeEmailInput(email: unknown): string | null {
+  if (typeof email !== 'string') return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || normalized.length > MAX_EMAIL_LENGTH || !normalized.includes('@')) {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizeVerificationCode(code: unknown): string | null {
+  if (typeof code !== 'string' && typeof code !== 'number') return null;
+  const digits = String(code).replace(/\D/g, '');
+  if (digits.length !== 6) return null;
+  return digits;
+}
+
+async function respondPendingVerification(
+  res: Response,
+  user: { id: string; email: string; displayName: string }
+): Promise<void> {
+  const issued = await issueVerificationCode(user.id, user.email, user.displayName);
+  if (!issued.ok) {
+    res.status(503).json({ error: issued.error });
+    return;
+  }
+
+  res.status(200).json({
+    needsVerification: true,
+    email: maskEmail(user.email),
+  });
 }
 
 router.post('/register', authRateLimiter, async (req, res: Response) => {
@@ -100,6 +141,15 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
 
     const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (existing) {
+      if (!existing.emailVerified) {
+        const validPassword = await comparePassword(password, existing.passwordHash);
+        if (!validPassword) {
+          res.status(409).json({ error: 'Email já cadastrado' });
+          return;
+        }
+        await respondPendingVerification(res, existing);
+        return;
+      }
       res.status(409).json({ error: 'Email já cadastrado' });
       return;
     }
@@ -110,14 +160,24 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
         email: email.trim().toLowerCase(),
         passwordHash,
         displayName: displayName.trim(),
+        emailVerified: false,
       },
     });
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const issued = await issueVerificationCode(user.id, user.email, user.displayName);
+    if (!issued.ok) {
+      await prisma.user.delete({ where: { id: user.id } });
+      res.status(503).json({ error: issued.error });
+      return;
+    }
+
     setAuditContext(req, audit.of('auth.register', 'User', user.id, {
-      after: { email: user.email, displayName: user.displayName, role: user.role },
+      after: { email: user.email, displayName: user.displayName, role: user.role, emailVerified: false },
     }));
-    res.status(201).json({ token, user: sanitizeUser(user) });
+    res.status(201).json({
+      needsVerification: true,
+      email: maskEmail(user.email),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao registrar usuário' });
@@ -168,6 +228,20 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
       return;
     }
 
+    if (!user.emailVerified) {
+      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
+        metadata: { email: user.email },
+        success: false,
+        errorCode: 'EMAIL_NOT_VERIFIED',
+      }));
+      res.status(403).json({
+        error: 'Confirme seu e-mail com o código enviado antes de entrar.',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: maskEmail(user.email),
+      });
+      return;
+    }
+
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
     setAuditContext(req, audit.of('auth.login.success', 'User', user.id, {
       after: { email: user.email, displayName: user.displayName, role: user.role },
@@ -176,6 +250,84 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao fazer login' });
+  }
+});
+
+router.post('/verify-email', emailVerificationRateLimiter, async (req, res: Response) => {
+  try {
+    const email = normalizeEmailInput(req.body?.email);
+    const code = normalizeVerificationCode(req.body?.code);
+    if (!email || !code) {
+      res.status(400).json({ error: 'E-mail e código de 6 dígitos são obrigatórios.' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      res.status(400).json({ error: 'Código inválido ou expirado.' });
+      return;
+    }
+    if (user.emailVerified) {
+      const token = signToken({ userId: user.id, email: user.email, role: user.role });
+      res.json({ token, user: sanitizeUser(user) });
+      return;
+    }
+
+    const result = await verifyStoredCode(user.id, code);
+    if (result === 'expired') {
+      res.status(400).json({ error: 'Código expirado. Solicite um novo código.' });
+      return;
+    }
+    if (result === 'locked') {
+      res.status(429).json({ error: 'Muitas tentativas incorretas. Solicite um novo código.' });
+      return;
+    }
+    if (result === 'invalid') {
+      res.status(400).json({ error: 'Código inválido.' });
+      return;
+    }
+
+    const verified = await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerifiedAt: new Date() },
+    });
+
+    const token = signToken({ userId: verified.id, email: verified.email, role: verified.role });
+    setAuditContext(req, audit.of('auth.email.verify', 'User', verified.id, {
+      after: { emailVerified: true },
+    }));
+    res.json({ token, user: sanitizeUser(verified) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao verificar e-mail' });
+  }
+});
+
+router.post('/resend-verification', emailVerificationRateLimiter, async (req, res: Response) => {
+  try {
+    const email = normalizeEmailInput(req.body?.email);
+    if (!email) {
+      res.status(400).json({ error: 'E-mail inválido.' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user && !user.emailVerified) {
+      const issued = await issueVerificationCode(user.id, user.email, user.displayName);
+      if (!issued.ok) {
+        res.status(503).json({ error: issued.error });
+        return;
+      }
+      setAuditContext(req, audit.of('auth.email.resend', 'User', user.id));
+    }
+
+    res.json({
+      message: 'Se existir uma conta pendente com este e-mail, um novo código foi enviado.',
+      email: maskEmail(email),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao reenviar código' });
   }
 });
 

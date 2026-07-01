@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './Pages/login/login.component';
 import { RegisterComponent } from './Pages/register/register.component';
+import { VerifyEmailComponent } from './Pages/verify-email/verify-email.component';
 import { PlayerProfileComponent } from './Pages/player-profile/player-profile.component';
 import { authGuard } from './Guards/auth.guard';
 
@@ -13,6 +14,7 @@ export const routes: Routes = [
   },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
+  { path: 'verify-email', component: VerifyEmailComponent },
   {
     path: 'create-league',
     loadComponent: () =>

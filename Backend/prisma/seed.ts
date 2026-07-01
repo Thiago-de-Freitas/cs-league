@@ -38,12 +38,16 @@ async function main() {
       displayName: ADMIN_DISPLAY_NAME,
       role: 'ADMIN',
       passwordHash,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: adminEmail,
       displayName: ADMIN_DISPLAY_NAME,
       role: 'ADMIN',
       passwordHash,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 

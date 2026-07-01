@@ -50,9 +50,11 @@ export class RegisterComponent implements OnInit {
     const { email, password, username } = this.registerForm.value;
 
     this.authService.register(email, password, username).subscribe({
-      next: () => {
+      next: (res) => {
         this.loading = false;
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/verify-email'], {
+          queryParams: { email, masked: res.email },
+        });
       },
       error: (err) => {
         this.loading = false;

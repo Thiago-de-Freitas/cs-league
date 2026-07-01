@@ -119,18 +119,20 @@ enum PickupBalanceMode {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  displayName  String
-  steamId      String?
-  avatarUrl    String?
-  position     PlayerPosition?
-  role         UserRole @default(USER)
-  isActive     Boolean  @default(true)
-  bannedUntil  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  displayName     String
+  steamId         String?
+  avatarUrl       String?
+  position        PlayerPosition?
+  role            UserRole @default(USER)
+  isActive        Boolean  @default(true)
+  bannedUntil     DateTime?
+  emailVerified   Boolean  @default(false)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   ownedTeams   Team[]       @relation("TeamOwner")
   memberships  TeamMember[]
