@@ -95,7 +95,9 @@ export function buildMapVetoView(input: {
     team2StartingSide: input.team2StartingSide,
     bansRequired,
     bansCompleted: input.bannedMaps.length,
-    isStale: now.getTime() - input.lastActionAt.getTime() > VETO_ACTION_TIMEOUT_MS,
+    isStale:
+      input.status !== 'COMPLETED' &&
+      now.getTime() - input.lastActionAt.getTime() > VETO_ACTION_TIMEOUT_MS,
     vetoDeadlineAt: null,
     deadlineExpired: false,
     vetoReopenedByAdmin: false,

@@ -76,7 +76,10 @@ export function formatSeriesVetoView(
     activeGameNumber: series.activeGameNumber,
     team1MapWins: series.team1MapWins,
     team2MapWins: series.team2MapWins,
-    isStale: now.getTime() - series.lastActionAt.getTime() > STALE_MS,
+    isStale:
+      series.vetoStatus !== 'MAPS_ASSIGNED' &&
+      series.vetoStatus !== 'COMPLETED' &&
+      now.getTime() - series.lastActionAt.getTime() > STALE_MS,
     autoResolved: series.autoResolved,
     vetoDeadlineAt: deadline.vetoDeadlineAt?.toISOString() ?? null,
     deadlineExpired: deadline.deadlineExpired,
