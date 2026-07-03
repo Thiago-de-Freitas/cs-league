@@ -15,6 +15,7 @@ import { formatTeamCapacity } from '../../Utils/bracket.util';
 import { RANKING_POSITION_OPTIONS, RankingPositionFilter, getPlayerPositionLabel } from '../../Utils/player-positions';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
 import { APP_NAME_PARTS, APP_TAGLINE } from '../../Utils/brand';
+import { getPlayerLevel, getLevelBadgeClass } from '../../Utils/player-level.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -253,6 +254,14 @@ export class DashboardComponent implements OnInit {
 
   getKd(player: PlayerRankingEntry): string {
     return player.deaths > 0 ? player.kd.toFixed(2) : player.kills.toString();
+  }
+
+  getPlayerLevel(player: PlayerRankingEntry): number {
+    return getPlayerLevel(player);
+  }
+
+  getLevelBadgeClass(player: PlayerRankingEntry): string {
+    return getLevelBadgeClass(player.level);
   }
 
   acceptInvite(invite: TeamInvite): void {

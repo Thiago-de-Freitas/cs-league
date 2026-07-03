@@ -48,6 +48,18 @@
   --gc-rank-legendary: #8847ff;
   --gc-rank-supreme: #eb4b4b;
 
+  /* Níveis de ranking global (1-10, estilo Faceit) */
+  --gc-level-1: #b0c3d9;
+  --gc-level-2: #6dd36d;
+  --gc-level-3: #00c853;
+  --gc-level-4: #b5d000;
+  --gc-level-5: #ffc107;
+  --gc-level-6: #ffa000;
+  --gc-level-7: #ff7a00;
+  --gc-level-8: #ff5500;
+  --gc-level-9: #ff2e2e;
+  --gc-level-10: #ff3d3d;
+
   /* Tipografia */
   --font-display: 'Barlow Condensed', sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;

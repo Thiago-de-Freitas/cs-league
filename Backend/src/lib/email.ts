@@ -402,6 +402,49 @@ export async function sendEmailChangeCode(
   return dispatchEmail(to, subject, text, html, `${logLabel} para ${to}: código ${code}`);
 }
 
+export function buildPasswordChangeCodeBody(
+  displayName: string,
+  code: string
+): { subject: string; text: string; html: string } {
+  const formattedCode = formatVerificationCode(code);
+  const safeName = escapeHtml(displayName);
+  const safeCode = escapeHtml(formattedCode);
+
+  const subject = `${formattedCode} — confirme a troca de senha`;
+  const text = [
+    `Olá, ${displayName}!`,
+    '',
+    'Recebemos um pedido para alterar a senha da sua conta na Gamers League.',
+    '',
+    'Digite o código abaixo para confirmar e definir sua nova senha:',
+    '',
+    formattedCode,
+    '',
+    'Se você não solicitou esta alteração, ignore este e-mail — sua senha continua a mesma.',
+    '',
+    '— Equipe Gamers League',
+  ].join('\n');
+
+  const html = buildCodeEmailHtml({
+    title: 'Confirmar troca de senha',
+    greeting: safeName,
+    intro: 'Recebemos um pedido para alterar a senha da sua conta. Digite o código abaixo para definir sua nova senha:',
+    code: safeCode,
+    footer: 'Se você não solicitou esta alteração, ignore este e-mail — sua senha continua a mesma.',
+  });
+
+  return { subject, text, html };
+}
+
+export async function sendPasswordChangeCode(
+  to: string,
+  code: string,
+  displayName: string
+): Promise<EmailSendResult> {
+  const { subject, text, html } = buildPasswordChangeCodeBody(displayName, code);
+  return dispatchEmail(to, subject, text, html, `troca de senha para ${to}: código ${code}`);
+}
+
 function buildCodeEmailHtml(opts: {
   title: string;
   greeting: string;

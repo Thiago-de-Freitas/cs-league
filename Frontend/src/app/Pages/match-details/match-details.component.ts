@@ -82,6 +82,9 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   manualStatDrafts: ManualStatDraft[] = [];
   manualTotalRounds: number | null = null;
   manualStatsSaving = false;
+  scoreboardOcrRunning = false;
+  scoreboardOcrProgress = 0;
+  scoreboardOcrUnmatched: string[] = [];
   cs2Maps = CS2_MAPS;
   getMapLabel = getMapLabel;
   getHighlightTypeLabel = getHighlightTypeLabel;
@@ -378,7 +381,62 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
   openManualStatsForm(): void {
     if (!this.match) return;
     this.initManualStatsForm();
+    this.scoreboardOcrUnmatched = [];
     this.showManualStatsForm = true;
+  }
+
+  async onScoreboardImageSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      this.notify.error('Selecione um arquivo de imagem (PNG/JPG).');
+      input.value = '';
+      return;
+    }
+
+    this.scoreboardOcrRunning = true;
+    this.scoreboardOcrProgress = 0;
+    this.scoreboardOcrUnmatched = [];
+
+    try {
+      const { runScoreboardOcr, applyScoreboardOcrToDrafts } = await import(
+        '../../Utils/scoreboard-ocr.util'
+      );
+      const result = await runScoreboardOcr(file, (p) => {
+        this.scoreboardOcrProgress = Math.round(p * 100);
+      });
+
+      if (result.players.length === 0) {
+        this.notify.warning(
+          'Não foi possível reconhecer estatísticas na imagem. Use um print nítido do placar final.'
+        );
+        return;
+      }
+
+      const { matched, unmatched } = applyScoreboardOcrToDrafts(
+        result.players,
+        this.manualStatDrafts
+      );
+      this.scoreboardOcrUnmatched = unmatched;
+
+      if (matched > 0) {
+        this.notify.success(
+          `${matched} jogador(es) preenchido(s) a partir da imagem. Revise os valores antes de salvar.`
+        );
+      } else {
+        this.notify.warning(
+          'Nenhum jogador do roster foi reconhecido. Confira os nomes ou preencha manualmente.'
+        );
+      }
+    } catch (err) {
+      console.error('Scoreboard OCR failed', err);
+      this.notify.error('Falha ao processar a imagem do placar.');
+    } finally {
+      this.scoreboardOcrRunning = false;
+      input.value = '';
+    }
   }
 
   closeManualStatsForm(): void {

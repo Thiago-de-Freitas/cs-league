@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RankingsService } from '../../Services/rankings.service';
 import { UsersService } from '../../Services/users.service';
 import { PlayerProfileStats } from '../../Models/interfaces';
+import { getPlayerLevel, getLevelBadgeClass } from '../../Utils/player-level.util';
 
 @Component({
   selector: 'app-player-profile',
@@ -71,5 +72,13 @@ export class PlayerProfileComponent implements OnInit {
   getPlayerLabel(): string {
     if (!this.profile) return '';
     return this.profile.displayName || this.profile.playerName;
+  }
+
+  get playerLevel(): number {
+    return getPlayerLevel(this.profile);
+  }
+
+  get levelBadgeClass(): string {
+    return getLevelBadgeClass(this.profile?.level);
   }
 }

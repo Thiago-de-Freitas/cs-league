@@ -504,6 +504,14 @@ export interface DeleteAccountResponse {
   success: boolean;
 }
 
+export interface PasswordChangeStatusResponse {
+  active: boolean;
+}
+
+export interface PasswordChangeRequestResponse {
+  maskedEmail: string;
+}
+
 export interface PlayerRankingEntry {
   rank: number;
   playerName: string;
@@ -522,6 +530,8 @@ export interface PlayerRankingEntry {
   hsPercent: number;
   kast: number;
   rating: number;
+  rankPoints?: number;
+  level?: number;
 }
 
 export interface PlayerProfileStats {
@@ -537,6 +547,8 @@ export interface PlayerProfileStats {
   hsPercent: number;
   kast: number;
   rating: number;
+  rankPoints?: number;
+  level?: number;
 }
 
 export interface TeamRankingEntry {
@@ -616,6 +628,8 @@ export interface PublicUserProfile {
   positionLabel: string | null;
   role: string;
   createdAt: string;
+  rankPoints?: number;
+  level?: number;
   teamCount: number;
   teams: PublicUserTeam[];
   leagueStats: PlayerProfileStats | null;

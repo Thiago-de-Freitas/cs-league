@@ -30,6 +30,7 @@ import { requireDemoQueue } from '../middleware/demoQueue';
 import { isAdmin } from '../lib/permissions';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
+import { clearDemoPoints } from '../lib/playerRankingPoints';
 import { isHighlightsFeatureEnabled } from '../lib/featureFlags';
 import { enqueueHighlightExtractJob } from '../lib/highlightExtractQueue';
 import { filterHighlightsForPersonalDemo } from '../lib/highlightPayload';
@@ -940,6 +941,8 @@ router.post('/:id/reprocess', authMiddleware, participationGuard, requireDemoQue
       data: { status: 'PENDING', errorMessage: null, filePath: absolutePath },
     });
 
+    await clearDemoPoints(demo.id);
+
     await enqueueDemoJob(demo.id, absolutePath);
 
     setAuditContext(req, audit.of('demo.reprocess', 'Demo', demo.id, {
@@ -987,6 +990,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       fs.unlink(filePath, () => {});
     }
 
+    await clearDemoPoints(demo.id);
     await prisma.demo.delete({ where: { id: demo.id } });
 
     setAuditContext(req, audit.of('demo.delete', 'Demo', demo.id, {

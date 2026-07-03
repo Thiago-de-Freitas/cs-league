@@ -224,6 +224,7 @@
               <thead>
                 <tr>
                   <th>#</th>
+                  <th>Nível</th>
                   <th>Jogador</th>
                   <th>ADR</th>
                   <th>K/D</th>
@@ -233,6 +234,11 @@
               <tbody>
                 <tr *ngFor="let player of playerRankings">
                   <td class="rank-cell" [class.rank-top]="player.rank <= 3">{{ player.rank }}</td>
+                  <td>
+                    <span [class]="getLevelBadgeClass(player)" [title]="'Nível ' + getPlayerLevel(player)">
+                      {{ getPlayerLevel(player) }}
+                    </span>
+                  </td>
                   <td>
                     <a *ngIf="getPlayerProfileLink(player) as link" [routerLink]="link" class="ranking-player-link">
                       <strong>{{ getPlayerLabel(player) }}</strong>

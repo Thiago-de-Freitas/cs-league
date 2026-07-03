@@ -17,6 +17,10 @@
 
         <h1 class="sidebar-name">{{ profile.displayName }}</h1>
         <p class="sidebar-email meta" *ngIf="profile.email">{{ profile.email }}</p>
+        <div class="sidebar-level">
+          <span [class]="levelBadgeClass" [title]="'Nível ' + playerLevel">{{ playerLevel }}</span>
+          <span class="sidebar-level-text">Nível {{ playerLevel }} · {{ rankPoints }} pts</span>
+        </div>
         <span class="badge badge-orange sidebar-role" *ngIf="profile.role === 'ADMIN'">Admin</span>
 
         <div class="sidebar-steam" *ngIf="profile.steamId">

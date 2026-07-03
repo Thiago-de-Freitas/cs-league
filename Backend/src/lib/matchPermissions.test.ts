@@ -24,6 +24,14 @@ describe('checkMatchViewAccess', () => {
   it('denies unrelated user', () => {
     assert.equal(checkMatchViewAccess('u1', 'USER', match, []), false);
   });
+
+  it('allows any league participant (read-only)', () => {
+    assert.equal(checkMatchViewAccess('u1', 'USER', match, [], true), true);
+  });
+
+  it('denies non-participant even with participant flag false', () => {
+    assert.equal(checkMatchViewAccess('u1', 'USER', match, [], false), false);
+  });
 });
 
 describe('checkMatchResultAccess', () => {

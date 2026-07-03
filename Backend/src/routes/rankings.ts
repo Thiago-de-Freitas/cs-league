@@ -1,7 +1,9 @@
 import { Router, Response } from 'express';
 import { getPlayerRankings, getTeamRankings, getPlayerProfileBySteamId } from '../lib/rankings';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { requireAdmin } from '../lib/permissions';
 import { parseRankingPositionFilter, RANKING_POSITION_OPTIONS, type RankingPositionFilter } from '../lib/playerPosition';
+import { LEVEL_THRESHOLDS, MAX_LEVEL, recomputeAllPoints } from '../lib/playerRankingPoints';
 
 const router = Router();
 
@@ -40,8 +42,9 @@ router.get('/players', authMiddleware, async (req: AuthRequest, res: Response) =
     const includePersonal =
       req.query.includePersonal === 'true' ||
       req.query.includePersonal === '1';
+    const sort = req.query.sort === 'level' ? 'level' : 'rating';
 
-    const result = await getPlayerRankings({ leagueId, position, page, pageSize, includePersonal });
+    const result = await getPlayerRankings({ leagueId, position, page, pageSize, includePersonal, sort });
     res.json(result);
   } catch (err) {
     console.error(err);
@@ -60,6 +63,27 @@ router.get('/players/:steamId', async (req, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao carregar perfil do jogador' });
+  }
+});
+
+router.get('/levels', (_req, res: Response) => {
+  res.json({
+    maxLevel: MAX_LEVEL,
+    thresholds: LEVEL_THRESHOLDS.map((minPoints, index) => ({
+      level: index + 1,
+      minPoints,
+    })),
+  });
+});
+
+router.post('/recompute', authMiddleware, async (req: AuthRequest, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const result = await recomputeAllPoints();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao recalcular pontos de ranking' });
   }
 });
 

@@ -142,6 +142,30 @@ def record_worker_audit(
         print(f"[audit] falha ao registrar {action}: {err}")
 
 
+def notify_demo_rating(demo_id: str) -> None:
+    """Aciona o cálculo de pontos de ranking (níveis 1-10) na API após concluir a demo."""
+    if not BACKEND_INTERNAL_URL or not INTERNAL_SERVICE_KEY:
+        return
+    if "${{" in INTERNAL_SERVICE_KEY:
+        return
+
+    url = f"{BACKEND_INTERNAL_URL}/api/internal/demos/{demo_id}/rating"
+    req = urllib.request.Request(
+        url,
+        data=b"{}",
+        headers={
+            "Content-Type": "application/json",
+            "X-Internal-Service-Key": INTERNAL_SERVICE_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30):
+            pass
+    except Exception as err:
+        print(f"[rating] falha ao calcular pontos da demo {demo_id}: {err}")
+
+
 def fetch_demo_from_api(demo_id: str) -> tuple[str | None, str | None]:
     url_error = validate_backend_internal_url(BACKEND_INTERNAL_URL)
     if url_error:
@@ -905,6 +929,7 @@ def process_job(demo_id: str, file_path: str):
         )
     save_and_extract_highlights(file_path, demo_id, meta)
     update_demo_status(demo_id, "COMPLETED")
+    notify_demo_rating(demo_id)
     record_worker_audit(
         "demo.processing.complete",
         "Demo",

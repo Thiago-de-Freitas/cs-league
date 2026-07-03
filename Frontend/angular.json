@@ -30,6 +30,9 @@
               "src/styles.css"
             ],
             "scripts": [],
+            "allowedCommonJsDependencies": [
+              "tesseract.js"
+            ],
             "prerender": false
           },
           "configurations": {

@@ -5,6 +5,7 @@ import { UsersService } from '../../Services/users.service';
 import { PersonalStatsOverview, PublicUserProfile } from '../../Models/interfaces';
 import { ProfileAnalyticsSectionComponent } from '../../Components/profile-analytics/profile-analytics.component';
 import { resolveUploadAssetUrl } from '../../Utils/upload-asset.util';
+import { getPlayerLevel, getLevelBadgeClass } from '../../Utils/player-level.util';
 
 @Component({
   selector: 'app-user-profile',
@@ -80,6 +81,18 @@ export class UserProfileComponent implements OnInit {
     if (role === 'CAPTAIN') return 'Capitão';
     if (role === 'MEMBER') return 'Membro';
     return role;
+  }
+
+  get playerLevel(): number {
+    return getPlayerLevel(this.profile);
+  }
+
+  get levelBadgeClass(): string {
+    return getLevelBadgeClass(this.profile?.level);
+  }
+
+  get rankPoints(): number {
+    return this.profile?.rankPoints ?? 0;
   }
 
   get hasLeagueStats(): boolean {

@@ -483,6 +483,67 @@
 
         <div class="settings-divider"></div>
 
+        <section class="account-security-section" aria-labelledby="password-change-title">
+          <h3 id="password-change-title" class="subsection-title">Trocar senha</h3>
+          <p class="form-hint">Enviaremos um código para o seu e-mail verificado (<strong>{{ email }}</strong>) para confirmar a troca.</p>
+
+          <div *ngIf="passwordChangeMsg" class="success-message settings-inline-message">{{ passwordChangeMsg }}</div>
+          <div *ngIf="passwordChangeError" class="error-message settings-inline-message">{{ passwordChangeError }}</div>
+
+          <form [formGroup]="passwordChangeForm" class="form-group-spacing" (ngSubmit)="passwordChangePhase === 'idle' ? startPasswordChange() : submitPasswordChange()">
+            <ng-container *ngIf="passwordChangePhase === 'code'">
+              <div class="form-group">
+                <label for="newPassword" class="form-label">Nova senha</label>
+                <input type="password" id="newPassword" formControlName="newPassword" class="input-field" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label for="confirmPassword" class="form-label">Confirmar nova senha</label>
+                <input type="password" id="confirmPassword" formControlName="confirmPassword" class="input-field" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label for="passwordChangeCode" class="form-label">
+                  Código enviado para {{ passwordChangeMaskedEmail }}
+                </label>
+                <input
+                  type="text"
+                  id="passwordChangeCode"
+                  formControlName="code"
+                  class="input-field"
+                  inputmode="numeric"
+                  maxlength="6"
+                  placeholder="000000"
+                  autocomplete="one-time-code">
+              </div>
+            </ng-container>
+
+            <div class="settings-actions-row">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="passwordChangeLoading">
+                {{ passwordChangeLoading ? 'Aguarde...' : (passwordChangePhase === 'idle' ? 'Enviar código' : 'Confirmar nova senha') }}
+              </button>
+              <button
+                *ngIf="passwordChangePhase === 'code'"
+                type="button"
+                class="btn btn-secondary"
+                (click)="resendPasswordChangeCode()"
+                [disabled]="passwordChangeResendLoading">
+                {{ passwordChangeResendLoading ? 'Reenviando...' : 'Reenviar código' }}
+              </button>
+              <button
+                *ngIf="passwordChangePhase === 'code'"
+                type="button"
+                class="btn btn-ghost"
+                (click)="cancelPasswordChange()">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <div class="settings-divider"></div>
+
         <section class="danger-zone-section" aria-labelledby="delete-account-title">
           <h3 id="delete-account-title" class="subsection-title danger-title">Excluir conta</h3>
           <p class="form-hint danger-hint">

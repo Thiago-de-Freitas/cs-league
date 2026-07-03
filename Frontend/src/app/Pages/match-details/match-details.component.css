@@ -39,6 +39,21 @@
 .series-game-nav { margin-top: 1rem; padding: 1rem; }
 .series-game-nav-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .manual-stats-intro { margin: 0 0 1rem; }
+.manual-ocr-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.manual-ocr-btn { margin: 0; cursor: pointer; }
+.manual-ocr-btn.disabled { opacity: 0.6; pointer-events: none; }
+.manual-ocr-hint { color: var(--gc-text-secondary); }
+.manual-ocr-unmatched {
+  margin: 0 0 1rem;
+  color: var(--gc-text-secondary);
+}
+.manual-ocr-unmatched strong { color: var(--gc-orange); }
 .manual-rounds-row {
   display: flex;
   flex-direction: column;

@@ -43,6 +43,7 @@ import {
   getUploadStorageStatus,
 } from './lib/uploadAssets';
 import { recordWorkerAudit, skipAudit } from './lib/audit';
+import { computeDemoPoints } from './lib/playerRankingPoints';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -369,6 +370,23 @@ app.post('/api/internal/demos/:id/highlights', internalServiceAuth, async (req, 
   } catch (err) {
     console.error('[internal/demo-highlights]', err);
     res.status(500).json({ error: 'Erro ao salvar highlights da demo' });
+  }
+});
+
+app.post('/api/internal/demos/:id/rating', internalServiceAuth, async (req, res) => {
+  try {
+    const demoId = req.params.id;
+    if (!isValidResourceId(demoId)) {
+      res.status(400).json({ error: 'ID inválido' });
+      return;
+    }
+
+    const result = await computeDemoPoints(demoId);
+    skipAudit(req);
+    res.status(200).json({ ok: true, scored: result.scored });
+  } catch (err) {
+    console.error('[internal/demo-rating]', err);
+    res.status(500).json({ error: 'Erro ao calcular pontos da demo' });
   }
 });
 

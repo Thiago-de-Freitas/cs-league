@@ -72,7 +72,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
   emailChangeError = '';
   deleteAccountLoading = false;
   deleteAccountError = '';
+  passwordChangePhase: 'idle' | 'code' = 'idle';
+  passwordChangeMaskedEmail = '';
+  passwordChangeLoading = false;
+  passwordChangeResendLoading = false;
+  passwordChangeMsg = '';
+  passwordChangeError = '';
   emailChangeForm: FormGroup;
+  passwordChangeForm: FormGroup;
   deleteAccountForm: FormGroup;
   private listPollSub?: Subscription;
   private highlightsPollSub?: Subscription;
@@ -94,6 +101,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.emailChangeForm = this.fb.group({
       newEmail: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
+      code: ['', [Validators.pattern(/^\d{6}$/)]],
+    });
+    this.passwordChangeForm = this.fb.group({
+      newPassword: ['', [Validators.required, Validators.minLength(6)]],
+      confirmPassword: ['', [Validators.required, Validators.minLength(6)]],
       code: ['', [Validators.pattern(/^\d{6}$/)]],
     });
     this.deleteAccountForm = this.fb.group({
@@ -583,6 +595,92 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.emailChangeMsg = '';
     this.emailChangeError = '';
     this.emailChangeForm.patchValue({ newEmail: '', password: '', code: '' });
+  }
+
+  startPasswordChange(): void {
+    if (this.passwordChangeLoading) return;
+    this.passwordChangeLoading = true;
+    this.passwordChangeError = '';
+    this.passwordChangeMsg = '';
+    this.authService.requestPasswordChange().subscribe({
+      next: (res) => {
+        this.passwordChangeLoading = false;
+        this.passwordChangePhase = 'code';
+        this.passwordChangeMaskedEmail = res.maskedEmail;
+        this.passwordChangeForm.patchValue({ newPassword: '', confirmPassword: '', code: '' });
+        this.passwordChangeMsg = `Código enviado para ${res.maskedEmail}. Defina sua nova senha.`;
+      },
+      error: (err) => {
+        this.passwordChangeLoading = false;
+        this.passwordChangeError = err.error?.error || 'Não foi possível iniciar a troca de senha.';
+      },
+    });
+  }
+
+  submitPasswordChange(): void {
+    if (this.passwordChangeLoading) return;
+    const { newPassword, confirmPassword } = this.passwordChangeForm.value;
+    const code = String(this.passwordChangeForm.value.code || '').replace(/\D/g, '');
+    if (!newPassword || newPassword.length < 6) {
+      this.passwordChangeError = 'A nova senha deve ter ao menos 6 caracteres.';
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      this.passwordChangeError = 'As senhas não coincidem.';
+      return;
+    }
+    if (code.length !== 6) {
+      this.passwordChangeError = 'Informe o código de 6 dígitos.';
+      return;
+    }
+
+    this.passwordChangeLoading = true;
+    this.passwordChangeError = '';
+    this.passwordChangeMsg = '';
+    this.authService.verifyPasswordChange(code, newPassword).subscribe({
+      next: () => {
+        this.passwordChangeLoading = false;
+        this.resetPasswordChangeFlow();
+        this.successMsg = 'Senha alterada com sucesso!';
+        this.notify.success('Sua senha foi alterada.', 'Conta');
+      },
+      error: (err) => {
+        this.passwordChangeLoading = false;
+        this.passwordChangeError = err.error?.error || 'Não foi possível trocar a senha.';
+      },
+    });
+  }
+
+  resendPasswordChangeCode(): void {
+    if (this.passwordChangeResendLoading || this.passwordChangePhase === 'idle') return;
+    this.passwordChangeResendLoading = true;
+    this.passwordChangeError = '';
+    this.authService.resendPasswordChangeCode().subscribe({
+      next: (res) => {
+        this.passwordChangeResendLoading = false;
+        this.passwordChangeMaskedEmail = res.maskedEmail;
+        this.passwordChangeMsg = `Novo código enviado para ${res.maskedEmail}.`;
+      },
+      error: (err) => {
+        this.passwordChangeResendLoading = false;
+        this.passwordChangeError = err.error?.error || 'Não foi possível reenviar o código.';
+      },
+    });
+  }
+
+  cancelPasswordChange(): void {
+    this.authService.cancelPasswordChange().subscribe({
+      next: () => this.resetPasswordChangeFlow(),
+      error: () => this.resetPasswordChangeFlow(),
+    });
+  }
+
+  resetPasswordChangeFlow(): void {
+    this.passwordChangePhase = 'idle';
+    this.passwordChangeMaskedEmail = '';
+    this.passwordChangeMsg = '';
+    this.passwordChangeError = '';
+    this.passwordChangeForm.patchValue({ newPassword: '', confirmPassword: '', code: '' });
   }
 
   deleteAccount(): void {

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, shareReplay, tap } from 'rxjs';
-import { AuthResponse, DeleteAccountResponse, EmailChangePhaseResponse, EmailChangeStatusResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
+import { AuthResponse, DeleteAccountResponse, EmailChangePhaseResponse, EmailChangeStatusResponse, PasswordChangeRequestResponse, PasswordChangeStatusResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
 import { LeagueService } from './league.service';
 import { RankingsService } from './rankings.service';
 import { TeamService } from './team.service';
@@ -136,6 +136,29 @@ export class AuthService {
 
   cancelEmailChange(): Observable<{ success: boolean }> {
     return this.http.post<{ success: boolean }>(`${this.apiUrl}/me/change-email/cancel`, {});
+  }
+
+  getPasswordChangeStatus(): Observable<PasswordChangeStatusResponse> {
+    return this.http.get<PasswordChangeStatusResponse>(`${this.apiUrl}/me/change-password/status`);
+  }
+
+  requestPasswordChange(): Observable<PasswordChangeRequestResponse> {
+    return this.http.post<PasswordChangeRequestResponse>(`${this.apiUrl}/me/change-password/request`, {});
+  }
+
+  verifyPasswordChange(code: string, newPassword: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/me/change-password/verify`, {
+      code,
+      newPassword,
+    }).pipe(tap((res) => this.setSession(res)));
+  }
+
+  resendPasswordChangeCode(): Observable<PasswordChangeRequestResponse> {
+    return this.http.post<PasswordChangeRequestResponse>(`${this.apiUrl}/me/change-password/resend`, {});
+  }
+
+  cancelPasswordChange(): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${this.apiUrl}/me/change-password/cancel`, {});
   }
 
   deleteAccount(password: string, confirmText: string): Observable<DeleteAccountResponse> {

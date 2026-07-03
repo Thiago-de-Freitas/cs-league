@@ -279,6 +279,25 @@
         Preencha os dados do placar do jogo. O ADR é calculado automaticamente: dano ÷ total de rounds.
       </p>
 
+      <div class="manual-ocr-row">
+        <label class="btn btn-secondary btn-small manual-ocr-btn" [class.disabled]="manualStatsSaving || scoreboardOcrRunning">
+          {{ scoreboardOcrRunning ? 'Lendo imagem... ' + scoreboardOcrProgress + '%' : 'Preencher a partir de imagem' }}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            (change)="onScoreboardImageSelected($event)"
+            [disabled]="manualStatsSaving || scoreboardOcrRunning" />
+        </label>
+        <span class="meta manual-ocr-hint">
+          Anexe um print do placar final. Os valores são apenas uma sugestão — confira antes de salvar.
+        </span>
+      </div>
+      <p class="meta manual-ocr-unmatched" *ngIf="scoreboardOcrUnmatched.length">
+        Não reconhecidos automaticamente: <strong>{{ scoreboardOcrUnmatched.join(', ') }}</strong>.
+        Ajuste os nomes ou adicione manualmente.
+      </p>
+
       <div class="manual-rounds-row" *ngIf="!matchTotalRounds">
         <label class="form-label" for="manual-total-rounds">Total de rounds da partida</label>
         <input

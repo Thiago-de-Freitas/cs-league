@@ -37,6 +37,13 @@ import {
   verifyNewEmailForChange,
   verifyOldEmailForChange,
 } from '../lib/emailChange';
+import {
+  cancelPasswordChange,
+  getPasswordChangeState,
+  resendPasswordChangeCode,
+  startPasswordChange,
+  verifyPasswordChangeCode,
+} from '../lib/passwordChange';
 import { deleteUserAndData } from '../lib/deleteUser';
 
 const router = Router();
@@ -668,6 +675,138 @@ router.post('/me/change-email/cancel', authMiddleware, requireVerifiedAccount, a
     res.status(500).json({ error: 'Erro ao cancelar troca de e-mail' });
   }
 });
+
+router.get(
+  '/me/change-password/status',
+  authMiddleware,
+  requireVerifiedAccount,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const state = await getPasswordChangeState(req.user!.userId);
+      res.json({ active: !!state });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao consultar troca de senha' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-password/request',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+
+      const started = await startPasswordChange(user.id, user.email, user.displayName);
+      if (!started.ok) {
+        res.status(started.error.includes('Aguarde') ? 429 : 503).json({ error: started.error });
+        return;
+      }
+
+      setAuditContext(req, audit.of('auth.password.change.request', 'User', user.id));
+      res.json({ maskedEmail: started.maskedEmail });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao iniciar troca de senha' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-password/verify',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+      const code = normalizeVerificationCode(req.body?.code);
+      const newPassword = parsePasswordInput(req.body?.newPassword);
+      if (!code) {
+        res.status(400).json({ error: 'Código de 6 dígitos é obrigatório.' });
+        return;
+      }
+      if (!newPassword) {
+        res.status(400).json({
+          error: `A nova senha deve ter entre ${MIN_PASSWORD_LENGTH} e ${MAX_PASSWORD_LENGTH} caracteres.`,
+        });
+        return;
+      }
+
+      const result = await verifyPasswordChangeCode(user.id, code);
+      if (!result.ok) {
+        const status = result.code === 'locked' ? 429 : 400;
+        res.status(status).json({ error: result.error });
+        return;
+      }
+
+      const sameAsCurrent = await comparePassword(newPassword, user.passwordHash);
+      if (sameAsCurrent) {
+        res.status(400).json({ error: 'A nova senha deve ser diferente da senha atual.' });
+        return;
+      }
+
+      const passwordHash = await hashPassword(newPassword, BCRYPT_ROUNDS);
+      const updated = await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      });
+
+      const token = signToken({ userId: updated.id, email: updated.email, role: updated.role });
+      setAuditContext(req, audit.of('auth.password.change.complete', 'User', updated.id));
+      res.json({ token, user: sanitizeUser(updated) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao trocar senha' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-password/resend',
+  authMiddleware,
+  requireVerifiedAccount,
+  sensitiveAccountRateLimiter,
+  emailVerificationRateLimiter,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      const user = req.accountUser!;
+
+      const resent = await resendPasswordChangeCode(user.id, user.email, user.displayName);
+      if (!resent.ok) {
+        res.status(resent.error.includes('Aguarde') ? 429 : 400).json({ error: resent.error });
+        return;
+      }
+
+      setAuditContext(req, audit.of('auth.password.change.resend', 'User', user.id));
+      res.json({ maskedEmail: resent.maskedEmail });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao reenviar código' });
+    }
+  }
+);
+
+router.post(
+  '/me/change-password/cancel',
+  authMiddleware,
+  requireVerifiedAccount,
+  async (req: AccountAuthRequest, res: Response) => {
+    try {
+      await cancelPasswordChange(req.user!.userId);
+      setAuditContext(req, audit.of('auth.password.change.cancel', 'User', req.user!.userId));
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Erro ao cancelar troca de senha' });
+    }
+  }
+);
 
 router.post(
   '/me/delete-account',

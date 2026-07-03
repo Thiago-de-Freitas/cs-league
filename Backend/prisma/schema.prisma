@@ -131,6 +131,7 @@ model User {
   bannedUntil     DateTime?
   emailVerified   Boolean  @default(false)
   emailVerifiedAt DateTime?
+  rankPoints      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -141,6 +142,7 @@ model User {
   demos        Demo[]
   auditEvents  AuditEvent[] @relation("AuditActor")
   leaguePlayerEntries LeaguePlayerEntry[]
+  ratingEvents PlayerRatingEvent[]
 }
 
 model Team {
@@ -355,10 +357,28 @@ model Demo {
   uploadedBy User              @relation(fields: [uploadedById], references: [id])
   stats      MatchPlayerStat[]
   highlights DemoHighlight[]
+  ratingEvents PlayerRatingEvent[]
 
   @@index([matchId])
   @@index([uploadedById, isPersonal])
   @@index([status, isPersonal])
+}
+
+model PlayerRatingEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  demoId    String
+  steamId   String?
+  points    Int      @default(0)
+  breakdown Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  demo Demo @relation(fields: [demoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, demoId])
+  @@index([userId])
+  @@index([demoId])
 }
 
 model MatchPlayerStat {

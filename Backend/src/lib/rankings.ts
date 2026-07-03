@@ -12,6 +12,7 @@ import {
   type PlayerPosition,
   type RankingPositionFilter,
 } from './playerPosition';
+import { levelFromPoints } from './playerRankingPoints';
 
 export type PlayerRankingEntry = {
   rank: number;
@@ -31,6 +32,10 @@ export type PlayerRankingEntry = {
   hsPercent: number;
   kast: number;
   rating: number;
+  /** Pontos globais acumulados (ranking estilo Faceit). */
+  rankPoints: number;
+  /** Nível 1-10 derivado de rankPoints. */
+  level: number;
 };
 
 export type LeaguePlayerStatRow = {
@@ -48,7 +53,7 @@ export type LeaguePlayerStatRow = {
 
 export type AggregatedPlayerRanking = Omit<
   PlayerRankingEntry,
-  'rank' | 'displayName' | 'positionLabel' | 'userId'
+  'rank' | 'displayName' | 'positionLabel' | 'userId' | 'rankPoints' | 'level'
 >;
 
 export type TeamMembershipContext = {
@@ -489,12 +494,15 @@ function resolveCurrentPosition(
   return null;
 }
 
+export type PlayerRankingSort = 'rating' | 'level';
+
 export type PlayerRankingOptions = {
   leagueId?: string;
   position?: RankingPositionFilter;
   page?: number;
   pageSize?: number;
   includePersonal?: boolean;
+  sort?: PlayerRankingSort;
 };
 
 export const PLAYER_RANKING_PAGE_SIZES = [10, 20, 30] as const;
@@ -522,7 +530,7 @@ function parsePlayerRankingPageSize(value: unknown, fallback: (typeof PLAYER_RAN
 }
 
 export async function getPlayerRankings(options: PlayerRankingOptions = {}): Promise<PlayerRankingsPageResult> {
-  const { leagueId, position, includePersonal = false } = options;
+  const { leagueId, position, includePersonal = false, sort = 'rating' } = options;
   const page = parsePlayerRankingPage(options.page);
   const pageSize = parsePlayerRankingPageSize(options.pageSize);
   const registeredSteamIds = await loadRegisteredSteamIdSet();
@@ -636,7 +644,34 @@ export async function getPlayerRankings(options: PlayerRankingOptions = {}): Pro
   const userIdBySteam = new Map(users.map((u) => [u.steamId!, u.id]));
   const profilePositionBySteam = new Map(users.map((u) => [u.steamId!, u.position]));
 
-  const allRanked = aggregatePlayerRankingsByLeagueMatches(rows, 0);
+  const aggregated = aggregatePlayerRankingsByLeagueMatches(rows, 0);
+
+  const rankedSteamIds = [
+    ...new Set(aggregated.map((e) => e.steamId).filter((id): id is string => !!id?.trim())),
+  ];
+  const rankPointUsers = rankedSteamIds.length
+    ? await prisma.user.findMany({
+        where: { steamId: { in: rankedSteamIds } },
+        select: { steamId: true, rankPoints: true },
+      })
+    : [];
+  const rankPointsBySteam = new Map(rankPointUsers.map((u) => [u.steamId!, u.rankPoints]));
+
+  const allRanked = aggregated.map((entry) => {
+    const rankPoints = entry.steamId ? rankPointsBySteam.get(entry.steamId) ?? 0 : 0;
+    return { ...entry, rankPoints, level: levelFromPoints(rankPoints) };
+  });
+
+  if (sort === 'level') {
+    allRanked.sort(
+      (a, b) =>
+        b.rankPoints - a.rankPoints ||
+        b.adr - a.adr ||
+        b.kd - a.kd ||
+        b.matches - a.matches
+    );
+  }
+
   const total = allRanked.length;
   const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
   const safePage = Math.min(page, totalPages);
@@ -679,6 +714,8 @@ export type PlayerProfileStats = {
   hsPercent: number;
   kast: number;
   rating: number;
+  rankPoints: number;
+  level: number;
 };
 
 export async function getPlayerProfileBySteamId(steamId: string): Promise<PlayerProfileStats | null> {
@@ -731,8 +768,10 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
 
   const user = await prisma.user.findFirst({
     where: { steamId: normalized },
-    select: { displayName: true },
+    select: { displayName: true, rankPoints: true },
   });
+
+  const rankPoints = user?.rankPoints ?? 0;
 
   return {
     steamId: normalized,
@@ -747,6 +786,8 @@ export async function getPlayerProfileBySteamId(steamId: string): Promise<Player
     hsPercent: aggregated.hsPercent,
     kast: aggregated.kast,
     rating: aggregated.rating,
+    rankPoints,
+    level: levelFromPoints(rankPoints),
   };
 }
 

@@ -4,6 +4,7 @@ import { getPlayerProfileBySteamId, type PlayerProfileStats } from './rankings';
 import { publicUploadUrlForResponse } from './uploadAssets';
 import { isAdmin } from './permissions';
 import { getPersonalStatsForUser, type SerializedPersonalStatsOverview } from './personalStats';
+import { levelFromPoints } from './playerRankingPoints';
 
 export function canViewInactiveUserProfile(
   isActive: boolean,
@@ -36,6 +37,8 @@ export type PublicUserProfile = {
   positionLabel: string | null;
   role: string;
   createdAt: string;
+  rankPoints: number;
+  level: number;
   teamCount: number;
   teams: PublicUserTeam[];
   leagueStats: PlayerProfileStats | null;
@@ -58,6 +61,7 @@ export async function getPublicUserProfile(
       position: true,
       role: true,
       isActive: true,
+      rankPoints: true,
       createdAt: true,
       memberships: {
         include: {
@@ -95,6 +99,8 @@ export async function getPublicUserProfile(
     positionLabel: user.position ? getPlayerPositionLabel(user.position) : null,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
+    rankPoints: user.rankPoints,
+    level: levelFromPoints(user.rankPoints),
     teamCount: user.memberships.length,
     teams: user.memberships.map((membership) => ({
       id: membership.team.id,

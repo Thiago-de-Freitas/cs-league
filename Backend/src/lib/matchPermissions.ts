@@ -10,11 +10,14 @@ export function checkMatchViewAccess(
   userId: string,
   role: string,
   match: MatchTeams,
-  memberTeamIds: string[]
+  memberTeamIds: string[],
+  isLeagueParticipant = false
 ): boolean {
   if (role === 'ADMIN') return true;
   if (match.league.ownerId === userId) return true;
-  return memberTeamIds.some((tid) => tid === match.team1Id || tid === match.team2Id);
+  if (memberTeamIds.some((tid) => tid === match.team1Id || tid === match.team2Id)) return true;
+  // Qualquer participante da liga pode visualizar todas as partidas (somente leitura).
+  return isLeagueParticipant;
 }
 
 export function checkMatchResultAccess(
@@ -48,8 +51,11 @@ export async function canUserAccessMatch(
     return { allowed: false, error: 'Partida não encontrada.' };
   }
 
-  const memberTeamIds = await getMemberTeamIds(userId, match.team1Id, match.team2Id);
-  const allowed = checkMatchViewAccess(userId, role, match, memberTeamIds);
+  const [memberTeamIds, leagueParticipant] = await Promise.all([
+    getMemberTeamIds(userId, match.team1Id, match.team2Id),
+    isLeagueParticipant(userId, match.leagueId),
+  ]);
+  const allowed = checkMatchViewAccess(userId, role, match, memberTeamIds, leagueParticipant);
 
   if (!allowed) {
     return { allowed: false, error: 'Sem permissão para visualizar esta partida.' };
@@ -113,6 +119,21 @@ async function loadMatchForAccess(matchId: string) {
     where: { id: matchId },
     include: { league: { select: { ownerId: true, status: true } } },
   });
+}
+
+/** Participa da liga: membro de um time inscrito ou inscrito como jogador (pickup). */
+export async function isLeagueParticipant(userId: string, leagueId: string): Promise<boolean> {
+  const [teamMembership, playerEntry] = await Promise.all([
+    prisma.leagueTeam.findFirst({
+      where: { leagueId, team: { members: { some: { userId } } } },
+      select: { id: true },
+    }),
+    prisma.leaguePlayerEntry.findFirst({
+      where: { leagueId, userId },
+      select: { id: true },
+    }),
+  ]);
+  return !!teamMembership || !!playerEntry;
 }
 
 async function getMemberTeamIds(userId: string, team1Id: string, team2Id: string): Promise<string[]> {
