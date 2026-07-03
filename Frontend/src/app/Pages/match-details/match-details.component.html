@@ -93,6 +93,11 @@
 
     <div *ngIf="match && !loading" class="gc-card mt-4">
       <h2 class="section-title">Imagens da partida</h2>
+      <p class="meta match-images-intro">
+        Anexe prints e imagens ilustrativas da partida (galeria). Para <strong>extrair estatísticas
+        automaticamente</strong> de um print do placar, use o botão “Preencher a partir de imagem”
+        dentro de <strong>Estatísticas manuais</strong>.
+      </p>
       <div class="match-images-upload">
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" (change)="onImageSelected($event)" [disabled]="imageUploading" />
         <input type="text" class="input-field" placeholder="Legenda (opcional)" [(ngModel)]="imageCaption" [disabled]="imageUploading" />
@@ -279,24 +284,59 @@
         Preencha os dados do placar do jogo. O ADR é calculado automaticamente: dano ÷ total de rounds.
       </p>
 
-      <div class="manual-ocr-row">
-        <label class="btn btn-secondary btn-small manual-ocr-btn" [class.disabled]="manualStatsSaving || scoreboardOcrRunning">
-          {{ scoreboardOcrRunning ? 'Lendo imagem... ' + scoreboardOcrProgress + '%' : 'Preencher a partir de imagem' }}
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            (change)="onScoreboardImageSelected($event)"
-            [disabled]="manualStatsSaving || scoreboardOcrRunning" />
-        </label>
-        <span class="meta manual-ocr-hint">
-          Anexe um print do placar final. Os valores são apenas uma sugestão — confira antes de salvar.
-        </span>
-      </div>
-      <p class="meta manual-ocr-unmatched" *ngIf="scoreboardOcrUnmatched.length">
-        Não reconhecidos automaticamente: <strong>{{ scoreboardOcrUnmatched.join(', ') }}</strong>.
-        Ajuste os nomes ou adicione manualmente.
-      </p>
+      <section class="ocr-panel">
+        <div class="ocr-panel-head">
+          <span class="ocr-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m21 15-4.35-4.35a2 2 0 0 0-2.83 0L4 20" />
+            </svg>
+          </span>
+          <div class="ocr-panel-heading">
+            <h3 class="ocr-title">Preenchimento automático por imagem</h3>
+            <span class="badge ocr-badge">Beta</span>
+          </div>
+        </div>
+        <p class="ocr-desc">
+          Anexe um print do <strong>placar final</strong> (scoreboard) da partida e a leitura
+          automática (OCR) tenta reconhecer cada jogador e preencher vítimas, mortes, assistências,
+          %HS e dano. Todo o processamento acontece no seu navegador — a imagem <strong>não é enviada
+          ao servidor</strong> nesta etapa.
+        </p>
+        <ol class="ocr-steps">
+          <li>Capture o placar ao fim da partida — quanto mais nítido e sem cortes, melhor o reconhecimento.</li>
+          <li>Clique em <strong>Preencher a partir de imagem</strong> e selecione o print.</li>
+          <li>Revise os valores sugeridos e ajuste o que for necessário antes de salvar.</li>
+        </ol>
+        <div class="ocr-actions">
+          <label class="btn btn-secondary manual-ocr-btn" [class.disabled]="manualStatsSaving || scoreboardOcrRunning">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            {{ scoreboardOcrRunning ? 'Lendo imagem...' : 'Preencher a partir de imagem' }}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              (change)="onScoreboardImageSelected($event)"
+              [disabled]="manualStatsSaving || scoreboardOcrRunning" />
+          </label>
+          <span class="ocr-hint">Os valores são apenas uma sugestão — sempre confira antes de salvar.</span>
+        </div>
+        <div class="ocr-progress" *ngIf="scoreboardOcrRunning">
+          <div class="ocr-progress-bar">
+            <div class="ocr-progress-fill" [style.width.%]="scoreboardOcrProgress"></div>
+          </div>
+          <span class="ocr-progress-label">Reconhecendo texto... {{ scoreboardOcrProgress }}%</span>
+        </div>
+        <p class="ocr-unmatched" *ngIf="scoreboardOcrUnmatched.length">
+          <strong>Não reconhecidos automaticamente:</strong> {{ scoreboardOcrUnmatched.join(', ') }}.
+          Ajuste os nomes ou preencha manualmente.
+        </p>
+      </section>
 
       <div class="manual-rounds-row" *ngIf="!matchTotalRounds">
         <label class="form-label" for="manual-total-rounds">Total de rounds da partida</label>

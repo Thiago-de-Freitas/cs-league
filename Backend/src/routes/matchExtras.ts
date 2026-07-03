@@ -82,7 +82,7 @@ async function assertCaptainOrAdmin(
 }
 
 export function registerMatchExtras(router: Router): void {
-  router.get('/:id/map-veto', async (req: AuthRequest, res: Response) => {
+  router.get('/:id/map-veto', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {
@@ -158,7 +158,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.post('/:id/map-veto/reopen', async (req: AuthRequest, res: Response) => {
+  router.post('/:id/map-veto/reopen', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (req.user!.role !== 'ADMIN') {
         res.status(403).json({ error: 'Apenas administradores podem reabrir o veto de mapas.' });
@@ -309,7 +309,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.get('/:id/images', async (req: AuthRequest, res: Response) => {
+  router.get('/:id/images', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {
@@ -365,7 +365,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.delete('/:id/images/:imageId', async (req: AuthRequest, res: Response) => {
+  router.delete('/:id/images/:imageId', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const image = await prisma.matchImage.findFirst({
         where: { id: req.params.imageId, matchId: req.params.id },
@@ -556,7 +556,7 @@ export function registerMatchExtras(router: Router): void {
     }
   });
 
-  router.get('/:id/series', async (req: AuthRequest, res: Response) => {
+  router.get('/:id/series', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const access = await canUserAccessMatch(req.user!.userId, req.user!.role, req.params.id);
       if (!access.allowed) {

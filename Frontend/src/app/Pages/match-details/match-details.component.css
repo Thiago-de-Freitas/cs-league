@@ -38,22 +38,128 @@
 .mt-4 { margin-top: 1rem; }
 .series-game-nav { margin-top: 1rem; padding: 1rem; }
 .series-game-nav-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.match-images-intro { margin: 0 0 1rem; max-width: 70ch; }
+
 .manual-stats-intro { margin: 0 0 1rem; }
-.manual-ocr-row {
+
+/* Painel de OCR (extração automática por imagem) */
+.ocr-panel {
+  border: 1px solid var(--gc-border-light);
+  border-left: 3px solid var(--gc-orange);
+  border-radius: var(--radius-md);
+  background: var(--gc-bg-secondary);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.ocr-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.6rem;
+}
+.ocr-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--gc-orange-dim);
+  color: var(--gc-orange);
+  flex-shrink: 0;
+}
+.ocr-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.ocr-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gc-text);
+}
+.ocr-badge {
+  background: var(--gc-orange-dim);
+  color: var(--gc-orange);
+  border: 1px solid var(--gc-orange);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+.ocr-desc {
+  margin: 0 0 0.75rem;
+  color: var(--gc-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 75ch;
+}
+.ocr-desc strong { color: var(--gc-text-label); }
+.ocr-steps {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  color: var(--gc-text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.ocr-steps li { margin-bottom: 0.2rem; }
+.ocr-steps strong { color: var(--gc-text-label); }
+.ocr-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
 }
-.manual-ocr-btn { margin: 0; cursor: pointer; }
+.manual-ocr-btn {
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
 .manual-ocr-btn.disabled { opacity: 0.6; pointer-events: none; }
-.manual-ocr-hint { color: var(--gc-text-secondary); }
-.manual-ocr-unmatched {
-  margin: 0 0 1rem;
-  color: var(--gc-text-secondary);
+.ocr-hint {
+  color: var(--gc-text-muted);
+  font-size: 0.82rem;
 }
-.manual-ocr-unmatched strong { color: var(--gc-orange); }
+.ocr-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+.ocr-progress-bar {
+  flex: 1;
+  height: 8px;
+  min-width: 140px;
+  border-radius: 999px;
+  background: var(--gc-surface-elevated);
+  overflow: hidden;
+}
+.ocr-progress-fill {
+  height: 100%;
+  background: var(--gc-orange);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.ocr-progress-label {
+  font-size: 0.8rem;
+  color: var(--gc-text-secondary);
+  white-space: nowrap;
+}
+.ocr-unmatched {
+  margin: 0.85rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--gc-red-dim);
+  color: var(--gc-text-secondary);
+  font-size: 0.85rem;
+}
+.ocr-unmatched strong { color: var(--gc-red); }
+
 .manual-rounds-row {
   display: flex;
   flex-direction: column;
@@ -62,9 +168,20 @@
   margin-bottom: 1rem;
 }
 .manual-rounds-note { margin: 0 0 1rem; }
-.manual-team-block { margin-bottom: 1.5rem; }
+
+/* Blocos de time (stats manuais) */
+.manual-team-block {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--gc-border);
+  border-radius: var(--radius-md);
+  background: var(--gc-bg-secondary);
+  padding: 1rem 1.1rem;
+}
 .manual-team-title {
-  margin: 0 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.85rem;
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
@@ -72,14 +189,23 @@
   letter-spacing: 0.05em;
   color: var(--gc-orange);
 }
+.manual-team-title::before {
+  content: '';
+  width: 4px;
+  height: 1.05rem;
+  border-radius: 2px;
+  background: var(--gc-orange);
+}
 .manual-stats-table { min-width: 760px; }
+.manual-stats-table tbody tr:hover { background: var(--gc-surface-hover); }
 .manual-stat-input,
 .manual-player-input {
   min-width: 4.5rem;
   padding: 0.45rem 0.55rem;
   font-size: 0.9rem;
+  text-align: center;
 }
-.manual-player-input { min-width: 10rem; }
+.manual-player-input { min-width: 10rem; text-align: left; }
 .manual-stats-actions,
 .empty-stats-actions {
   display: flex;
