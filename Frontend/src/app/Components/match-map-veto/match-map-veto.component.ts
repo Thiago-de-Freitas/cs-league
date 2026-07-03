@@ -116,15 +116,22 @@ export class MatchMapVetoComponent implements OnChanges {
   reopenLoading = false;
   actionError = '';
   getMapLabel = getMapLabel;
+  private staleRefreshRequested = false;
 
   constructor(private matchService: MatchService) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['veto'] && this.veto?.isStale && this.enabled) {
-      this.refreshVeto();
-    }
-    if (changes['veto'] && this.veto?.deadlineExpired && this.enabled) {
-      this.refreshVeto();
+    if (!changes['veto'] || !this.enabled || !this.veto) return;
+    // Só o estado "stale" (turno expirado) precisa de refresh, que faz o servidor
+    // auto-resolver. deadlineExpired é terminal (baseado no horário) e nunca muda
+    // com refresh — dispará-lo aqui causava loop infinito de requisições.
+    if (this.veto.isStale) {
+      if (!this.staleRefreshRequested) {
+        this.staleRefreshRequested = true;
+        this.refreshVeto();
+      }
+    } else {
+      this.staleRefreshRequested = false;
     }
   }
 

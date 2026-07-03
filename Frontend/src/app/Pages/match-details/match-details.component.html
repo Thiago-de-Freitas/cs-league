@@ -103,7 +103,7 @@
         <input type="text" class="input-field" placeholder="Legenda (opcional)" [(ngModel)]="imageCaption" [disabled]="imageUploading" />
       </div>
       <div class="match-images-grid" *ngIf="match.images?.length; else noMatchImages">
-        <figure *ngFor="let img of match.images" class="match-image-item">
+        <figure *ngFor="let img of match.images; trackBy: trackByImageId" class="match-image-item">
           <img [src]="img.imageUrl" [alt]="img.caption || 'Imagem da partida'" />
           <figcaption *ngIf="img.caption">{{ img.caption }}</figcaption>
           <button type="button" class="btn btn-ghost btn-small" (click)="deleteImage(img.id)">Remover</button>

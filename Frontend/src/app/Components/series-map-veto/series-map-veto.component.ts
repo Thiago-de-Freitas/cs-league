@@ -131,12 +131,22 @@ export class SeriesMapVetoComponent implements OnChanges {
   reopenLoading = false;
   actionError = '';
   getMapLabel = getMapLabel;
+  private staleRefreshRequested = false;
 
   constructor(private matchService: MatchService) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['series'] && (this.series?.isStale || this.series?.deadlineExpired)) {
-      this.refreshSeries();
+    if (!changes['series'] || !this.series) return;
+    // Só "stale" (turno expirado) exige refresh para o servidor auto-resolver.
+    // deadlineExpired é terminal (baseado no horário) e refazer o fetch retorna
+    // sempre o mesmo estado — dispará-lo aqui causava loop infinito de requisições.
+    if (this.series.isStale) {
+      if (!this.staleRefreshRequested) {
+        this.staleRefreshRequested = true;
+        this.refreshSeries();
+      }
+    } else {
+      this.staleRefreshRequested = false;
     }
   }
 

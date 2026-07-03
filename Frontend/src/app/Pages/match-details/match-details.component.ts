@@ -8,7 +8,7 @@ import { MatchService } from '../../Services/match.service';
 import { AuthService } from '../../Services/auth.service';
 import { DemoService } from '../../Services/demo.service';
 import { NotificationService } from '../../Services/notification.service';
-import { Demo, Match, MatchHighlight, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
+import { Demo, Match, MatchHighlight, MatchImage, MatchPlayerStat, MatchRosterPlayer, ManualPlayerStatInput } from '../../Models/interfaces';
 import { DemoUploadModalComponent } from '../../Components/demo-upload-modal/demo-upload-modal.component';
 import { DemoStatusLoaderComponent } from '../../Components/demo-status-loader/demo-status-loader.component';
 import { MatchMapVetoComponent } from '../../Components/match-map-veto/match-map-veto.component';
@@ -726,6 +726,10 @@ export class MatchDetailsComponent implements OnInit, OnDestroy {
         this.notify.error(err.error?.error || 'Erro ao enviar imagem.');
       },
     });
+  }
+
+  trackByImageId(_index: number, image: MatchImage): string {
+    return image.id;
   }
 
   deleteImage(imageId: string): void {
