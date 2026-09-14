@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { checkLeagueManagerMatchDataAccess } from './matchPermissions';
+import { getGameConfig } from './games';
 
 export type PersonalDemoValidation =
   | { valid: true }
@@ -58,6 +59,24 @@ export async function validatePersonalDemoUpload(
 }
 
 export async function validateGeneralDemoUpload(matchId: string): Promise<PersonalDemoValidation> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { league: { select: { game: true } } },
+  });
+
+  if (!match) {
+    return { valid: false, error: 'Partida não encontrada.', code: 'MATCH_NOT_FOUND' };
+  }
+
+  const gameConfig = getGameConfig(match.league.game);
+  if (!gameConfig.supportsDemoUpload) {
+    return {
+      valid: false,
+      error: `Upload de demo não está disponível para ${gameConfig.label}. Use importação via API ou estatísticas manuais.`,
+      code: 'MATCH_HAS_DEMO',
+    };
+  }
+
   const existing = await prisma.demo.findFirst({
     where: {
       matchId,

@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { getPlayerRankings, getTeamRankings, getPlayerProfileBySteamId } from '../lib/rankings';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../lib/permissions';
-import { parseRankingPositionFilter, RANKING_POSITION_OPTIONS, type RankingPositionFilter } from '../lib/playerPosition';
+import { parseRankingPositionFilter, getRankingPositionOptionsForGame, RANKING_POSITION_OPTIONS, type RankingPositionFilter } from '../lib/playerPosition';
 import { LEVEL_THRESHOLDS, MAX_LEVEL, recomputeAllPoints } from '../lib/playerRankingPoints';
 
 const router = Router();
@@ -19,8 +19,9 @@ function parsePageSize(value: unknown): number | undefined {
   return undefined;
 }
 
-router.get('/positions', authMiddleware, (_req: AuthRequest, res: Response) => {
-  res.json(RANKING_POSITION_OPTIONS);
+router.get('/positions', authMiddleware, (req: AuthRequest, res: Response) => {
+  const game = typeof req.query.game === 'string' ? req.query.game : 'CS2';
+  res.json(getRankingPositionOptionsForGame(game));
 });
 
 router.get('/players', authMiddleware, async (req: AuthRequest, res: Response) => {

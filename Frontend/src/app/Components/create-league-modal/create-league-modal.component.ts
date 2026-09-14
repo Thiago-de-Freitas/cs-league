@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LeagueService } from '../../Services/league.service';
+import { GamesService, type GameConfigApi } from '../../Services/games.service';
 import { League } from '../../Models/interfaces';
 import { MAX_LEAGUE_TEAMS, MIN_LEAGUE_TEAMS } from '../../Utils/bracket.util';
 import {
@@ -12,7 +13,7 @@ import {
   type LeagueSeriesFormat,
 } from '../../Utils/series-map.util';
 import { LeagueSeriesMapSettingsComponent } from '../league-series-map-settings/league-series-map-settings.component';
-import { DEFAULT_MAP_POOL } from '../../Utils/maps';
+import { getDefaultMapPoolForGame, getMapsForGame } from '../../Utils/game-maps.util';
 import {
   PICKUP_BALANCE_MODE_OPTIONS,
   PickupBalanceMode,
@@ -25,7 +26,7 @@ import {
   templateUrl: './create-league-modal.component.html',
   styleUrls: ['./create-league-modal.component.css']
 })
-export class CreateLeagueModalComponent {
+export class CreateLeagueModalComponent implements OnInit {
   @Output() closed = new EventEmitter<void>();
   @Output() created = new EventEmitter<League>();
 
@@ -34,7 +35,9 @@ export class CreateLeagueModalComponent {
   errorMessage = '';
   minTeams = MIN_LEAGUE_TEAMS;
   maxTeamsLimit = MAX_LEAGUE_TEAMS;
-  mapPool: string[] = [...DEFAULT_MAP_POOL];
+  games: GameConfigApi[] = [];
+  selectedGame: GameConfigApi | null = null;
+  mapPool: string[] = getDefaultMapPoolForGame('cs2');
   seriesFormat: LeagueSeriesFormat = 'bo1';
   mapVetoEnabled = true;
   pickupBalanceModes: PickupBalanceMode[] = ['rating'];
@@ -42,9 +45,11 @@ export class CreateLeagueModalComponent {
 
   constructor(
     private fb: FormBuilder,
-    private leagueService: LeagueService
+    private leagueService: LeagueService,
+    private gamesService: GamesService
   ) {
     this.form = this.fb.group({
+      game: ['cs2', Validators.required],
       leagueName: ['', Validators.required],
       description: ['', Validators.maxLength(500)],
       format: ['single_elimination'],
@@ -56,6 +61,45 @@ export class CreateLeagueModalComponent {
       pickupPlayersPerTeam: [5],
       registrationOpen: [false],
     });
+  }
+
+  ngOnInit(): void {
+    this.gamesService.listGames().subscribe({
+      next: (games) => {
+        this.games = games;
+        this.onGameChange(this.form.get('game')?.value ?? 'cs2');
+      },
+    });
+    this.form.get('game')?.valueChanges.subscribe((game) => this.onGameChange(game));
+  }
+
+  get gameMaps() {
+    return getMapsForGame(this.form.get('game')?.value ?? 'cs2');
+  }
+
+  get availableSeriesFormats(): LeagueSeriesFormat[] {
+    return (this.selectedGame?.seriesFormats ?? ['bo1', 'bo3']) as LeagueSeriesFormat[];
+  }
+
+  get selectedGameTagline(): string {
+    return this.selectedGame?.tagline ?? 'Competições de Counter-Strike 2';
+  }
+
+  onGameChange(gameId: string): void {
+    this.selectedGame = this.games.find((g) => g.id === gameId) ?? null;
+    this.mapPool = getDefaultMapPoolForGame(gameId);
+    this.seriesFormat = (this.selectedGame?.seriesFormats[0] ?? 'bo1') as LeagueSeriesFormat;
+    this.mapVetoEnabled = this.selectedGame?.supportsMapVeto ?? true;
+
+    const formatControl = this.form.get('format');
+    if (gameId === 'pubg' && formatControl) {
+      formatControl.setValue('points_race');
+    } else if (formatControl?.value === 'points_race') {
+      formatControl.setValue('single_elimination');
+    }
+
+    const perTeam = this.selectedGame?.defaultTeamSize ?? 5;
+    this.form.patchValue({ pickupPlayersPerTeam: perTeam });
   }
 
   get isGroupStage(): boolean {
@@ -75,8 +119,12 @@ export class CreateLeagueModalComponent {
     return this.form.get('format')?.value === 'one_vs_one';
   }
 
+  get isPointsRace(): boolean {
+    return this.form.get('format')?.value === 'points_race';
+  }
+
   get showMapSeriesOptions(): boolean {
-    return showMapSeriesOptions(this.form.get('format')?.value);
+    return showMapSeriesOptions(this.form.get('format')?.value) && (this.selectedGame?.supportsMapVeto ?? true);
   }
 
   get mapSeriesScopeHint(): string {
@@ -89,6 +137,17 @@ export class CreateLeagueModalComponent {
   get minTeamsForFormat(): number {
     if (this.isOneVsOne) return 2;
     return this.isSingleGroup ? 3 : this.isMultiGroup ? 4 : MIN_LEAGUE_TEAMS;
+  }
+
+  formatAllowed(format: string): boolean {
+    if (!this.selectedGame) return true;
+    if (format === 'one_vs_one') return this.selectedGame.supportsOneVsOne;
+    if (format === 'points_race') return this.selectedGame.allowedLeagueFormats.includes('points_race');
+    if (format === 'single_elimination') return this.selectedGame.allowedLeagueFormats.includes('single_elimination');
+    if (format === 'single_group' || format === 'multi_group') {
+      return this.selectedGame.allowedLeagueFormats.includes('group_stage');
+    }
+    return true;
   }
 
   isPickupBalanceModeSelected(mode: PickupBalanceMode): boolean {
@@ -143,10 +202,10 @@ export class CreateLeagueModalComponent {
 
     this.loading = true;
     this.errorMessage = '';
-    const { leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupPlayersPerTeam } = this.form.value;
+    const { game, leagueName, description, maxTeams, registrationOpen, format, groupCount, advancePerGroup, homeAndAway, matchesPerMatchDay, pickupPlayersPerTeam } = this.form.value;
     const capRaw = String(maxTeams ?? '').trim();
     let registrationCap: number | null = null;
-    if (capRaw && format !== 'one_vs_one') {
+    if (capRaw && format !== 'one_vs_one' && format !== 'points_race') {
       registrationCap = Number(capRaw);
       if (!Number.isInteger(registrationCap) || registrationCap < MIN_LEAGUE_TEAMS || registrationCap > MAX_LEAGUE_TEAMS) {
         this.loading = false;
@@ -156,10 +215,12 @@ export class CreateLeagueModalComponent {
     }
 
     if (format === 'one_vs_one') {
+      const min = this.selectedGame?.minPickupPlayersPerTeam ?? 1;
+      const max = this.selectedGame?.maxPickupPlayersPerTeam ?? 5;
       const perTeam = Number(pickupPlayersPerTeam);
-      if (!Number.isInteger(perTeam) || perTeam < 1 || perTeam > 5) {
+      if (!Number.isInteger(perTeam) || perTeam < min || perTeam > max) {
         this.loading = false;
-        this.errorMessage = 'Jogadores por time deve ser entre 1 e 5.';
+        this.errorMessage = `Jogadores por time deve ser entre ${min} e ${max}.`;
         return;
       }
     }
@@ -179,6 +240,8 @@ export class CreateLeagueModalComponent {
     } else if (format === 'one_vs_one') {
       apiFormat = 'ONE_VS_ONE';
       registrationCap = null;
+    } else if (format === 'points_race') {
+      apiFormat = 'POINTS_RACE';
     }
 
     let apiHomeAndAway = false;
@@ -197,9 +260,10 @@ export class CreateLeagueModalComponent {
 
     const mapSettingsPayload = this.showMapSeriesOptions
       ? buildMapSettingsPayload(this.seriesFormat, this.mapVetoEnabled, this.mapPool)
-      : {};
+      : { mapPool: this.mapPool };
 
     this.leagueService.createLeague({
+      game: String(game).toUpperCase(),
       name: leagueName,
       description,
       maxTeams: registrationCap,

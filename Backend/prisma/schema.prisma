@@ -47,15 +47,24 @@ enum MatchStatus {
   CANCELLED
 }
 
+enum GameTitle {
+  CS2
+  VALORANT
+  LOL
+  PUBG
+}
+
 enum LeagueFormat {
   SINGLE_ELIMINATION
   GROUP_STAGE
   ONE_VS_ONE
+  POINTS_RACE
 }
 
 enum SeriesFormat {
   BO1
   BO3
+  BO5
 }
 
 enum SeriesVetoStatus {
@@ -68,6 +77,8 @@ enum SeriesVetoStatus {
 enum GameSide {
   CT
   T
+  ATTACK
+  DEFENDER
 }
 
 enum MapVetoStatus {
@@ -132,9 +143,11 @@ model User {
   emailVerified   Boolean  @default(false)
   emailVerifiedAt DateTime?
   rankPoints      Int      @default(0)
+  riotId          String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  gameAccounts UserGameAccount[]
   ownedTeams   Team[]       @relation("TeamOwner")
   memberships  TeamMember[]
   invites      TeamInvite[] @relation("InvitedUser")
@@ -194,10 +207,26 @@ model TeamInvite {
   @@unique([teamId, invitedUserId])
 }
 
+model UserGameAccount {
+  id         String    @id @default(cuid())
+  userId     String
+  game       GameTitle
+  externalId String
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, game])
+  @@index([game, externalId])
+}
+
 model League {
   id                String       @id @default(cuid())
   name              String
   description       String       @default("")
+  game              GameTitle    @default(CS2)
   status            LeagueStatus @default(UPCOMING)
   format            LeagueFormat @default(SINGLE_ELIMINATION)
   maxTeams          Int?
@@ -313,6 +342,9 @@ model Match {
   map             String?
   team1Rounds     Int?
   team2Rounds     Int?
+  riotMatchId     String?
+  pubgMatchId     String?
+  placement       Int?
   team1StartingSide GameSide?
   team2StartingSide GameSide?
   seriesId          String?

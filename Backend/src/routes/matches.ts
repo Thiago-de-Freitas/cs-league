@@ -21,9 +21,13 @@ import {
   getStatDeltasForTeams,
   getRoundsOnlyStatDeltas,
   getPlayoffSeriesWinStatDeltas,
-  parseMatchRounds,
-  resolveMatchOutcome,
 } from '../lib/matchResult';
+import {
+  getStatDeltasForGame,
+  parseMatchScoreForGame,
+  resolveMatchOutcomeForGame,
+} from '../lib/games/matchScoring';
+import { getGameConfig } from '../lib/games';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, recordAuditInTransaction, setAuditContext, skipAudit } from '../lib/audit';
 import { registerMatchExtras } from './matchExtras';
@@ -94,7 +98,7 @@ function formatMatchResponse(
   match: {
     id: string;
     leagueId: string;
-    league: { id: string; name: string; ownerId: string; maxTeams: number | null; bracketSize: number | null };
+    league: { id: string; name: string; ownerId: string; maxTeams: number | null; bracketSize: number | null; game?: string };
     team1: { id: string; name: string; tag: string };
     team2: { id: string; name: string; tag: string };
     winner: { id: string; name: string; tag: string } | null;
@@ -150,10 +154,13 @@ function formatMatchResponse(
   );
   const manualDemo = demos.find((d) => d.isManual) ?? null;
 
+  const game = match.league.game ?? 'CS2';
+  const gameConfig = getGameConfig(game);
+
   return {
     id: match.id,
     leagueId: match.leagueId,
-    league: match.league,
+    league: { ...match.league, game: game.toLowerCase(), gameLabel: gameConfig.label },
     team1: match.team1,
     team2: match.team2,
     winner: match.winner,
@@ -165,7 +172,7 @@ function formatMatchResponse(
     round: match.round,
     bracketPosition: match.bracketPosition,
     map: match.map,
-    mapLabel: match.map ? getMapLabel(match.map) : null,
+    mapLabel: match.map ? getMapLabel(match.map, game) : null,
     team1StartingSide: match.team1StartingSide?.toLowerCase() ?? null,
     team2StartingSide: match.team2StartingSide?.toLowerCase() ?? null,
     team1Rounds: match.team1Rounds,
@@ -177,7 +184,12 @@ function formatMatchResponse(
     roster,
     hasFileDemo,
     manualDemoId: manualDemo?.id ?? null,
-    permissions,
+    permissions: {
+      ...permissions,
+      canUploadDemo: permissions.canUploadDemo && gameConfig.supportsDemoUpload,
+      canImportRiot: gameConfig.statsIngestion === 'RIOT_API',
+      canImportPubg: gameConfig.statsIngestion === 'PUBG_API',
+    },
     mapVeto: extras?.mapVeto ?? null,
     mapVetoEnabled: extras?.mapVetoEnabled ?? false,
     lineup: extras?.lineup ?? [],
@@ -226,6 +238,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
             mapPool: true,
             mapVetoEnabled: true,
             seriesFormat: true,
+            game: true,
           },
         },
         lineup: true,
@@ -500,7 +513,7 @@ router.patch('/:id/result', authMiddleware, participationGuard, async (req: Auth
     const match = await prisma.match.findUnique({
       where: { id: req.params.id },
       include: {
-        league: { select: { maxTeams: true, bracketSize: true, seriesFormat: true } },
+        league: { select: { maxTeams: true, bracketSize: true, seriesFormat: true, game: true } },
         series: { select: { format: true } },
       },
     });
@@ -521,13 +534,15 @@ router.patch('/:id/result', authMiddleware, participationGuard, async (req: Auth
 
     const { winnerId: winnerIdFromBody, map, playedAt, team1Rounds, team2Rounds } = req.body;
 
-    const rounds = parseMatchRounds(team1Rounds, team2Rounds);
+    const game = match.league.game;
+    const rounds = parseMatchScoreForGame(game, team1Rounds, team2Rounds);
     if ('error' in rounds) {
       res.status(400).json({ error: rounds.error });
       return;
     }
 
-    const outcome = resolveMatchOutcome(
+    const outcome = resolveMatchOutcomeForGame(
+      game,
       match.team1Id,
       match.team2Id,
       rounds.team1Rounds,
@@ -542,17 +557,11 @@ router.patch('/:id/result', authMiddleware, participationGuard, async (req: Auth
 
     const winnerId = outcome.winnerId;
     const isBo3Map =
-      !!match.seriesId && (match.series?.format === 'BO3' || match.league.seriesFormat === 'BO3');
+      !!match.seriesId && (match.series?.format === 'BO3' || match.series?.format === 'BO5' || match.league.seriesFormat === 'BO3' || match.league.seriesFormat === 'BO5');
 
     const statDeltas = isBo3Map
-      ? getRoundsOnlyStatDeltas(match.team1Id, match.team2Id, rounds.team1Rounds, rounds.team2Rounds)
-      : getStatDeltasForTeams(
-          match.team1Id,
-          match.team2Id,
-          rounds.team1Rounds,
-          rounds.team2Rounds,
-          outcome
-        );
+      ? getStatDeltasForGame(game, match.team1Id, match.team2Id, rounds.team1Rounds, rounds.team2Rounds, outcome, true)
+      : getStatDeltasForGame(game, match.team1Id, match.team2Id, rounds.team1Rounds, rounds.team2Rounds, outcome);
 
     let groupPhaseJustCompleted = false;
     const bracketSize = resolveBracketSize(

@@ -36,6 +36,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   userName = '';
   email = '';
   steamId = '';
+  riotId = '';
   position = '';
   readonly positionOptions = PLAYER_POSITIONS;
   readonly highlightsFeatureEnabled = HIGHLIGHTS_FEATURE_ENABLED;
@@ -96,6 +97,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.profileForm = this.fb.group({
       displayName: ['', Validators.required],
       steamId: [''],
+      riotId: [''],
       position: [''],
     });
     this.emailChangeForm = this.fb.group({
@@ -130,6 +132,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.userName = user.displayName;
         this.email = user.email;
         this.steamId = user.steamId || '';
+        this.riotId = user.riotId || '';
         this.position = normalizePlayerPositionForForm(user.position);
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
@@ -137,6 +140,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         this.profileForm.patchValue({
           displayName: user.displayName,
           steamId: user.steamId || '',
+          riotId: user.riotId || '',
           position: this.position,
         });
       },
@@ -409,21 +413,24 @@ export class ProfileComponent implements OnInit, OnDestroy {
   onUpdateProfile(): void {
     if (!this.profileForm.valid) return;
 
-    const { displayName, steamId, position } = this.profileForm.value;
+    const { displayName, steamId, riotId, position } = this.profileForm.value;
     this.authService.updateProfile({
       displayName,
       steamId,
+      riotId,
       position: position?.trim() || null,
     }).subscribe({
       next: (user) => {
         this.userName = user.displayName;
         this.steamId = user.steamId || '';
+        this.riotId = user.riotId || '';
         this.position = normalizePlayerPositionForForm(user.position);
         this.avatarUrl = user.avatarUrl || null;
         this.avatarBroken = false;
         this.profileForm.patchValue({
           displayName: user.displayName,
           steamId: user.steamId || '',
+          riotId: user.riotId || '',
           position: this.position,
         });
         this.successMsg = 'Perfil atualizado com sucesso!';

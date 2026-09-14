@@ -60,6 +60,9 @@ import {
   parsePickupBalanceModesFromApi,
 } from '../lib/pickupBalance';
 import leaguePickupRoutes from './leaguePickup';
+import { validateLeagueGameSettings } from '../lib/games/leagueGameValidation';
+import { getGameConfig } from '../lib/games';
+import { usesRoundTiebreaker } from '../lib/games/matchScoring';
 
 const router = Router();
 router.use(leaguePickupRoutes);
@@ -262,7 +265,7 @@ function formatLeague(
     round: m.round,
     bracketPosition: m.bracketPosition,
     map: m.map,
-    mapLabel: m.map ? getMapLabel(m.map) : null,
+    mapLabel: m.map ? getMapLabel(m.map, league.game) : null,
     seriesId: m.seriesId,
     seriesGameNumber: m.seriesGameNumber,
     seriesStatus: m.series?.status?.toLowerCase() ?? null,
@@ -288,7 +291,8 @@ function formatLeague(
         status: m.status,
         team1Rounds: m.team1Rounds,
         team2Rounds: m.team2Rounds,
-      }))
+      })),
+      { useRoundTiebreaker: usesRoundTiebreaker(league.game) }
     );
     return {
       id: g.id,
@@ -314,6 +318,8 @@ function formatLeague(
     id: league.id,
     name: league.name,
     description: league.description,
+    game: league.game.toLowerCase(),
+    gameLabel: getGameConfig(league.game).label,
     status: league.status.toLowerCase(),
     format: league.format.toLowerCase(),
     maxTeams: league.maxTeams,
@@ -336,7 +342,7 @@ function formatLeague(
     scheduleTimezone: league.scheduleTimezone,
     scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
     scheduleWeekOverrides: weekOverrides,
-    mapPool: parseMapPool(league.mapPool),
+    mapPool: parseMapPool(league.mapPool, league.game),
     mapVetoEnabled: league.mapVetoEnabled,
     seriesFormat: league.seriesFormat.toLowerCase(),
     pickupTeamCount: league.pickupTeamCount,
@@ -538,41 +544,29 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
       return;
     }
 
-    if (!isValidRegistrationCap(maxTeams)) {
+    const gameSettings = validateLeagueGameSettings(req.body);
+    if ('error' in gameSettings) {
+      res.status(400).json({ error: gameSettings.error });
+      return;
+    }
+
+    if (!isValidRegistrationCap(maxTeams) && gameSettings.leagueFormat !== 'ONE_VS_ONE' && gameSettings.leagueFormat !== 'POINTS_RACE') {
       res.status(400).json({
         error: 'Limite de vagas inválido. Use entre 2 e 64 ou deixe em branco (ilimitado).',
       });
       return;
     }
 
-    const leagueFormat =
-      format?.toUpperCase() === 'ONE_VS_ONE'
-        ? 'ONE_VS_ONE'
-        : format?.toUpperCase() === 'GROUP_STAGE'
-          ? 'GROUP_STAGE'
-          : 'SINGLE_ELIMINATION';
+    const leagueFormat = gameSettings.leagueFormat;
 
     if (leagueFormat === 'ONE_VS_ONE') {
-      const mapPool = parseMapPool(req.body?.mapPool);
-      const seriesFormat =
-        String(req.body?.seriesFormat ?? 'BO1').toUpperCase() === 'BO3' ? 'BO3' : 'BO1';
-      const poolError = validateMapPoolForSeriesFormat(mapPool, seriesFormat);
-      if (poolError) {
-        res.status(400).json({ error: poolError });
-        return;
-      }
-      const mapVetoEnabled = seriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
-
       const pickupTeamCount = PICKUP_LEAGUE_FIXED_TEAM_COUNT;
-      const pickupPlayersPerTeam = isValidPickupPlayersPerTeam(Number(req.body?.pickupPlayersPerTeam))
-        ? Number(req.body.pickupPlayersPerTeam)
-        : 5;
-      const pickupBalanceModes = parsePickupBalanceModesFromApi(req.body?.pickupBalanceModes ?? req.body?.pickupBalanceMode);
 
       const league = await prisma.league.create({
         data: {
           name,
           description: description || '',
+          game: gameSettings.game,
           maxTeams: null,
           registrationOpen: false,
           format: 'ONE_VS_ONE',
@@ -580,13 +574,13 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
           advancePerGroup: 1,
           homeAndAway: false,
           matchesPerMatchDay: 0,
-          mapVetoEnabled,
-          mapPool,
-          seriesFormat,
+          mapVetoEnabled: gameSettings.mapVetoEnabled,
+          mapPool: gameSettings.mapPool,
+          seriesFormat: gameSettings.seriesFormat,
           pickupTeamCount,
-          pickupPlayersPerTeam,
-          pickupBalanceMode: pickupBalanceModes[0] ?? 'RATING',
-          pickupBalanceModes,
+          pickupPlayersPerTeam: gameSettings.pickupPlayersPerTeam,
+          pickupBalanceMode: parsePickupBalanceModesFromApi(req.body?.pickupBalanceModes ?? req.body?.pickupBalanceMode)[0] ?? 'RATING',
+          pickupBalanceModes: parsePickupBalanceModesFromApi(req.body?.pickupBalanceModes ?? req.body?.pickupBalanceMode),
           ownerId: req.user!.userId,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
@@ -598,7 +592,41 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
       });
       const full = await getLeagueWithDetails(league.id);
       setAuditContext(req, audit.of('league.create', 'League', league.id, {
-        after: { name: league.name, format: league.format },
+        after: { name: league.name, format: league.format, game: league.game },
+      }));
+      res.status(201).json(formatLeague(full!));
+      return;
+    }
+
+    if (leagueFormat === 'POINTS_RACE') {
+      const league = await prisma.league.create({
+        data: {
+          name,
+          description: description || '',
+          game: gameSettings.game,
+          maxTeams: parseRegistrationCap(maxTeams),
+          registrationOpen: registrationOpen === true,
+          format: 'POINTS_RACE',
+          groupCount: 1,
+          advancePerGroup: 1,
+          homeAndAway: false,
+          matchesPerMatchDay: 0,
+          mapVetoEnabled: false,
+          mapPool: gameSettings.mapPool,
+          seriesFormat: 'BO1',
+          pickupPlayersPerTeam: gameSettings.pickupPlayersPerTeam,
+          ownerId: req.user!.userId,
+          startDate: startDate ? new Date(startDate) : null,
+          endDate: endDate ? new Date(endDate) : null,
+          status:
+            req.user!.role === 'ADMIN' && status?.toUpperCase()
+              ? status.toUpperCase()
+              : 'UPCOMING',
+        },
+      });
+      const full = await getLeagueWithDetails(league.id);
+      setAuditContext(req, audit.of('league.create', 'League', league.id, {
+        after: { name: league.name, format: league.format, game: league.game },
       }));
       res.status(201).json(formatLeague(full!));
       return;
@@ -611,16 +639,6 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
         : 2;
 
     const registrationCap = parseRegistrationCap(maxTeams);
-    const resolvedMapPool = parseMapPool(req.body?.mapPool);
-    const resolvedSeriesFormat =
-      String(req.body?.seriesFormat ?? 'BO1').toUpperCase() === 'BO3' ? 'BO3' : 'BO1';
-    const poolError = validateMapPoolForSeriesFormat(resolvedMapPool, resolvedSeriesFormat);
-    if (poolError) {
-      res.status(400).json({ error: poolError });
-      return;
-    }
-    const resolvedMapVeto =
-      resolvedSeriesFormat === 'BO3' ? true : req.body?.mapVetoEnabled !== false;
 
     const groupStageOptions =
       leagueFormat === 'GROUP_STAGE'
@@ -639,6 +657,7 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
       data: {
         name,
         description: description || '',
+        game: gameSettings.game,
         maxTeams: registrationCap,
         registrationOpen: registrationOpen === true,
         format: leagueFormat,
@@ -646,9 +665,10 @@ router.post('/', authMiddleware, participationGuard, async (req: AuthRequest, re
         advancePerGroup: advance,
         homeAndAway: groupStageOptions.homeAndAway,
         matchesPerMatchDay: groupStageOptions.matchesPerMatchDay,
-        mapPool: resolvedMapPool,
-        seriesFormat: resolvedSeriesFormat,
-        mapVetoEnabled: resolvedMapVeto,
+        mapPool: gameSettings.mapPool,
+        seriesFormat: gameSettings.seriesFormat,
+        mapVetoEnabled: gameSettings.mapVetoEnabled,
+        pickupPlayersPerTeam: gameSettings.pickupPlayersPerTeam,
         ownerId: req.user!.userId,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -730,13 +750,17 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       if (mapPool !== undefined || seriesFormat !== undefined) {
         const nextFormat =
           seriesFormat !== undefined
-            ? String(seriesFormat).toUpperCase() === 'BO3'
-              ? 'BO3'
-              : 'BO1'
+            ? String(seriesFormat).toUpperCase() === 'BO5'
+              ? 'BO5'
+              : String(seriesFormat).toUpperCase() === 'BO3'
+                ? 'BO3'
+                : 'BO1'
             : check.league.seriesFormat;
         const nextPool =
-          mapPool !== undefined ? parseMapPool(mapPool) : parseMapPool(check.league.mapPool);
-        const poolError = validateMapPoolForSeriesFormat(nextPool, nextFormat);
+          mapPool !== undefined
+            ? parseMapPool(mapPool, check.league.game)
+            : parseMapPool(check.league.mapPool, check.league.game);
+        const poolError = validateMapPoolForSeriesFormat(nextPool, nextFormat, check.league.game);
         if (poolError) {
           res.status(400).json({ error: poolError });
           return;
@@ -746,12 +770,14 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const effectiveSeriesFormat =
       seriesFormat !== undefined
-        ? String(seriesFormat).toUpperCase() === 'BO3'
-          ? 'BO3'
-          : 'BO1'
+        ? String(seriesFormat).toUpperCase() === 'BO5'
+          ? 'BO5'
+          : String(seriesFormat).toUpperCase() === 'BO3'
+            ? 'BO3'
+            : 'BO1'
         : undefined;
     const effectiveMapVeto =
-      effectiveSeriesFormat === 'BO3'
+      effectiveSeriesFormat === 'BO3' || effectiveSeriesFormat === 'BO5'
         ? true
         : mapVetoEnabled !== undefined
           ? mapVetoEnabled !== false
@@ -773,7 +799,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
         ...(existingMatches === 0 && matchesPerMatchDay !== undefined && isValidMatchesPerMatchDay(matchesPerMatchDay) && {
           matchesPerMatchDay: Number(matchesPerMatchDay),
         }),
-        ...(existingMatches === 0 && mapPool !== undefined && { mapPool: parseMapPool(mapPool) }),
+        ...(existingMatches === 0 && mapPool !== undefined && { mapPool: parseMapPool(mapPool, check.league.game) }),
         ...(existingMatches === 0 && effectiveSeriesFormat !== undefined && {
           seriesFormat: effectiveSeriesFormat,
         }),

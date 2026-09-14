@@ -3,12 +3,20 @@
     <div class="gc-modal-header">
       <div>
         <h2 id="create-league-title" class="gc-modal-title">Criar Nova Liga</h2>
-        <p class="gc-modal-subtitle">Organize suas competições de Counter-Strike 2.</p>
+        <p class="gc-modal-subtitle">{{ selectedGameTagline }}</p>
       </div>
       <button type="button" class="gc-modal-close" (click)="close()" [disabled]="loading" aria-label="Fechar">&times;</button>
     </div>
 
     <form class="gc-modal-body" [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="game" class="form-label">Jogo</label>
+        <select id="game" formControlName="game" class="input-field">
+          <option *ngFor="let g of games" [value]="g.id">{{ g.label }}</option>
+        </select>
+        <p class="form-hint">O jogo não pode ser alterado após criar partidas na liga.</p>
+      </div>
+
       <div class="form-group">
         <label for="league-name" class="form-label">Nome da Liga</label>
         <input id="league-name" type="text" required
@@ -34,10 +42,11 @@
       <div class="form-group">
         <label for="format" class="form-label">Formato do torneio</label>
         <select id="format" formControlName="format" class="input-field">
-          <option value="one_vs_one">Liga individual — jogadores balanceados em times temporários</option>
-          <option value="single_elimination">Liga — eliminatória direta</option>
-          <option value="single_group">Grupo único — todos contra todos → fase de liga</option>
-          <option value="multi_group">Vários grupos — top N de cada → fase de liga</option>
+          <option value="one_vs_one" *ngIf="formatAllowed('one_vs_one')">Liga individual — jogadores balanceados em times temporários</option>
+          <option value="single_elimination" *ngIf="formatAllowed('single_elimination')">Liga — eliminatória direta</option>
+          <option value="single_group" *ngIf="formatAllowed('single_group')">Grupo único — todos contra todos → fase de liga</option>
+          <option value="multi_group" *ngIf="formatAllowed('multi_group')">Vários grupos — top N de cada → fase de liga</option>
+          <option value="points_race" *ngIf="formatAllowed('points_race')">Corrida de pontos — múltiplas quedas (PUBG)</option>
         </select>
         <p class="form-hint" *ngIf="isOneVsOne">
           Você convoca jogadores, o sistema cria times que existem só nesta liga e balanceia por rating, ADR, HS% ou posição.
@@ -65,7 +74,7 @@
 
       <div class="form-group" *ngIf="isOneVsOne">
         <label class="form-label" for="pickup-players-per-team">Jogadores por time</label>
-        <input id="pickup-players-per-team" type="number" class="input-field" formControlName="pickupPlayersPerTeam" min="1" max="5">
+        <input id="pickup-players-per-team" type="number" class="input-field" formControlName="pickupPlayersPerTeam" [attr.min]="selectedGame?.minPickupPlayersPerTeam ?? 1" [attr.max]="selectedGame?.maxPickupPlayersPerTeam ?? 5">
       </div>
 
       <div class="form-group pickup-criteria-group" *ngIf="isOneVsOne">
@@ -85,6 +94,8 @@
         <app-league-series-map-settings
           [seriesFormat]="seriesFormat"
           [mapPool]="mapPool"
+          [gameMaps]="gameMaps"
+          [availableSeriesFormats]="availableSeriesFormats"
           [mapVetoEnabled]="mapVetoEnabled"
           [scopeHint]="mapSeriesScopeHint"
           (seriesFormatChange)="seriesFormat = $event"
@@ -140,7 +151,7 @@
         </p>
       </div>
 
-      <div class="form-group" *ngIf="!isOneVsOne">
+      <div class="form-group" *ngIf="!isOneVsOne && !isPointsRace">
         <label for="max-teams" class="form-label">Limite de vagas (opcional)</label>
         <input
           id="max-teams"

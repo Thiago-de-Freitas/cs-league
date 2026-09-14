@@ -239,8 +239,10 @@ export function generateRoundRobinPairings(teamIds: string[], homeAndAway = fals
 
 export function computeGroupStandings(
   teamIds: string[],
-  matches: GroupMatchResult[]
+  matches: GroupMatchResult[],
+  options?: { useRoundTiebreaker?: boolean }
 ): GroupStanding[] {
+  const useRoundTiebreaker = options?.useRoundTiebreaker !== false;
   const stats = new Map<
     string,
     { wins: number; losses: number; draws: number; points: number; roundsWon: number; roundsLost: number; played: number }
@@ -320,7 +322,9 @@ export function computeGroupStandings(
 
   standings.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
-    if (b.roundDifference !== a.roundDifference) return b.roundDifference - a.roundDifference;
+    if (useRoundTiebreaker && b.roundDifference !== a.roundDifference) {
+      return b.roundDifference - a.roundDifference;
+    }
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (a.losses !== b.losses) return a.losses - b.losses;
     return a.teamId.localeCompare(b.teamId);

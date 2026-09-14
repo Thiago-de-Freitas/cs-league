@@ -26,6 +26,14 @@ export class MatchService {
     });
   }
 
+  importRiotMatch(matchId: string, riotMatchId: string, region = 'na'): Observable<unknown> {
+    return this.http.post(`${this.apiUrl}/${matchId}/import-riot`, { riotMatchId, region });
+  }
+
+  importPubgMatch(matchId: string, payload: { pubgMatchId?: string; shard?: string; placements?: { teamId: string; placement: number }[] }): Observable<unknown> {
+    return this.http.post(`${this.apiUrl}/${matchId}/import-pubg`, payload);
+  }
+
   rescheduleMatch(matchId: string, scheduledAt: string): Observable<Match> {
     return this.http.patch<Match>(`${this.apiUrl}/${matchId}/schedule`, { scheduledAt });
   }

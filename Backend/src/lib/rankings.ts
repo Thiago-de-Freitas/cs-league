@@ -451,6 +451,33 @@ export function calcRating(kd: number, adr: number, kast: number, hsPercent: num
   return Math.round(((kd / 1.2) * 0.35 + (adr / 85) * 0.35 + (kast / 75) * 0.2 + (hsPercent / 50) * 0.1) * 100) / 100;
 }
 
+export function calcRatingForGame(
+  game: string,
+  kd: number,
+  adr: number,
+  kast: number,
+  hsPercent: number,
+  analytics?: Record<string, unknown> | null
+): number {
+  const normalized = game.toUpperCase();
+  if (normalized === 'VALORANT') {
+    const acs = Number(analytics?.acs ?? adr);
+    return Math.round(Math.min(100, kd * 28 + acs / 4) * 100) / 100;
+  }
+  if (normalized === 'LOL') {
+    const cs = Number(analytics?.cs ?? 0);
+    const vision = Number(analytics?.visionScore ?? 0);
+    return Math.round(Math.min(100, kd * 32 + cs / 20 + vision / 5) * 100) / 100;
+  }
+  if (normalized === 'PUBG') {
+    const placement = Number(analytics?.placement ?? 0);
+    const damage = Number(analytics?.damage ?? adr);
+    const placementScore = placement > 0 ? Math.max(0, 20 - placement) : 0;
+    return Math.round(Math.min(100, kd * 20 + damage / 100 + placementScore) * 100) / 100;
+  }
+  return calcRating(kd, adr, kast, hsPercent);
+}
+
 async function loadMembershipsForStats(
   rows: Array<{ team1Id: string; team2Id: string }>
 ): Promise<Map<string, TeamMembershipContext>> {

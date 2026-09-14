@@ -45,6 +45,7 @@ import {
   verifyPasswordChangeCode,
 } from '../lib/passwordChange';
 import { deleteUserAndData } from '../lib/deleteUser';
+import { parseRiotId, syncRiotIdToUser } from '../lib/userGameAccount';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -77,6 +78,7 @@ function sanitizeUser(user: {
   email: string;
   displayName: string;
   steamId: string | null;
+  riotId?: string | null;
   avatarUrl: string | null;
   position: string | null;
   role: string;
@@ -92,6 +94,7 @@ function sanitizeUser(user: {
     email: user.email,
     displayName: user.displayName,
     steamId: user.steamId,
+    riotId: user.riotId ?? null,
     avatarUrl: publicUploadUrlForResponse(user.avatarUrl),
     position: user.position?.toLowerCase() ?? null,
     role: user.role,
@@ -355,8 +358,13 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { displayName, steamId, position } = req.body;
-    const data: { displayName?: string; steamId?: string | null; position?: import('@prisma/client').PlayerPosition | null } = {};
+    const { displayName, steamId, riotId, position } = req.body;
+    const data: {
+      displayName?: string;
+      steamId?: string | null;
+      riotId?: string | null;
+      position?: import('@prisma/client').PlayerPosition | null;
+    } = {};
 
     if (displayName !== undefined) {
       if (typeof displayName !== 'string' || !displayName.trim() || displayName.length > MAX_DISPLAY_NAME_LENGTH) {
@@ -372,6 +380,17 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
         return;
       }
       data.steamId = steamId === null ? null : steamId.trim() || null;
+    }
+
+    if (riotId !== undefined) {
+      if (riotId === null || riotId === '') {
+        data.riotId = null;
+      } else if (typeof riotId !== 'string' || !parseRiotId(riotId)) {
+        res.status(400).json({ error: 'Riot ID inválido. Use o formato Nome#TAG.' });
+        return;
+      } else {
+        data.riotId = riotId.trim();
+      }
     }
 
     if (position !== undefined) {
@@ -392,8 +411,13 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       where: { id: req.user!.userId },
       data,
     });
+
+    if (riotId !== undefined) {
+      await syncRiotIdToUser(user.id, user.riotId);
+    }
+
     setAuditContext(req, audit.of('user.profile.update', 'User', user.id, {
-      after: { displayName: user.displayName, steamId: user.steamId, position: user.position },
+      after: { displayName: user.displayName, steamId: user.steamId, riotId: user.riotId, position: user.position },
     }));
     res.json(sanitizeUser(user));
   } catch (err) {

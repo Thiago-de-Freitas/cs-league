@@ -44,7 +44,7 @@ router.get('/:id/veto', authMiddleware, async (req: AuthRequest, res: Response) 
   try {
     const series = await prisma.matchSeries.findUnique({
       where: { id: req.params.id },
-      include: { league: { select: { ownerId: true } } },
+      include: { league: { select: { ownerId: true, game: true } } },
     });
     if (!series) {
       res.status(404).json({ error: 'Série não encontrada' });
@@ -79,7 +79,7 @@ router.post('/:id/veto/ban', authMiddleware, participationGuard, async (req: Aut
   try {
     const series = await prisma.matchSeries.findUnique({
       where: { id: req.params.id },
-      include: { league: { select: { ownerId: true } } },
+      include: { league: { select: { ownerId: true, game: true } } },
     });
     if (!series) {
       res.status(404).json({ error: 'Série não encontrada' });
@@ -98,7 +98,7 @@ router.post('/:id/veto/ban', authMiddleware, participationGuard, async (req: Aut
     }
 
     const mapId = String(req.body?.map ?? '').trim();
-    if (!isValidMapId(mapId)) {
+    if (!isValidMapId(mapId, series.league.game)) {
       res.status(400).json({ error: 'Mapa inválido' });
       return;
     }
@@ -137,7 +137,7 @@ router.post('/:id/veto/pick', authMiddleware, participationGuard, async (req: Au
   try {
     const series = await prisma.matchSeries.findUnique({
       where: { id: req.params.id },
-      include: { league: { select: { ownerId: true } } },
+      include: { league: { select: { ownerId: true, game: true } } },
     });
     if (!series) {
       res.status(404).json({ error: 'Série não encontrada' });
@@ -156,7 +156,7 @@ router.post('/:id/veto/pick', authMiddleware, participationGuard, async (req: Au
     }
 
     const mapId = String(req.body?.map ?? '').trim();
-    if (!isValidMapId(mapId)) {
+    if (!isValidMapId(mapId, series.league.game)) {
       res.status(400).json({ error: 'Mapa inválido' });
       return;
     }

@@ -55,7 +55,11 @@ export function applyStartingSides(
   team2Id: string,
   side: GameSide
 ): { team1StartingSide: GameSide; team2StartingSide: GameSide } {
-  const other: GameSide = side === 'CT' ? 'T' : 'CT';
+  const other: GameSide =
+    side === 'CT' ? 'T'
+      : side === 'T' ? 'CT'
+        : side === 'ATTACK' ? 'DEFENDER'
+          : 'ATTACK';
   if (pickingTeamId === team1Id) {
     return { team1StartingSide: side, team2StartingSide: other };
   }

@@ -10,7 +10,7 @@ import { CS2_MAPS, DEFAULT_MAP_POOL, getMapLabel } from '../../Utils/maps';
     <div class="map-pool-picker">
       <p class="form-hint" *ngIf="hint">{{ hint }}</p>
       <div class="map-pool-options">
-        <label *ngFor="let map of allMaps" class="map-pool-option">
+        <label *ngFor="let map of maps" class="map-pool-option">
           <input
             type="checkbox"
             [checked]="selectedSet.has(map.value)"
@@ -44,11 +44,11 @@ import { CS2_MAPS, DEFAULT_MAP_POOL, getMapLabel } from '../../Utils/maps';
 })
 export class MapPoolPickerComponent {
   @Input() selected: string[] = [...DEFAULT_MAP_POOL];
+  @Input() maps: { value: string; label: string }[] = CS2_MAPS.map((m) => ({ value: m.value, label: m.label }));
   @Input() disabled = false;
   @Input() hint = '';
   @Output() selectedChange = new EventEmitter<string[]>();
 
-  allMaps = CS2_MAPS;
   error = '';
 
   get selectedSet(): Set<string> {

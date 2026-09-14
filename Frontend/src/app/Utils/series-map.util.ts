@@ -1,4 +1,4 @@
-export type LeagueSeriesFormat = 'bo1' | 'bo3';
+export type LeagueSeriesFormat = 'bo1' | 'bo3' | 'bo5';
 
 export type LeagueUiFormat =
   | 'one_vs_one'
@@ -26,6 +26,9 @@ export function validateLeagueMapSettings(
   if (seriesFormat === 'bo3' && mapPool.length < 5) {
     return 'BO3 exige pelo menos 5 mapas no pool.';
   }
+  if (seriesFormat === 'bo5' && mapPool.length < 7) {
+    return 'BO5 exige pelo menos 7 mapas no pool.';
+  }
   return null;
 }
 
@@ -37,7 +40,7 @@ export function buildMapSettingsPayload(
   return {
     mapPool,
     seriesFormat,
-    mapVetoEnabled: seriesFormat === 'bo3' ? true : mapVetoEnabled,
+    mapVetoEnabled: seriesFormat === 'bo3' || seriesFormat === 'bo5' ? true : mapVetoEnabled,
   };
 }
 
@@ -55,14 +58,19 @@ export function getMapSeriesScopeHint(input: {
 }
 
 export function getSeriesFormatLabel(seriesFormat: LeagueSeriesFormat | string | null | undefined): string {
-  return seriesFormat === 'bo3' ? 'Melhor de 3 mapas' : '1 mapa (vitória única)';
+  if (seriesFormat === 'bo5') return 'Melhor de 5 mapas';
+  if (seriesFormat === 'bo3') return 'Melhor de 3 mapas';
+  return '1 mapa (vitória única)';
 }
 
 export function shouldShowMapPool(seriesFormat: LeagueSeriesFormat, mapVetoEnabled: boolean): boolean {
-  return seriesFormat === 'bo3' || mapVetoEnabled;
+  return seriesFormat === 'bo3' || seriesFormat === 'bo5' || mapVetoEnabled;
 }
 
 export function getMapPoolHint(seriesFormat: LeagueSeriesFormat): string {
+  if (seriesFormat === 'bo5') {
+    return 'BO5 exige pelo menos 7 mapas no pool.';
+  }
   if (seriesFormat === 'bo3') {
     return 'BO3 exige pelo menos 5 mapas (2 bans, 2 picks e mapa decider).';
   }
@@ -76,6 +84,9 @@ export function getVetoFlowDescription(
   if (seriesFormat === 'bo3') {
     return 'No BO3, capitães definem os 3 mapas da série antes dos jogos. Cada mapa vencido conta para o placar da série (ex.: 2–0 ou 2–1).';
   }
+  if (seriesFormat === 'bo5') {
+    return 'No BO5, capitães definem os mapas da série. Vence quem alcançar 3 vitórias de mapa.';
+  }
   if (mapVetoEnabled) {
     return 'No BO1 com veto, capitães alternam bans até sobrar um único mapa. O vencedor desse mapa vence o confronto.';
   }
@@ -88,7 +99,14 @@ export function getVetoSteps(seriesFormat: LeagueSeriesFormat, mapVetoEnabled: b
       '2 bans alternados (removem mapas do pool)',
       '2 picks alternados (cada time escolhe um mapa)',
       'O mapa restante é o decider (3º jogo)',
-      'Antes de cada mapa, capitães escolhem o lado CT/T',
+      'Antes de cada mapa, capitães escolhem o lado',
+    ];
+  }
+  if (seriesFormat === 'bo5') {
+    return [
+      'Bans e picks alternados até definir até 5 mapas',
+      'Vence a série quem ganhar 3 mapas',
+      'Antes de cada mapa, capitães escolhem o lado',
     ];
   }
   if (mapVetoEnabled) {

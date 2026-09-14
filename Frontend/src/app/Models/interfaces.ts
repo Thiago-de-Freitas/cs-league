@@ -3,6 +3,7 @@ export interface User {
   email: string;
   displayName: string;
   steamId?: string | null;
+  riotId?: string | null;
   avatarUrl?: string | null;
   position?: string | null;
   role: 'USER' | 'ADMIN';
@@ -58,7 +59,9 @@ export interface League {
   id: string;
   name: string;
   description: string;
-  format?: 'single_elimination' | 'group_stage' | 'one_vs_one' | string;
+  game?: string;
+  gameLabel?: string;
+  format?: 'single_elimination' | 'group_stage' | 'one_vs_one' | 'points_race' | string;
   maxTeams?: number | null;
   bracketSize?: number | null;
   effectiveBracketSize?: number;

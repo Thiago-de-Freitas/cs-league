@@ -1,49 +1,58 @@
 # Gamers League — Apresentação para Sócios
 
 **Versão do produto:** 1.1.0  
-**Data:** junho de 2026  
+**Data:** julho de 2026  
 **Status:** MVP funcional em desenvolvimento ativo, pronto para deploy em produção
 
 ---
 
 ## Resumo executivo
 
-**Gamers League** é uma plataforma web para organizar, disputar e analisar competições de esports — com foco inicial em **Counter-Strike 2**. O produto une em um só lugar o que hoje costuma estar fragmentado: gestão de ligas e times, chaveamentos automáticos, upload e processamento de demos, rankings, perfis de jogadores e **analytics de performance** inspirados em ferramentas como Leetify.
+**Gamers League** é a plataforma que une **organização de ligas** e **análise de performance** em um único produto — hoje com foco em **Counter-Strike 2**.
 
-A proposta de valor é simples: **transformar cada partida jogada em dado acionável** — para organizadores que querem ligas profissionais sem planilhas, e para jogadores que querem evoluir com métricas claras e dicas personalizadas.
+Hoje, quem organiza um campeonato amador ou semi-pro vive entre Discord, planilhas e ferramentas manuais. Quem joga usa Leetify ou Scope.gg para evoluir, mas essas métricas ficam fora do histórico da liga. O resultado: operação lenta, dados fragmentados e pouca inteligência competitiva de verdade.
+
+A Gamers League resolve os dois lados do mesmo problema:
+
+- **Para organizadores** — ligas, times, chaveamentos, veto de mapas, resultados e estatísticas oficiais sem planilha.
+- **Para jogadores** — cada demo vira rating, radar de skills, forma recente e dicas do que melhorar, vinculadas à competição em que jogaram.
+
+Em uma frase: **cada partida deixa de ser só um placar e vira dado acionável** — para quem administra e para quem disputa.
+
+O produto já está demonstrável de ponta a ponta (cadastro → liga → partida → demo → analytics), com mais de 450 testes automatizados e arquitetura pronta para produção (Railway + Docker).
 
 ---
 
 ## O problema que resolvemos
 
 ### Para organizadores de ligas
-- Criar e administrar campeonatos exige ferramentas dispersas (Discord, planilhas, Faceit manual, etc.).
-- Registrar resultados, gerar mata-mata, controlar inscrições e publicar estatísticas consome tempo e gera erros.
-- Demos de CS2 são ricas em dados, mas difíceis de extrair e vincular à competição oficial.
+- Campeonatos dependem de um kit improvisado: Discord para comunicação, planilhas para chaveamento, Faceit ou registro manual para resultados.
+- Inscrições, mata-mata, grupos e publicação de stats consomem tempo e geram inconsistência.
+- Demos de CS2 são a fonte mais rica de verdade da partida — e quase nunca entram no fluxo oficial da liga.
 
 ### Para jogadores e times
-- Estatísticas básicas (K/D, ADR) existem em vários lugares, mas **não estão integradas ao histórico da liga**.
-- Ferramentas de análise avançada (Leetify, Scope.gg) não gerenciam campeonatos.
-- Falta visão de evolução ao longo do tempo e orientação prática sobre o que melhorar.
+- K/D e ADR existem em vários sites, mas **não conversam com o histórico competitivo da liga**.
+- Ferramentas de análise avançada (Leetify, Scope.gg) ajudam o jogador a evoluir, porém **não organizam campeonatos**.
+- Falta um lugar onde performance, evolução e contexto da competição apareçam juntos — com orientação clara do que melhorar.
 
-### Oportunidade
-O mercado brasileiro e latino de CS2 competitivo amador e semi-profissional cresce continuamente. Há espaço para uma plataforma **localizada, integrada e acessível** que combine competição organizada com inteligência de performance — sem depender exclusivamente de ecossistemas externos (Faceit, ESEA, etc.).
+### A oportunidade
+O cenário amador e semi-pro de CS2 no Brasil e na América Latina continua expandindo. Organizadores e comunidades precisam de uma solução **em português, integrada e acessível** — competição organizada + inteligência de performance — sem depender só de ecossistemas externos (Faceit, ESEA e similares).
 
 ---
 
 ## O que é o Gamers League
 
-Plataforma full-stack onde usuários podem:
+Uma plataforma web completa para o ciclo competitivo:
 
-1. **Cadastrar-se** e verificar e-mail
-2. **Criar times** (capitão, membros, convites, logos)
-3. **Criar e administrar ligas** com formatos variados
-4. **Disputar partidas** com veto de mapas, séries BO1/BO3 e registro de resultados
-5. **Enviar demos** (.dem) que são processadas automaticamente
-6. **Consultar estatísticas** por partida, jogador e liga
-7. **Acompanhar evolução pessoal** com dashboard de performance e dicas contextuais
+1. **Cadastro** com verificação de e-mail
+2. **Times** com capitão, membros, convites e logos
+3. **Ligas** em formatos variados (mata-mata, grupos + playoffs, 1v1, pickup)
+4. **Partidas** com veto de mapas, séries BO1/BO3 e registro de resultados
+5. **Upload de demos** (.dem) com processamento automático
+6. **Estatísticas** por partida, jogador e liga
+7. **Analytics pessoais** — rating, skills, evolução e dicas contextuais
 
-O produto já possui painel administrativo (gestão de jogadores, trilha de auditoria) e está preparado para deploy em nuvem (Railway), com Docker e documentação de infraestrutura.
+Inclui painel administrativo (moderação e auditoria) e está preparado para nuvem (Railway), com Docker e documentação de infraestrutura.
 
 ---
 
@@ -186,11 +195,11 @@ A arquitetura é **modular e escalável**: o worker pode ser replicado independe
 
 ## Diferenciais competitivos
 
-1. **Tudo em um lugar** — liga + demo + stats + evolução pessoal, sem trocar de plataforma
-2. **Analytics acionáveis** — não só números, mas metas, tiers e dicas (“melhore trades”, “HE/round baixo”, etc.)
+1. **Operação + performance no mesmo lugar** — liga, demo, stats oficiais e evolução pessoal sem trocar de ferramenta
+2. **Analytics que orientam ação** — não só números: metas, tiers e dicas (“melhore trades”, “HE/round baixo”)
 3. **Feito para o mercado local** — português, fluxos de liga amadora brasileira, self-hosted ou cloud
 4. **Código próprio e testado** — base sólida para customização, white-label ou features B2B
-5. **Arquitetura moderna** — stack atual, filas assíncronas, pronta para crescer
+5. **Arquitetura pronta para crescer** — stack moderna, filas assíncronas, worker escalável de forma independente
 
 ---
 
@@ -200,7 +209,7 @@ A arquitetura é **modular e escalável**: o worker pode ser replicado independe
 |--------|-----------|
 | **SaaS por organizador** | Plano mensal para criar ligas com limite de times/demos |
 | **Freemium** | Liga gratuita até X times; analytics avançados no plano pago |
-| **White-label** | Plataforma customizada para marcas, universidades ou federaciones |
+| **White-label** | Plataforma customizada para marcas, universidades ou federações |
 | **Marketplace de ligas** | Descoberta de campeonatos abertos + taxa de inscrição |
 | **B2B para orgs** | API + dashboard para times semi-profissionais |
 
@@ -232,10 +241,10 @@ Nenhum desses modelos está codificado hoje; o MVP priorizou **produto e tecnolo
 
 ## Por que investir tempo e recursos agora
 
-- **Produto tangível:** não é slide deck — há código, testes, UI e fluxo completo demonstrável
-- **Mercado em crescimento:** CS2 e ligas amadoras seguem em expansão pós-lançamento
-- **Barreira técnica superada:** parser de demos, filas, analytics e UI já implementados
-- **Flexibilidade estratégica:** pode virar produto B2C, B2B ou ferramenta interna de uma org
+- **Já é demonstrável** — código, testes, UI e fluxo completo; não é só um pitch
+- **Mercado em movimento** — CS2 e ligas amadoras seguem crescendo; quem organizar bem captura comunidade
+- **Barreira técnica já vencida** — parser de demos, filas, analytics e interface prontos
+- **Várias saídas estratégicas** — B2C, B2B, white-label ou ferramenta interna de uma org
 
 ---
 
@@ -262,4 +271,4 @@ Nenhum desses modelos está codificado hoje; o MVP priorizou **produto e tecnolo
 
 ---
 
-*Documento gerado para apoio a conversas com sócios e investidores. Atualize a seção "Estado atual" conforme novas releases.*
+*Documento de apoio a conversas com sócios e investidores. Atualize a seção "Estado atual" a cada release.*

@@ -408,7 +408,12 @@
             <p class="form-hint">Usado para extrair suas estatísticas nas demos pessoais.</p>
           </div>
           <div class="form-group">
-            <label for="position" class="form-label">Posição no CS</label>
+            <label for="riotId" class="form-label">Riot ID</label>
+            <input type="text" id="riotId" formControlName="riotId" class="input-field" placeholder="Nome#TAG">
+            <p class="form-hint">Necessário para Valorant e League of Legends (importação via API Riot).</p>
+          </div>
+          <div class="form-group">
+            <label for="position" class="form-label">Posição principal</label>
             <select id="position" formControlName="position" class="input-field">
               <option value="">Sem posição definida</option>
               <option *ngFor="let pos of positionOptions" [value]="pos">{{ formatPosition(pos) }}</option>

@@ -44,6 +44,7 @@ async function loadMatchContext(matchId: string) {
           id: true,
           ownerId: true,
           format: true,
+          game: true,
           mapPool: true,
           mapVetoEnabled: true,
         },
@@ -134,7 +135,7 @@ export function registerMatchExtras(router: Router): void {
         return;
       }
       const mapId = String(req.body?.map ?? '').trim();
-      if (!isValidMapId(mapId)) {
+      if (!isValidMapId(mapId, match.league.game)) {
         res.status(400).json({ error: 'Mapa inválido' });
         return;
       }

@@ -23,7 +23,7 @@ export type { LeagueSeriesFormat };
       <div class="form-group">
         <span class="form-label">Como definir o vencedor do confronto</span>
         <div class="series-format-options" role="radiogroup" [attr.aria-label]="'Formato para definir vencedor'">
-          <label class="series-format-option" [class.is-selected]="seriesFormat === 'bo1'">
+          <label class="series-format-option" [class.is-selected]="seriesFormat === 'bo1'" *ngIf="availableSeriesFormats.includes('bo1')">
             <input
               type="radio"
               name="seriesFormat"
@@ -36,7 +36,7 @@ export type { LeagueSeriesFormat };
               <span class="series-format-option-desc">Vence quem ganhar o mapa único.</span>
             </span>
           </label>
-          <label class="series-format-option" [class.is-selected]="seriesFormat === 'bo3'">
+          <label class="series-format-option" [class.is-selected]="seriesFormat === 'bo3'" *ngIf="availableSeriesFormats.includes('bo3')">
             <input
               type="radio"
               name="seriesFormat"
@@ -47,6 +47,19 @@ export type { LeagueSeriesFormat };
             <span class="series-format-option-body">
               <strong>Melhor de 3 (BO3)</strong>
               <span class="series-format-option-desc">Vence quem ganhar 2 mapas.</span>
+            </span>
+          </label>
+          <label class="series-format-option" [class.is-selected]="seriesFormat === 'bo5'" *ngIf="availableSeriesFormats.includes('bo5')">
+            <input
+              type="radio"
+              name="seriesFormat"
+              value="bo5"
+              [checked]="seriesFormat === 'bo5'"
+              [disabled]="disabled"
+              (change)="onFormatChange('bo5')">
+            <span class="series-format-option-body">
+              <strong>Melhor de 5 (BO5)</strong>
+              <span class="series-format-option-desc">Vence quem ganhar 3 mapas.</span>
             </span>
           </label>
         </div>
@@ -79,6 +92,7 @@ export type { LeagueSeriesFormat };
         <label class="form-label">Map pool</label>
         <app-map-pool-picker
           [selected]="mapPool"
+          [maps]="gameMaps"
           [disabled]="disabled"
           [hint]="mapPoolHint"
           (selectedChange)="onMapPoolChange($event)">
@@ -153,6 +167,8 @@ export type { LeagueSeriesFormat };
 export class LeagueSeriesMapSettingsComponent {
   @Input() seriesFormat: LeagueSeriesFormat = 'bo1';
   @Input() mapPool: string[] = [...DEFAULT_MAP_POOL];
+  @Input() gameMaps: { value: string; label: string }[] = [];
+  @Input() availableSeriesFormats: LeagueSeriesFormat[] = ['bo1', 'bo3'];
   @Input() mapVetoEnabled = true;
   @Input() disabled = false;
   @Input() scopeHint = '';
@@ -182,10 +198,11 @@ export class LeagueSeriesMapSettingsComponent {
   onFormatChange(format: LeagueSeriesFormat): void {
     this.validationError = '';
     this.seriesFormatChange.emit(format);
-    if (format === 'bo3') {
+    if (format === 'bo3' || format === 'bo5') {
       this.mapVetoEnabledChange.emit(true);
-      if (this.mapPool.length < 5) {
-        this.mapPoolChange.emit([...DEFAULT_MAP_POOL]);
+      const minMaps = format === 'bo5' ? 7 : 5;
+      if (this.mapPool.length < minMaps) {
+        this.mapPoolChange.emit([...this.mapPool.length >= 2 ? this.mapPool : DEFAULT_MAP_POOL]);
       }
     }
   }

@@ -61,6 +61,7 @@ export class LeagueService {
   }
 
   createLeague(data: {
+    game?: string;
     name: string;
     description?: string;
     maxTeams?: number | null;
