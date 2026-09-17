@@ -400,4 +400,23 @@ export class DashboardComponent implements OnInit {
     };
     return labels[status] || status;
   }
+
+  isManagedLeague(league: League): boolean {
+    const userId = this.authService.currentUser?.id;
+    return !!userId && league.ownerId === userId;
+  }
+
+  leagueRoleLabel(league: League): string {
+    if (this.isManagedLeague(league)) return 'Gestor';
+    if (this.authService.isSystemAdmin()) return 'Admin';
+    return 'Participante';
+  }
+
+  get managedLeaguesCount(): number {
+    return this.leagues.filter((league) => this.isManagedLeague(league)).length;
+  }
+
+  get participatingLeaguesCount(): number {
+    return this.leagues.filter((league) => !this.isManagedLeague(league)).length;
+  }
 }

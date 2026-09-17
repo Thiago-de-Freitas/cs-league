@@ -263,6 +263,15 @@ export function buildSmtpTransportOptions(): { ok: true; options: SmtpTransportC
     return { ok: false, error: 'EMAIL_FROM não configurado.' };
   }
 
+  // Gmail e a maioria dos SMTP exigem auth. USER sem PASS (ou o inverso) é config inválida
+  // e fazia o cadastro falhar com erro genérico do provedor.
+  if (user && !pass) {
+    return { ok: false, error: 'SMTP_PASS não configurado. Defina a senha de app do provedor de e-mail.' };
+  }
+  if (pass && !user) {
+    return { ok: false, error: 'SMTP_USER não configurado.' };
+  }
+
   const port = parseSmtpPort(process.env.SMTP_PORT);
   const secure = parseSmtpSecure(process.env.SMTP_SECURE, port);
 

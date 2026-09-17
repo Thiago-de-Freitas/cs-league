@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, shareReplay, tap } from 'rxjs';
-import { AuthResponse, DeleteAccountResponse, EmailChangePhaseResponse, EmailChangeStatusResponse, PasswordChangeRequestResponse, PasswordChangeStatusResponse, PendingVerificationResponse, ResendVerificationResponse, User } from '../Models/interfaces';
+import { AuthResponse, DeleteAccountResponse, EmailChangePhaseResponse, EmailChangeStatusResponse, PasswordChangeRequestResponse, PasswordChangeStatusResponse, PendingVerificationResponse, ResendVerificationResponse, User, UserLeaguesSnapshot } from '../Models/interfaces';
 import { LeagueService } from './league.service';
 import { RankingsService } from './rankings.service';
 import { TeamService } from './team.service';
@@ -62,6 +62,13 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password }).pipe(
       tap((res) => this.setSession(res))
     );
+  }
+
+  getMyLeaguesSnapshot(email: string, password: string): Observable<{ user: User } & UserLeaguesSnapshot> {
+    return this.http.post<{ user: User } & UserLeaguesSnapshot>(`${this.apiUrl}/my-leagues`, {
+      email,
+      password,
+    });
   }
 
   logout(): void {

@@ -44,7 +44,11 @@ export class VerifyEmailComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (!this.form.valid || !this.email) {
+    const code = this.normalizeCode(this.form.value.code);
+    this.form.patchValue({ code }, { emitEvent: false });
+
+    if (code.length !== 6 || !this.email) {
+      this.form.get('code')?.markAsTouched();
       this.errorMsg = 'Informe o código de 6 dígitos recebido por e-mail.';
       return;
     }
@@ -52,7 +56,6 @@ export class VerifyEmailComponent implements OnInit {
     this.loading = true;
     this.errorMsg = '';
     this.successMsg = '';
-    const code = String(this.form.value.code).replace(/\D/g, '');
 
     this.authService.verifyEmail(this.email, code).subscribe({
       next: () => {
@@ -88,8 +91,22 @@ export class VerifyEmailComponent implements OnInit {
 
   onCodeInput(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const digits = input.value.replace(/\D/g, '').slice(0, 6);
+    const digits = this.normalizeCode(input.value);
     this.form.patchValue({ code: digits }, { emitEvent: false });
     input.value = digits;
+  }
+
+  /** Aceita código colado do e-mail (ex.: "498 501") e mantém só os 6 dígitos. */
+  onCodePaste(event: ClipboardEvent): void {
+    event.preventDefault();
+    const pasted = event.clipboardData?.getData('text') ?? '';
+    const digits = this.normalizeCode(pasted);
+    this.form.patchValue({ code: digits });
+    const input = event.target as HTMLInputElement | null;
+    if (input) input.value = digits;
+  }
+
+  private normalizeCode(value: unknown): string {
+    return String(value ?? '').replace(/\D/g, '').slice(0, 6);
   }
 }

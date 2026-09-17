@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, shareReplay, tap } from 'rxjs';
-import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride, PickupLeagueState } from '../Models/interfaces';
+import { League, LeagueScheduleConfig, LeagueScheduleWeekOverride, PickupLeagueState, UserLeaguesSnapshot } from '../Models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class LeagueService {
@@ -35,6 +35,10 @@ export class LeagueService {
       this.openLeaguesCache = this.http.get<League[]>(`${this.apiUrl}/open`).pipe(shareReplay(1));
     }
     return this.openLeaguesCache;
+  }
+
+  getMyLeagues(): Observable<UserLeaguesSnapshot> {
+    return this.http.get<UserLeaguesSnapshot>(`${this.apiUrl}/mine`);
   }
 
   getLeagueById(id: string): Observable<League> {

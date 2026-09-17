@@ -107,6 +107,10 @@
   padding: 0.5rem 0 0.25rem;
 }
 
+.dashboard-league-split {
+  margin: 0 0 0.75rem;
+}
+
 .dashboard-rankings {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);

@@ -24,6 +24,7 @@ export interface Player {
   position?: string | null;
   email?: string;
   steamId?: string | null;
+  avatarUrl?: string | null;
   adr?: number | null;
   matches?: number;
 }
@@ -98,7 +99,27 @@ export interface League {
   pickupBalanceMode?: 'rating' | 'adr' | 'hs_percent' | 'position_mix' | string;
   pickupBalanceModes?: PickupBalanceMode[];
   pickupBalancedAt?: string | null;
+  playerEntries?: LeaguePlayerEntry[];
   syncInfo?: { createdMatches: number; assignedTeams: number };
+}
+
+export interface LeaguePlayerEntry {
+  id: string;
+  userId: string;
+  teamId: string | null;
+  createdAt: string | Date;
+  player: {
+    id: string;
+    name: string;
+    steamId: string | null;
+    position: string | null;
+    avatarUrl: string | null;
+  };
+}
+
+export interface UserLeaguesSnapshot {
+  managed: League[];
+  participating: League[];
 }
 
 export type PickupBalanceMode = 'rating' | 'adr' | 'hs_percent' | 'position_mix';

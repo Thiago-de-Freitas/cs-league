@@ -4,6 +4,12 @@ import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../Services/auth.service';
 
+export function isCredentialCheckRequest(url: string): boolean {
+  return url.includes('/api/auth/login')
+    || url.includes('/api/auth/register')
+    || url.includes('/api/auth/my-leagues');
+}
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -15,8 +21,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
   return next(req).pipe(
     catchError((err) => {
-      const isAuthRoute = req.url.includes('/api/auth/login') || req.url.includes('/api/auth/register');
-      if (err.status === 401 && !isAuthRoute) {
+      if (err.status === 401 && !isCredentialCheckRequest(req.url)) {
         auth.logout();
         router.navigate(['/login']);
       }

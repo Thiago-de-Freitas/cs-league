@@ -1,5 +1,6 @@
 import { getDemoMaxUploadMb } from './demoUploadLimits';
 import { getDemoUploadChunkBytes } from './demoChunkedUpload';
+import { resolveJwtExpiresIn } from './jwt';
 
 function isUnresolvedRailwayRef(value: string): boolean {
   return value.includes('${{') || value.includes('{{');
@@ -113,6 +114,12 @@ export function getEnvConfigStatus() {
         ? cors.split(',').map((o) => normalizeOriginForDisplay(o.trim())).filter(Boolean)
         : [],
       jwtSecret: { set: jwt.length > 0, length: jwt.length, minLengthOk: jwt.length >= 32 },
+      jwtExpiresIn: (() => {
+        const raw = (process.env.JWT_EXPIRES_IN ?? '').trim();
+        const effective = String(resolveJwtExpiresIn(raw || undefined));
+        const invalidZero = raw.length > 0 && effective !== raw && (/^0+[smhdw]?$/i.test(raw) || raw === '0');
+        return { configured: raw.length > 0, raw: raw || null, effective, invalidZero };
+      })(),
       databaseUrl: { set: db.length > 0, unresolvedRef: db ? isUnresolvedRailwayRef(db) : false },
     },
     redis: {

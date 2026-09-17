@@ -36,6 +36,7 @@ import { internalServiceAuth } from './middleware/internalService';
 import { tryResolveDemoFilePath } from './lib/demoStorage';
 import { isValidResourceId } from './lib/pathSafe';
 import { getCoreEnvErrors, getRedisEnvErrors, getRedisWarnings, getProductionEnvErrors, getEnvConfigStatus, logProductionEnvErrors } from './lib/env';
+import { isCorsOriginAllowed, parseOriginList } from './lib/corsOrigin';
 import { getDemoMaxUploadErrorMessage } from './lib/demoUploadLimits';
 import { getBuildInfo, formatBuildLabel, type BuildInfo } from './lib/buildInfo';
 import {
@@ -51,13 +52,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const corsOriginEnv = process.env.CORS_ORIGIN;
-
-const normalizeOrigin = (url: string) => url.replace(/\/+$/, '');
-
-const corsOrigins = (corsOriginEnv || 'http://localhost:4200')
-  .split(',')
-  .map((o) => normalizeOrigin(o.trim()))
-  .filter(Boolean);
+const corsOrigins = parseOriginList(corsOriginEnv);
 
 const app = express();
 // Parser JSON antes das rotas /api/internal/* (worker envia destaques via POST JSON).
@@ -459,7 +454,7 @@ app.post('/api/internal/highlights/render-result', internalServiceAuth, async (r
 // CORS antes de qualquer bloqueio — upload direto front→back exige preflight com Authorization
 const corsOptions = cors({
   origin(origin, callback) {
-    if (!origin || corsOrigins.includes(normalizeOrigin(origin))) {
+    if (isCorsOriginAllowed(origin, corsOrigins)) {
       callback(null, true);
       return;
     }

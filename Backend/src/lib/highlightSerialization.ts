@@ -17,7 +17,10 @@ type HighlightRow = {
   metadata: unknown;
 };
 
-export function serializeHighlight<T extends HighlightRow>(highlight: T, parentKey: Record<string, string>) {
+export function serializeHighlight<T extends HighlightRow, P extends Record<string, string>>(
+  highlight: T,
+  parentKey: P
+) {
   return {
     ...parentKey,
     id: highlight.id,

@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { checkLeagueAccess } from './leagueAccess';
 
 export async function canUserAccessLeague(
   userId: string,
@@ -14,29 +15,27 @@ export async function canUserAccessLeague(
     select: { ownerId: true, registrationOpen: true, status: true },
   });
 
-  if (!league) {
-    return { allowed: false, error: 'Liga não encontrada.' };
-  }
+  const [membership, playerEntry] = league
+    ? await Promise.all([
+        prisma.leagueTeam.findFirst({
+          where: {
+            leagueId,
+            team: { members: { some: { userId } } },
+          },
+          select: { id: true },
+        }),
+        prisma.leaguePlayerEntry.findFirst({
+          where: { leagueId, userId },
+          select: { id: true },
+        }),
+      ])
+    : [null, null];
 
-  if (league.ownerId === userId) {
-    return { allowed: true };
-  }
-
-  if (league.registrationOpen && league.status === 'UPCOMING') {
-    return { allowed: true };
-  }
-
-  const membership = await prisma.leagueTeam.findFirst({
-    where: {
-      leagueId,
-      team: { members: { some: { userId } } },
-    },
-    select: { id: true },
+  return checkLeagueAccess({
+    userId,
+    role,
+    league,
+    isTeamMember: !!membership,
+    isPlayerEntry: !!playerEntry,
   });
-
-  if (membership) {
-    return { allowed: true };
-  }
-
-  return { allowed: false, error: 'Sem permissão para acessar esta liga.' };
 }

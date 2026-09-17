@@ -52,7 +52,7 @@ describe('uploadAssets', () => {
     const dataUrl = encodeUploadedImageToDataUrl({
       originalname: 'logo.png',
       buffer: pngHeader,
-    } as import('express').Express.Multer.File);
+    } as Parameters<typeof encodeUploadedImageToDataUrl>[0]);
     assert.match(dataUrl, /^data:image\/png;base64,/);
   });
 

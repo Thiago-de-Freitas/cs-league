@@ -68,6 +68,25 @@ describe('AuthService', () => {
     expect(service.canManageTeam({ ownerId: 'other', players: [{ id: 'u2' }] })).toBeFalse();
   });
 
+  it('getMyLeaguesSnapshot envia email e senha sem gravar sessão', (done) => {
+    service.getMyLeaguesSnapshot('user@test.com', 'secret').subscribe((snapshot) => {
+      expect(service.isLoggedIn).toBeFalse();
+      expect(snapshot.managed.length).toBe(1);
+      expect(snapshot.participating).toEqual([]);
+      expect(snapshot.user.email).toBe('user@test.com');
+      done();
+    });
+
+    const req = httpMock.expectOne('/api/auth/my-leagues');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'user@test.com', password: 'secret' });
+    req.flush({
+      user: { id: 'u1', email: 'user@test.com', displayName: 'User', role: 'USER' },
+      managed: [{ id: 'l1', name: 'Liga gerida', description: '', teams: [], status: 'ongoing' }],
+      participating: [],
+    });
+  });
+
   it('logout clears session', () => {
     localStorage.setItem('cs_league_token', 'jwt');
     localStorage.setItem('cs_league_user', JSON.stringify({ id: 'u1', role: 'USER' }));

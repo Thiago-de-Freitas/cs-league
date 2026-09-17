@@ -82,9 +82,18 @@
               <button type="button" class="btn btn-primary btn-small" (click)="openCreateLeagueModal()">+ Nova</button>
             </div>
           </div>
+          <p class="meta dashboard-league-split" *ngIf="leagues.length > 0">
+            {{ managedLeaguesCount }} como gestor · {{ participatingLeaguesCount }} como participante
+          </p>
           <ul class="gc-list" *ngIf="leagues.length > 0; else noLeagues">
             <li *ngFor="let league of paginatedLeagues" class="gc-list-item">
               <a [routerLink]="['/league-details', league.id]">{{ league.name }}</a>
+              <span
+                class="badge"
+                [class.badge-orange]="isManagedLeague(league)"
+                [class.badge-gray]="!isManagedLeague(league)">
+                {{ leagueRoleLabel(league) }}
+              </span>
               <span class="badge status-{{ league.status }}">{{ getStatusLabel(league.status) }}</span>
               <span class="meta">{{ formatTeamCapacity(league.teamCount || 0, league.maxTeams) }}</span>
             </li>

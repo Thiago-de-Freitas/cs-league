@@ -16,9 +16,13 @@ describe('buildSmtpTransportOptions', () => {
   it('exige SMTP_HOST e EMAIL_FROM', () => {
     const originalHost = process.env.SMTP_HOST;
     const originalFrom = process.env.EMAIL_FROM;
+    const originalUser = process.env.SMTP_USER;
+    const originalPass = process.env.SMTP_PASS;
     try {
       delete process.env.SMTP_HOST;
       delete process.env.EMAIL_FROM;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASS;
       const missingHost = buildSmtpTransportOptions();
       assert.equal(missingHost.ok, false);
       if (!missingHost.ok) {
@@ -33,6 +37,35 @@ describe('buildSmtpTransportOptions', () => {
       else process.env.SMTP_HOST = originalHost;
       if (originalFrom === undefined) delete process.env.EMAIL_FROM;
       else process.env.EMAIL_FROM = originalFrom;
+      if (originalUser === undefined) delete process.env.SMTP_USER;
+      else process.env.SMTP_USER = originalUser;
+      if (originalPass === undefined) delete process.env.SMTP_PASS;
+      else process.env.SMTP_PASS = originalPass;
+    }
+  });
+
+  it('rejeita SMTP_USER sem SMTP_PASS (quebra o cadastro)', () => {
+    const snapshot = {
+      SMTP_HOST: process.env.SMTP_HOST,
+      EMAIL_FROM: process.env.EMAIL_FROM,
+      SMTP_USER: process.env.SMTP_USER,
+      SMTP_PASS: process.env.SMTP_PASS,
+    };
+    try {
+      process.env.SMTP_HOST = 'smtp.gmail.com';
+      process.env.EMAIL_FROM = 'Gamers League <noreply@test.com>';
+      process.env.SMTP_USER = 'user@test.com';
+      process.env.SMTP_PASS = '';
+      const built = buildSmtpTransportOptions();
+      assert.equal(built.ok, false);
+      if (!built.ok) {
+        assert.match(built.error, /SMTP_PASS/);
+      }
+    } finally {
+      for (const [key, value] of Object.entries(snapshot)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
 

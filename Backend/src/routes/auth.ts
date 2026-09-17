@@ -20,8 +20,6 @@ import {
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
 import {
-  canUserLogin,
-  DEACTIVATED_ACCOUNT_MESSAGE,
   isParticipationBanned,
 } from '../lib/userModeration';
 import {
@@ -46,6 +44,8 @@ import {
 } from '../lib/passwordChange';
 import { deleteUserAndData } from '../lib/deleteUser';
 import { parseRiotId, syncRiotIdToUser } from '../lib/userGameAccount';
+import { authenticateWithPassword, resolveLoginIdentifier } from '../lib/authenticateUser';
+import { getUserLeaguesSnapshot } from '../lib/userLeaguesSnapshot';
 
 const router = Router();
 router.use(auditResponseMiddleware);
@@ -54,8 +54,6 @@ const comparePassword = promisify(bcrypt.compare);
 const BCRYPT_ROUNDS = 12;
 const MAX_DISPLAY_NAME_LENGTH = 100;
 const MAX_EMAIL_LENGTH = 255;
-/** Hash fixo para equalizar tempo de resposta no login quando o e-mail não existe. */
-const DUMMY_PASSWORD_HASH = '$2a$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW';
 const CHANGE_EMAIL_START_ERROR = 'Não foi possível iniciar a troca. Verifique a senha e o novo e-mail.';
 const DELETE_ACCOUNT_CONFIRM = 'EXCLUIR CONTA';
 
@@ -206,53 +204,37 @@ router.post('/register', authRateLimiter, async (req, res: Response) => {
   }
 });
 
+function respondPasswordAuthFailure(
+  req: Parameters<typeof setAuditContext>[0],
+  res: Response,
+  auditAction: 'auth.login.failed' | 'auth.my_leagues.failed',
+  result: Extract<Awaited<ReturnType<typeof authenticateWithPassword>>, { ok: false }>
+): void {
+  setAuditContext(req, audit.of(auditAction, 'User', result.userId, {
+    metadata: { email: result.auditEmail },
+    success: false,
+    errorCode: result.errorCode,
+  }));
+  if (result.errorCode === 'EMAIL_NOT_VERIFIED') {
+    res.status(403).json({
+      error: result.error,
+      code: 'EMAIL_NOT_VERIFIED',
+      email: result.maskedEmail,
+    });
+    return;
+  }
+  res.status(result.status).json({ error: result.error });
+}
+
 router.post('/login', authRateLimiter, async (req, res: Response) => {
   try {
-    const { email, password } = req.body;
-    const normalizedEmail = normalizeEmailInput(email);
-    const normalizedPassword = parsePasswordInput(password);
-    if (!normalizedEmail || !normalizedPassword) {
-      res.status(400).json({ error: 'Credenciais inválidas' });
+    const result = await authenticateWithPassword(req.body?.email, req.body?.password);
+    if (!result.ok) {
+      respondPasswordAuthFailure(req, res, 'auth.login.failed', result);
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
-    const valid = await comparePassword(normalizedPassword, passwordHash);
-    if (!user || !valid) {
-      setAuditContext(req, audit.of('auth.login.failed', 'User', user?.id ?? null, {
-        metadata: { email: normalizedEmail },
-        success: false,
-        errorCode: 'INVALID_CREDENTIALS',
-      }));
-      res.status(401).json({ error: 'Credenciais inválidas' });
-      return;
-    }
-
-    if (!canUserLogin(user)) {
-      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
-        metadata: { email: user.email },
-        success: false,
-        errorCode: 'ACCOUNT_DEACTIVATED',
-      }));
-      res.status(403).json({ error: DEACTIVATED_ACCOUNT_MESSAGE });
-      return;
-    }
-
-    if (!user.emailVerified) {
-      setAuditContext(req, audit.of('auth.login.failed', 'User', user.id, {
-        metadata: { email: user.email },
-        success: false,
-        errorCode: 'EMAIL_NOT_VERIFIED',
-      }));
-      res.status(403).json({
-        error: 'Confirme seu e-mail com o código enviado antes de entrar.',
-        code: 'EMAIL_NOT_VERIFIED',
-        email: maskEmail(user.email),
-      });
-      return;
-    }
-
+    const user = result.user;
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
     setAuditContext(req, audit.of('auth.login.success', 'User', user.id, {
       after: { email: user.email, displayName: user.displayName, role: user.role },
@@ -261,6 +243,36 @@ router.post('/login', authRateLimiter, async (req, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao fazer login' });
+  }
+});
+
+router.post('/my-leagues', authRateLimiter, async (req, res: Response) => {
+  try {
+    const result = await authenticateWithPassword(
+      resolveLoginIdentifier(req.body ?? {}),
+      req.body?.password
+    );
+    if (!result.ok) {
+      respondPasswordAuthFailure(req, res, 'auth.my_leagues.failed', result);
+      return;
+    }
+
+    const user = result.user;
+    const snapshot = await getUserLeaguesSnapshot(user.id);
+    setAuditContext(req, audit.of('auth.my_leagues.success', 'User', user.id, {
+      metadata: {
+        managedCount: snapshot.managed.length,
+        participatingCount: snapshot.participating.length,
+      },
+    }));
+    res.json({
+      user: sanitizeUser(user),
+      managed: snapshot.managed,
+      participating: snapshot.participating,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar ligas do usuário' });
   }
 });
 

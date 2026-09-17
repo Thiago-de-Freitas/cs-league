@@ -35,6 +35,28 @@ describe('LeagueService', () => {
     req.flush([]);
   });
 
+  it('getOpenLeagues requests open leagues', () => {
+    service.getOpenLeagues().subscribe();
+    const req = httpMock.expectOne('/api/leagues/open');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('getMyLeagues requests snapshot gerido vs participante', (done) => {
+    service.getMyLeagues().subscribe((snapshot) => {
+      expect(snapshot.managed.length).toBe(1);
+      expect(snapshot.participating.length).toBe(1);
+      expect(snapshot.managed[0].name).toBe('Liga gerida');
+      done();
+    });
+    const req = httpMock.expectOne('/api/leagues/mine');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      managed: [{ id: 'l1', name: 'Liga gerida', description: '', teams: [], status: 'ongoing' }],
+      participating: [{ id: 'l2', name: 'Liga jogada', description: '', teams: [], status: 'upcoming' }],
+    });
+  });
+
   it('deleteLeague calls DELETE endpoint', () => {
     service.deleteLeague('league-1').subscribe();
     const req = httpMock.expectOne('/api/leagues/league-1');

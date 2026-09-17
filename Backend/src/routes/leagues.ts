@@ -18,7 +18,6 @@ import { canUserRegisterTeam } from '../lib/leagueRegistration';
 import { isAdmin } from '../lib/permissions';
 import {
   areAllGroupMatchesComplete,
-  computeGroupStandings,
   countRoundRobinMatches,
   distributeTeamsIntoGroups,
   generateRoundRobinPairings,
@@ -43,15 +42,21 @@ import {
 import { applyGroupMatchSchedule, leagueToScheduleConfig, loadWeekOverrides, syncLeagueEndDate } from '../lib/applyLeagueSchedule';
 import { deleteLeagueCompletely } from '../lib/leagueDeletion';
 import { releasePickupPlayers, PICKUP_LEAGUE_FIXED_TEAM_COUNT, ensureEphemeralSquads } from '../lib/pickupLeague';
-import { roundDifference } from '../lib/matchResult';
-import { getAverageAdrBySteamIds, type PlayerAdrSummary } from '../lib/teamMemberStats';
-import { publicUploadUrlForResponse } from '../lib/uploadAssets';
+import { getUserLeaguesSnapshot } from '../lib/userLeaguesSnapshot';
+import {
+  buildAdrMapForLeagueTeams,
+  formatLeague,
+  formatTeamFromLeagueTeam,
+  getLeagueWithDetails,
+  getMatchIdsWithGeneralDemo,
+  teamWithRosterSelect,
+} from '../lib/leagueDetails';
 import { auditResponseMiddleware } from '../middleware/auditResponse';
 import { audit, setAuditContext } from '../lib/audit';
 import { buildAvailableTeamsWhere } from '../lib/leagueAvailableTeams';
 import { syncGroupStageMatches } from '../lib/syncGroupStageMatches';
 import { afterMatchCreated, initializeMatchMapVeto, upsertMatchLineup } from '../lib/mapVetoService';
-import { getMapLabel, parseMapPool, validateMapPoolForSeriesFormat } from '../lib/cs2Maps';
+import { parseMapPool, validateMapPoolForSeriesFormat } from '../lib/cs2Maps';
 import { createPlayoffSlot } from '../lib/playoffMatchFactory';
 import { createMatchSeries } from '../lib/matchSeriesService';
 import {
@@ -61,304 +66,10 @@ import {
 } from '../lib/pickupBalance';
 import leaguePickupRoutes from './leaguePickup';
 import { validateLeagueGameSettings } from '../lib/games/leagueGameValidation';
-import { getGameConfig } from '../lib/games';
-import { usesRoundTiebreaker } from '../lib/games/matchScoring';
 
 const router = Router();
 router.use(leaguePickupRoutes);
 router.use(auditResponseMiddleware);
-
-const teamWithRosterSelect = {
-  id: true,
-  name: true,
-  tag: true,
-  logoUrl: true,
-  ownerId: true,
-  members: {
-    select: {
-      role: true,
-      memberTag: true,
-      user: { select: { id: true, displayName: true, steamId: true, position: true } },
-    },
-  },
-} as const;
-
-const matchWithTeamsSelect = {
-  team1: { select: { id: true, name: true, tag: true } },
-  team2: { select: { id: true, name: true, tag: true } },
-  winner: { select: { id: true, name: true, tag: true } },
-  series: {
-    select: {
-      id: true,
-      format: true,
-      team1MapWins: true,
-      team2MapWins: true,
-      winnerId: true,
-      status: true,
-    },
-  },
-} as const;
-
-async function getMatchIdsWithGeneralDemo(leagueId: string): Promise<Set<string>> {
-  const demos = await prisma.demo.findMany({
-    where: {
-      isPersonal: false,
-      status: { in: ['PENDING', 'PROCESSING', 'COMPLETED'] },
-      match: { leagueId },
-    },
-    select: { matchId: true },
-  });
-  return new Set(demos.map((d) => d.matchId).filter((id): id is string => !!id));
-}
-
-async function getLeagueWithDetails(leagueId: string) {
-  return prisma.league.findUnique({
-    where: { id: leagueId },
-    include: {
-      owner: { select: { id: true, displayName: true } },
-      groups: {
-        orderBy: { order: 'asc' },
-        include: {
-          teams: {
-            include: {
-              team: { select: teamWithRosterSelect },
-            },
-          },
-        },
-      },
-      teams: {
-        include: {
-          team: { select: teamWithRosterSelect },
-        },
-        orderBy: [{ seed: 'asc' }, { points: 'desc' }, { wins: 'desc' }],
-      },
-      matches: {
-        include: matchWithTeamsSelect,
-        orderBy: [
-          { phase: 'asc' },
-          { round: 'asc' },
-          { groupRound: 'asc' },
-          { bracketPosition: 'asc' },
-          { seriesGameNumber: 'asc' },
-          { createdAt: 'asc' },
-        ],
-      },
-    },
-  });
-}
-
-function computeTeamAdr(players: { adr: number | null }[]): number | null {
-  const values = players.map((p) => p.adr).filter((v): v is number => v != null);
-  if (values.length === 0) return null;
-  const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
-  return Math.round(avg * 10) / 10;
-}
-
-function collectSteamIdsFromRosters(
-  leagueTeams: Array<{
-    team: { members: { user: { steamId: string | null } }[] };
-  }>
-): string[] {
-  return leagueTeams.flatMap((lt) =>
-    lt.team.members.map((m) => m.user.steamId).filter((id): id is string => !!id?.trim())
-  );
-}
-
-async function buildAdrMapForLeagueTeams(
-  leagueTeams: Array<{
-    team: { members: { user: { steamId: string | null } }[] };
-  }>
-): Promise<Map<string, PlayerAdrSummary>> {
-  return getAverageAdrBySteamIds(collectSteamIdsFromRosters(leagueTeams));
-}
-
-function formatTeamFromLeagueTeam(
-  lt: {
-  team: {
-    id: string;
-    name: string;
-    tag: string;
-    logoUrl: string | null;
-    ownerId: string;
-    members: {
-      user: { id: string; displayName: string; steamId: string | null; position: string | null };
-      role: string;
-      memberTag: string | null;
-    }[];
-  };
-  wins: number;
-  losses: number;
-  draws: number;
-  points: number;
-  roundsWon: number;
-  roundsLost: number;
-  seed: number | null;
-  groupId?: string | null;
-},
-  adrBySteam: Map<string, PlayerAdrSummary> = new Map()
-) {
-  const players = lt.team.members.map((m) => {
-    const steamKey = m.user.steamId?.trim().toLowerCase() ?? '';
-    const adrSummary = steamKey ? adrBySteam.get(steamKey) : undefined;
-    return {
-      id: m.user.id,
-      name: m.user.displayName,
-      IGN: m.user.displayName,
-      role: m.role,
-      memberTag: m.memberTag,
-      position: m.user.position,
-      adr: adrSummary?.adr ?? null,
-      matches: adrSummary?.matches ?? 0,
-    };
-  });
-
-  return {
-    id: lt.team.id,
-    name: lt.team.name,
-    tag: lt.team.tag,
-    logoUrl: publicUploadUrlForResponse(lt.team.logoUrl),
-    ownerId: lt.team.ownerId,
-    wins: lt.wins,
-    losses: lt.losses,
-    draws: lt.draws,
-    points: lt.points,
-    roundsWon: lt.roundsWon,
-    roundsLost: lt.roundsLost,
-    roundDifference: roundDifference(lt.roundsWon, lt.roundsLost),
-    seed: lt.seed,
-    groupId: lt.groupId ?? null,
-    teamAdr: computeTeamAdr(players),
-    players,
-  };
-}
-
-function formatLeague(
-  league: NonNullable<Awaited<ReturnType<typeof getLeagueWithDetails>>>,
-  matchIdsWithDemo: Set<string> = new Set(),
-  weekOverrides: { weekStart: string; daysOfWeek: number[] }[] = [],
-  adrBySteam: Map<string, PlayerAdrSummary> = new Map()
-) {
-  const groupMatches = league.matches.filter((m) => m.phase === 'GROUP');
-  const playoffMatches = league.matches.filter((m) => m.phase === 'PLAYOFF');
-  const groupPhaseComplete = groupMatches.length > 0 && areAllGroupMatchesComplete(groupMatches);
-  const playoffGenerated = playoffMatches.some((m) => m.round > 0);
-
-  const matchesByGroupId = new Map<string, typeof league.matches>();
-  for (const m of groupMatches) {
-    if (!m.groupId) continue;
-    const list = matchesByGroupId.get(m.groupId) ?? [];
-    list.push(m);
-    matchesByGroupId.set(m.groupId, list);
-  }
-
-  const formatMatch = (m: (typeof league.matches)[number]) => ({
-    id: m.id,
-    leagueId: m.leagueId,
-    team1: m.team1,
-    team2: m.team2,
-    winner: m.winner,
-    winnerId: m.winnerId,
-    status: m.status.toLowerCase(),
-    phase: m.phase.toLowerCase(),
-    groupId: m.groupId,
-    groupRound: m.groupRound,
-    round: m.round,
-    bracketPosition: m.bracketPosition,
-    map: m.map,
-    mapLabel: m.map ? getMapLabel(m.map, league.game) : null,
-    seriesId: m.seriesId,
-    seriesGameNumber: m.seriesGameNumber,
-    seriesStatus: m.series?.status?.toLowerCase() ?? null,
-    seriesWinnerId: m.series?.winnerId ?? null,
-    team1MapWins: m.series?.team1MapWins ?? null,
-    team2MapWins: m.series?.team2MapWins ?? null,
-    team1Rounds: m.team1Rounds,
-    team2Rounds: m.team2Rounds,
-    scheduledAt: m.scheduledAt,
-    playedAt: m.playedAt,
-    hasGeneralDemo: matchIdsWithDemo.has(m.id),
-  });
-
-  const groups = league.groups.map((g) => {
-    const gMatches = matchesByGroupId.get(g.id) ?? [];
-    const teamIds = g.teams.map((lt) => lt.teamId);
-    const standings = computeGroupStandings(
-      teamIds,
-      gMatches.map((m) => ({
-        team1Id: m.team1Id,
-        team2Id: m.team2Id,
-        winnerId: m.winnerId,
-        status: m.status,
-        team1Rounds: m.team1Rounds,
-        team2Rounds: m.team2Rounds,
-      })),
-      { useRoundTiebreaker: usesRoundTiebreaker(league.game) }
-    );
-    return {
-      id: g.id,
-      name: g.name,
-      order: g.order,
-      teams: g.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
-      standings: standings.map((s) => {
-        const lt = g.teams.find((t) => t.teamId === s.teamId);
-        return {
-          ...s,
-          team: lt
-            ? { id: lt.team.id, name: lt.team.name, tag: lt.team.tag }
-            : { id: s.teamId, name: '', tag: '' },
-        };
-      }),
-      matches: gMatches.map(formatMatch),
-      expectedMatches: countRoundRobinMatches(teamIds.length, league.homeAndAway),
-      matchesComplete: gMatches.length > 0 && areAllGroupMatchesComplete(gMatches),
-    };
-  });
-
-  return {
-    id: league.id,
-    name: league.name,
-    description: league.description,
-    game: league.game.toLowerCase(),
-    gameLabel: getGameConfig(league.game).label,
-    status: league.status.toLowerCase(),
-    format: league.format.toLowerCase(),
-    maxTeams: league.maxTeams,
-    bracketSize: league.bracketSize,
-    groupCount: league.groupCount,
-    advancePerGroup: league.advancePerGroup,
-    homeAndAway: league.homeAndAway,
-    matchesPerMatchDay: league.matchesPerMatchDay,
-    effectiveBracketSize: resolveBracketSize(league.teams.length, league.bracketSize),
-    registrationOpen: league.registrationOpen,
-    groupPhaseGenerated: groupMatches.length > 0,
-    groupPhaseComplete,
-    playoffGenerated,
-    ownerId: league.ownerId,
-    owner: league.owner,
-    startDate: league.startDate,
-    endDate: league.endDate,
-    defaultMatchDays: parseDefaultMatchDays(league.defaultMatchDays) ?? [],
-    defaultMatchTime: league.defaultMatchTime,
-    scheduleTimezone: league.scheduleTimezone,
-    scheduleConfigured: isScheduleConfigured(leagueToScheduleConfig(league)),
-    scheduleWeekOverrides: weekOverrides,
-    mapPool: parseMapPool(league.mapPool, league.game),
-    mapVetoEnabled: league.mapVetoEnabled,
-    seriesFormat: league.seriesFormat.toLowerCase(),
-    pickupTeamCount: league.pickupTeamCount,
-    pickupPlayersPerTeam: league.pickupPlayersPerTeam,
-    pickupBalanceMode: league.pickupBalanceMode?.toLowerCase() ?? 'rating',
-    pickupBalanceModes: (league.pickupBalanceModes?.length
-      ? league.pickupBalanceModes
-      : [league.pickupBalanceMode ?? 'RATING']
-    ).map((mode) => mode.toLowerCase()),
-    pickupBalancedAt: league.pickupBalancedAt,
-    groups,
-    teams: league.teams.map((lt) => formatTeamFromLeagueTeam(lt, adrBySteam)),
-    matches: league.matches.map(formatMatch),
-    createdAt: league.createdAt,
-  };
-}
 
 async function assertLeagueOwner(leagueId: string, userId: string, role: string) {
   const league = await prisma.league.findUnique({ where: { id: leagueId } });
@@ -396,6 +107,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
                 OR: [
                   { ownerId: userId },
                   { teams: { some: { team: { members: { some: { userId } } } } } },
+                  { playerEntries: { some: { userId } } },
                 ],
               },
               ...(includeArchived ? [] : [{ status: { not: 'ARCHIVED' as const } }]),
@@ -479,6 +191,16 @@ router.get('/open', authMiddleware, async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error('GET /api/leagues/open', err);
     res.status(500).json({ error: 'Erro ao listar ligas abertas' });
+  }
+});
+
+router.get('/mine', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const snapshot = await getUserLeaguesSnapshot(req.user!.userId);
+    res.json(snapshot);
+  } catch (err) {
+    console.error('GET /api/leagues/mine', err);
+    res.status(500).json({ error: 'Erro ao buscar ligas do usuário' });
   }
 });
 

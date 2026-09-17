@@ -1,3 +1,4 @@
+/// <reference types="jasmine" />
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -19,7 +20,7 @@ describe('AppComponent', () => {
           useValue: {
             isLoggedIn: false,
             getMe: () => of(null),
-            logout: jasmine.createSpy('logout'),
+            logout: () => undefined,
           },
         },
       ],

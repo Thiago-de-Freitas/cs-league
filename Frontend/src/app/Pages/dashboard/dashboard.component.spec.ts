@@ -19,7 +19,11 @@ describe('DashboardComponent', () => {
     rankingsServiceSpy = jasmine.createSpyObj('RankingsService', ['getPlayerRankings', 'getTeamRankings', 'invalidateAll']);
     leagueServiceSpy = jasmine.createSpyObj('LeagueService', ['getLeagues', 'getOpenLeagues']);
     teamServiceSpy = jasmine.createSpyObj('TeamService', ['getTeams', 'getPendingInvites']);
-    authServiceSpy = jasmine.createSpyObj('AuthService', [], { currentUser$: of({ displayName: 'Tester' }) });
+    authServiceSpy = jasmine.createSpyObj('AuthService', ['isSystemAdmin'], {
+      currentUser$: of({ id: 'u1', displayName: 'Tester', email: 't@test.com', role: 'USER' }),
+      currentUser: { id: 'u1', displayName: 'Tester', email: 't@test.com', role: 'USER' },
+    });
+    authServiceSpy.isSystemAdmin.and.returnValue(false);
 
     leagueServiceSpy.getLeagues.and.returnValue(of([]));
     leagueServiceSpy.getOpenLeagues.and.returnValue(of([]));
@@ -199,5 +203,23 @@ describe('DashboardComponent', () => {
     expect(html.textContent).toContain('Rankings');
     expect(html.textContent).toContain('Minhas ligas');
     expect(html.textContent).toContain('Meus times');
+  });
+
+  it('separa ligas geridas das que o usuário participa', () => {
+    component.leagues = [
+      { id: 'owned', name: 'Minha Liga', description: '', teams: [], status: 'ongoing', ownerId: 'u1' },
+      { id: 'playing', name: 'Outra Liga', description: '', teams: [], status: 'upcoming', ownerId: 'u2' },
+    ];
+    fixture.detectChanges();
+
+    expect(component.managedLeaguesCount).toBe(1);
+    expect(component.participatingLeaguesCount).toBe(1);
+    expect(component.leagueRoleLabel(component.leagues[0])).toBe('Gestor');
+    expect(component.leagueRoleLabel(component.leagues[1])).toBe('Participante');
+
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('1 como gestor · 1 como participante');
+    expect(html.textContent).toContain('Gestor');
+    expect(html.textContent).toContain('Participante');
   });
 });

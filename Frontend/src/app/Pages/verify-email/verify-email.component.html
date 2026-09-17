@@ -18,11 +18,12 @@
           type="text"
           inputmode="numeric"
           autocomplete="one-time-code"
-          maxlength="6"
+          maxlength="8"
           class="input-field verification-code-input"
           placeholder="000000"
           formControlName="code"
           (input)="onCodeInput($event)"
+          (paste)="onCodePaste($event)"
           [disabled]="loading">
         <div *ngIf="form.get('code')?.invalid && form.get('code')?.touched" class="error-message">
           Informe os 6 dígitos do código.
