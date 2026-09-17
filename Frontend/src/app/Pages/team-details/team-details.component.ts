@@ -33,6 +33,8 @@ export class TeamDetailsComponent implements OnInit {
   showDeleteConfirm = false;
   uploadingLogo = false;
   teamLogoBroken = false;
+  editName = '';
+  savingName = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -57,6 +59,7 @@ export class TeamDetailsComponent implements OnInit {
     this.teamService.getTeamById(id).subscribe({
       next: (team) => {
         this.team = team;
+        this.editName = team.name;
         this.isOwner = this.authService.isTeamOwner(team.ownerId || '');
         this.isSystemAdmin = this.authService.isSystemAdmin();
         this.teamLogoBroken = false;
@@ -79,6 +82,34 @@ export class TeamDetailsComponent implements OnInit {
 
   get canManageRoster(): boolean {
     return this.isOwner;
+  }
+
+  get isNameDirty(): boolean {
+    return this.editName.trim() !== (this.team?.name ?? '');
+  }
+
+  saveTeamName(): void {
+    if (!this.teamId || !this.team || !this.isOwner) return;
+    const name = this.editName.trim();
+    if (!name || name.length > 100) {
+      this.notify.error('Informe um nome com até 100 caracteres.', 'Nome do time');
+      return;
+    }
+    if (name === this.team.name) return;
+
+    this.savingName = true;
+    this.teamService.updateTeam(this.teamId, { name }).subscribe({
+      next: (team) => {
+        this.team = team;
+        this.editName = team.name;
+        this.savingName = false;
+        this.notify.success('Nome do time atualizado.', 'Time');
+      },
+      error: (err) => {
+        this.savingName = false;
+        this.notify.error(err.error?.error || 'Erro ao atualizar o nome do time.');
+      },
+    });
   }
 
   formatMemberRole(role: string): string {

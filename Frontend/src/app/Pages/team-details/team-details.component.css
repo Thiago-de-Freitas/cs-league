@@ -53,6 +53,22 @@
   pointer-events: none;
 }
 
+.team-name-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.team-name-form-row .input-field {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+}
+
+.team-name-form-row .btn {
+  flex: 0 0 auto;
+}
+
 .team-stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .team-tag-badge {
   font-family: var(--font-display);
@@ -168,6 +184,14 @@
   }
 
   .team-logo-actions {
+    width: 100%;
+  }
+
+  .team-name-form-row {
+    width: 100%;
+  }
+
+  .team-name-form-row .btn {
     width: 100%;
   }
 

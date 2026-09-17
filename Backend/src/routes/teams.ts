@@ -6,7 +6,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { participationGuard } from '../middleware/participationGuard';
 import { isAdmin } from '../lib/permissions';
 import { TEAM_LEAGUE_STATS_WHERE, sumLeagueTeamStats } from '../lib/teamStats';
-import { parseOwnerAsMember } from '../lib/teamCreation';
+import { parseOwnerAsMember, parseTeamName } from '../lib/teamCreation';
 import { getAverageAdrBySteamIds } from '../lib/teamMemberStats';
 import {
   deleteLegacyUploadFile,
@@ -256,11 +256,12 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     const { name, tag } = req.body;
     const data: { name?: string; tag?: string } = {};
     if (name !== undefined) {
-      if (typeof name !== 'string' || !name.trim() || name.length > 100) {
+      const parsedName = parseTeamName(name);
+      if (!parsedName) {
         res.status(400).json({ error: 'Nome inválido' });
         return;
       }
-      data.name = name.trim();
+      data.name = parsedName;
     }
     if (tag !== undefined) {
       if (typeof tag !== 'string' || !tag.trim() || tag.length > 10) {

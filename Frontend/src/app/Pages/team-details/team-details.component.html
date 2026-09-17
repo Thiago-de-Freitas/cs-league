@@ -23,6 +23,32 @@
         </div>
       </div>
 
+      <div *ngIf="isOwner" class="team-name-section mt-4">
+        <h2 class="section-title">Nome do time</h2>
+        <p class="meta mb-4">Só o criador do time (ou um administrador) pode alterar o nome.</p>
+        <form class="team-name-form" (ngSubmit)="saveTeamName()">
+          <label for="edit-team-name" class="form-label">Nome</label>
+          <div class="team-name-form-row">
+            <input
+              id="edit-team-name"
+              name="editTeamName"
+              type="text"
+              class="input-field"
+              [(ngModel)]="editName"
+              maxlength="100"
+              required
+              [disabled]="savingName"
+              autocomplete="off">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="savingName || !isNameDirty">
+              {{ savingName ? 'Salvando...' : 'Salvar nome' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div *ngIf="isOwner" class="team-logo-section mt-4">
         <h2 class="section-title">Logo do Time</h2>
         <p class="meta mb-4">PNG, JPG, WEBP ou GIF — máximo 2 MB.</p>

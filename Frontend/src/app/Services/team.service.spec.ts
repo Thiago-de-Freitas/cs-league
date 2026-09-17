@@ -58,6 +58,24 @@ describe('TeamService', () => {
     httpMock.expectNone('/api/teams');
   });
 
+  it('updateTeam envia PUT com o nome e invalida o cache', (done) => {
+    service.getTeams().subscribe();
+    httpMock.expectOne('/api/teams').flush([]);
+
+    service.updateTeam('t1', { name: 'Nova FURIA' }).subscribe({
+      next: (team) => {
+        expect(team.name).toBe('Nova FURIA');
+        service.getTeams().subscribe(() => done());
+        httpMock.expectOne('/api/teams').flush([]);
+      },
+    });
+
+    const req = httpMock.expectOne('/api/teams/t1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ name: 'Nova FURIA' });
+    req.flush({ id: 't1', name: 'Nova FURIA', tag: 'FUR', players: [] });
+  });
+
   it('deleteTeam invalidates cache', (done) => {
     service.getTeams().subscribe();
     httpMock.expectOne('/api/teams').flush([]);
