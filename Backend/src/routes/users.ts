@@ -206,7 +206,7 @@ router.get('/admin/unregistered-stats', authMiddleware, async (req: AuthRequest,
   try {
     if (!requireAdmin(req, res)) return;
 
-    const { listUnregisteredPlayerStatGroups } = await import('../lib/unregisteredPlayerStats');
+    const { listUnregisteredPlayerStatGroups } = await import('../lib/unregisteredPlayerStats.js');
     const result = await listUnregisteredPlayerStatGroups();
     res.json(result);
   } catch (err) {
@@ -220,7 +220,7 @@ router.delete('/admin/unregistered-stats', authMiddleware, async (req: AuthReque
     if (!requireAdmin(req, res)) return;
 
     const groupKey = typeof req.query.groupKey === 'string' ? req.query.groupKey.trim() : '';
-    const { deleteUnregisteredPlayerStats } = await import('../lib/unregisteredPlayerStats');
+    const { deleteUnregisteredPlayerStats } = await import('../lib/unregisteredPlayerStats.js');
     const result = await deleteUnregisteredPlayerStats(groupKey || undefined);
 
     setAuditContext(
